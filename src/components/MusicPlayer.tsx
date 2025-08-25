@@ -222,11 +222,11 @@ export const MusicPlayer = ({
         </div>
       )}
 
-      {/* Song Info */}
+      {/* Song Info - Hidden in Game Mode */}
       <div className="text-center mb-4">
         <div className="text-6xl mb-3 animate-chicken-walk">🎵</div>
-        <h3 className="text-xl font-bold text-white mb-1">{songTitle}</h3>
-        <p className="text-white/80">{artist}</p>
+        <h3 className="text-xl font-bold text-white mb-1">Música Misteriosa</h3>
+        <p className="text-white/80">🤔 Que música será esta?</p>
       </div>
 
       {/* Controls */}
