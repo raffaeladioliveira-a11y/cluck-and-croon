@@ -31,16 +31,25 @@ export const MusicPlayer = ({
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // URLs de músicas de exemplo com fallbacks mais confiáveis
+  // URLs de áudio funcionais e confiáveis
   const audioSources = [
-    "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Kangaroo_MusiQue_-_The_Neverwritten_Role_Playing_Game.mp3",
-    "https://commondatastorage.googleapis.com/codeskulptor-assets/week7-button.m4a",
-    "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav"
+    "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
+    "https://samplelib.com/lib/preview/mp3/sample-3s.mp3",
+    "https://file-examples.com/storage/fe68c8b7817ed82ba0c4c91/2017/11/file_example_MP3_700KB.mp3"
   ];
   
   const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
   const [hasAudioError, setHasAudioError] = useState(false);
-  const defaultAudioUrl = audioUrl || audioSources[currentSourceIndex];
+  
+  // Usar URL do banco ou fallback
+  const getEffectiveAudioUrl = () => {
+    if (audioUrl && audioUrl.trim() !== '') {
+      return audioUrl;
+    }
+    return audioSources[currentSourceIndex];
+  };
+  
+  const defaultAudioUrl = getEffectiveAudioUrl();
 
   // Simulação de reprodução quando não há áudio real
   const simulatePlayback = () => {
