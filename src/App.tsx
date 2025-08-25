@@ -9,6 +9,7 @@ import GameLobby from "./pages/GameLobby";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import GameArena from "./pages/GameArena";
+import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="/lobby/:roomCode" element={<GameLobby />} />
           <Route path="/game/:roomCode" element={<GameArena />} />
           <Route path="/admin" element={<AdminLogin />} />
