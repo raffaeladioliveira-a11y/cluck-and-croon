@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
@@ -15,14 +16,61 @@ interface Player {
 }
 
 export default function GameLobby() {
-  const [roomCode] = useState("GAL123");
-  const [players, setPlayers] = useState<Player[]>([
-    { id: "1", name: "Galinha Pititica", avatar: "🐔", isHost: true },
-    { id: "2", name: "Galo Carijó", avatar: "🐓", isHost: false },
-    { id: "3", name: "Pintinho Pio", avatar: "🐣", isHost: false },
-  ]);
+  const { roomCode } = useParams<{ roomCode: string }>();
+  const navigate = useNavigate();
+  const [players, setPlayers] = useState<Player[]>([]);
+
+  // Carregar dados do jogador e simular outros jogadores
+  useEffect(() => {
+    const playerData = localStorage.getItem('playerData');
+    if (!playerData) {
+      // Se não há dados do jogador, redirecionar para home
+      navigate('/');
+      return;
+    }
+
+    const player = JSON.parse(playerData);
+    
+    // Simular outros jogadores no galinheiro
+    const mockPlayers: Player[] = [
+      { 
+        id: "current", 
+        name: player.name, 
+        avatar: player.avatar, 
+        isHost: player.isHost 
+      },
+    ];
+
+    // Adicionar alguns jogadores simulados se não for o host
+    if (!player.isHost) {
+      mockPlayers.unshift(
+        { id: "host", name: "Fazendeiro Silva", avatar: "👑🐓", isHost: true }
+      );
+    }
+
+    // Adicionar alguns jogadores aleatórios
+    const randomPlayers = [
+      { id: "2", name: "Galinha Cacarejá", avatar: "🐔", isHost: false },
+      { id: "3", name: "Pintinho Pio", avatar: "🐣", isHost: false },
+    ];
+
+    setPlayers([...mockPlayers, ...randomPlayers.slice(0, Math.floor(Math.random() * 3))]);
+  }, [navigate]);
+
+  const handleStartGame = () => {
+    toast({
+      title: "🎵 Iniciando Cantoria!",
+      description: "Carregando as músicas do galinheiro...",
+    });
+
+    setTimeout(() => {
+      navigate(`/game/${roomCode}`);
+    }, 1500);
+  };
 
   const copyRoomCode = async () => {
+    if (!roomCode) return;
+    
     try {
       await navigator.clipboard.writeText(roomCode);
       toast({
@@ -39,6 +87,8 @@ export default function GameLobby() {
   };
 
   const shareRoomLink = async () => {
+    if (!roomCode) return;
+    
     const link = `${window.location.origin}/join/${roomCode}`;
     try {
       await navigator.clipboard.writeText(link);
@@ -205,11 +255,12 @@ export default function GameLobby() {
               </p>
               <ChickenButton 
                 variant="feather" 
-                size="xl" 
-                disabled={players.length < 1}
-                chickenStyle="bounce"
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-2xl px-8"
-              >
+                  size="xl" 
+                  disabled={players.length < 1}
+                  chickenStyle="bounce"
+                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-2xl px-8"
+                  onClick={handleStartGame}
+                >
                 🎵 Começar a Cantoria! 🎵
               </ChickenButton>
             </div>

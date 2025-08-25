@@ -1,18 +1,100 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "@/hooks/use-toast";
 import heroImage from "@/assets/galinheiro-hero.jpg";
 
 export default function Home() {
+  const navigate = useNavigate();
   const [roomCode, setRoomCode] = useState("");
   const [playerName, setPlayerName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("🐔");
 
   const chickenAvatars = ["🐔", "🐓", "🐣", "🐤", "🐥", "🏵️🐔", "👑🐓", "🌟🐥", "💎🐤", "🎵🐣"];
+
+  // Função para gerar código de sala aleatório
+  const generateRoomCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 6; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  // Função para criar novo galinheiro
+  const handleCreateRoom = () => {
+    if (!playerName.trim()) {
+      toast({
+        title: "🐔 Ops!",
+        description: "Você precisa dar um nome para sua galinha primeiro!",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newRoomCode = generateRoomCode();
+    
+    // Salvar dados do jogador no localStorage (temporariamente)
+    localStorage.setItem('playerData', JSON.stringify({
+      name: playerName,
+      avatar: selectedAvatar,
+      isHost: true
+    }));
+
+    toast({
+      title: "🏠 Galinheiro Criado!",
+      description: `Código: ${newRoomCode}. Redirecionando...`,
+    });
+
+    // Navegar para o lobby
+    setTimeout(() => {
+      navigate(`/lobby/${newRoomCode}`);
+    }, 1000);
+  };
+
+  // Função para entrar em galinheiro existente
+  const handleJoinRoom = () => {
+    if (!playerName.trim()) {
+      toast({
+        title: "🐔 Ops!",
+        description: "Você precisa dar um nome para sua galinha primeiro!",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (roomCode.length !== 6) {
+      toast({
+        title: "🚪 Código Inválido!",
+        description: "O código do galinheiro deve ter 6 caracteres.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Salvar dados do jogador no localStorage (temporariamente)
+    localStorage.setItem('playerData', JSON.stringify({
+      name: playerName,
+      avatar: selectedAvatar,
+      isHost: false
+    }));
+
+    toast({
+      title: "🚪 Entrando no Galinheiro!",
+      description: `Conectando ao galinheiro ${roomCode}...`,
+    });
+
+    // Navegar para o lobby
+    setTimeout(() => {
+      navigate(`/lobby/${roomCode}`);
+    }, 1000);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-sky">
@@ -62,6 +144,7 @@ export default function Home() {
                   size="lg" 
                   className="w-full group"
                   chickenStyle="bounce"
+                  onClick={handleCreateRoom}
                 >
                   🏠 Criar Novo Galinheiro
                 </ChickenButton>
@@ -92,6 +175,7 @@ export default function Home() {
                   className="w-full"
                   chickenStyle="walk"
                   disabled={roomCode.length < 6}
+                  onClick={handleJoinRoom}
                 >
                   🚪 Entrar no Galinheiro
                 </ChickenButton>
