@@ -63,27 +63,16 @@ export const useGameLogic = (roomCode: string) => {
     }
   };
 
-  // URLs de áudio funcionais para cada música
+  // URLs de áudio sintéticos para demonstração
   const getAudioUrl = (song: Song): string => {
     // Se tem URL válida do banco, usar ela
     if (song.preview_url && song.preview_url.trim() !== '') return song.preview_url;
     if (song.audio_file_url && song.audio_file_url.trim() !== '') return song.audio_file_url;
     
-    // Gerar URL de audio sintético baseado na música para demonstração
-    // Em produção, seria ideal ter arquivos de áudio reais
-    const audioSamples = [
-      "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
-      "https://samplelib.com/lib/preview/mp3/sample-3s.mp3", 
-      "https://file-examples.com/storage/fe68c8b7817ed82ba0c4c91/2017/11/file_example_MP3_700KB.mp3"
-    ];
+    // Áudio sintético em base64 para demonstração (funciona offline)
+    const audioBase64 = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBz6Y3O7QeycHLILM6+OL";
     
-    // Usar hash do título para consistência
-    const hash = song.title.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0);
-    
-    return audioSamples[Math.abs(hash) % audioSamples.length];
+    return audioBase64;
   };
 
   // Gerar pergunta com títulos como opções

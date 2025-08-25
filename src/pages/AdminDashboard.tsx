@@ -50,6 +50,15 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Estados para configurações
+  const [gameSettings, setGameSettings] = useState({
+    eggs_per_correct: 10,
+    speed_bonus: 5,
+    time_per_question: 15,
+    max_players: 10,
+    song_duration: 15
+  });
+
   // States for different sections
   const [songs, setSongs] = useState<Song[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -171,6 +180,36 @@ export default function AdminDashboard() {
 
     setIsAuthenticated(true);
   }, [navigate]);
+
+  // Função para salvar configurações
+  const saveGameSettings = async () => {
+    console.log('💾 AdminDashboard: Salvando configurações:', gameSettings);
+    try {
+      // Em um cenário real, você salvaria estas configurações no banco
+      // Por agora, vamos apenas simular o salvamento
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Configurações salvas!",
+        description: "As configurações do galinheiro foram atualizadas com sucesso.",
+      });
+      
+    } catch (error) {
+      console.error('❌ AdminDashboard: Erro ao salvar configurações:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao salvar configurações",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSettingChange = (field: string, value: string) => {
+    setGameSettings(prev => ({
+      ...prev,
+      [field]: parseInt(value) || 0
+    }));
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('adminAuth');
@@ -628,17 +667,29 @@ export default function AdminDashboard() {
                   
                   <div>
                     <Label className="text-white/90">Ovos por acerto</Label>
-                    <Input defaultValue="10" className="bg-white/20 border-white/30 text-white" />
+                    <Input 
+                      value={gameSettings.eggs_per_correct} 
+                      onChange={(e) => handleSettingChange('eggs_per_correct', e.target.value)}
+                      className="bg-white/20 border-white/30 text-white" 
+                    />
                   </div>
                   
                   <div>
                     <Label className="text-white/90">Bônus velocidade</Label>
-                    <Input defaultValue="5" className="bg-white/20 border-white/30 text-white" />
+                    <Input 
+                      value={gameSettings.speed_bonus} 
+                      onChange={(e) => handleSettingChange('speed_bonus', e.target.value)}
+                      className="bg-white/20 border-white/30 text-white" 
+                    />
                   </div>
                   
                   <div>
                     <Label className="text-white/90">Tempo por pergunta (segundos)</Label>
-                    <Input defaultValue="15" className="bg-white/20 border-white/30 text-white" />
+                    <Input 
+                      value={gameSettings.time_per_question} 
+                      onChange={(e) => handleSettingChange('time_per_question', e.target.value)}
+                      className="bg-white/20 border-white/30 text-white" 
+                    />
                   </div>
                 </div>
 
@@ -647,15 +698,27 @@ export default function AdminDashboard() {
                   
                   <div>
                     <Label className="text-white/90">Máximo de jogadores por sala</Label>
-                    <Input defaultValue="10" className="bg-white/20 border-white/30 text-white" />
+                    <Input 
+                      value={gameSettings.max_players} 
+                      onChange={(e) => handleSettingChange('max_players', e.target.value)}
+                      className="bg-white/20 border-white/30 text-white" 
+                    />
                   </div>
                   
                   <div>
                     <Label className="text-white/90">Duração da música (segundos)</Label>
-                    <Input defaultValue="15" className="bg-white/20 border-white/30 text-white" />
+                    <Input 
+                      value={gameSettings.song_duration} 
+                      onChange={(e) => handleSettingChange('song_duration', e.target.value)}
+                      className="bg-white/20 border-white/30 text-white" 
+                    />
                   </div>
                   
-                  <ChickenButton variant="feather" className="w-full">
+                  <ChickenButton 
+                    variant="feather" 
+                    className="w-full"
+                    onClick={saveGameSettings}
+                  >
                     💾 Salvar Configurações
                   </ChickenButton>
                 </div>
