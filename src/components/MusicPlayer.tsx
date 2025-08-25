@@ -31,12 +31,81 @@ export const MusicPlayer = ({
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // URLs de músicas de exemplo (Creative Commons)
-  const defaultAudioUrl = audioUrl || "https://www.soundjay.com/misc/sounds/magic-chime-02.mp3";
+  // URLs de músicas de exemplo com fallbacks
+  const audioSources = [
+    "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
+    "https://archive.org/download/testmp3testfile/mpthreetest.mp3",
+    "https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3"
+  ];
+  
+  const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
+  const [hasAudioError, setHasAudioError] = useState(false);
+  const defaultAudioUrl = audioUrl || audioSources[currentSourceIndex];
+
+  // Simulação de reprodução quando não há áudio real
+  const simulatePlayback = () => {
+    console.log('🎵 MusicPlayer: Iniciando simulação de reprodução');
+    setIsPlaying(true);
+    setCurrentTime(0);
+    
+    const interval = setInterval(() => {
+      setCurrentTime(prev => {
+        const newTime = prev + 1;
+        if (newTime >= duration) {
+          console.log('🎵 MusicPlayer: Simulação concluída');
+          clearInterval(interval);
+          setIsPlaying(false);
+          onEnded?.();
+          return 0;
+        }
+        onTimeUpdate?.(newTime);
+        return newTime;
+      });
+    }, 1000);
+  };
+
+  const togglePlay = async () => {
+    const audio = audioRef.current;
+    if (!audio) {
+      console.log('🎵 MusicPlayer: Elemento de áudio não encontrado, simulando reprodução');
+      simulatePlayback();
+      return;
+    }
+
+    console.log('🎵 MusicPlayer: Toggle play - Estado atual:', isPlaying);
+
+    try {
+      if (isPlaying) {
+        console.log('🎵 MusicPlayer: Pausando áudio');
+        audio.pause();
+        setIsPlaying(false);
+      } else {
+        console.log('🎵 MusicPlayer: Tentando reproduzir áudio');
+        
+        // Verificar se o áudio está carregado
+        if (audio.readyState < 2 || hasAudioError) {
+          console.log('🎵 MusicPlayer: Áudio não carregado ou com erro, simulando reprodução');
+          simulatePlayback();
+          return;
+        }
+        
+        // Tentar reproduzir
+        await audio.play();
+        console.log('🎵 MusicPlayer: Áudio reproduzindo com sucesso');
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error('🎵 MusicPlayer: Erro ao reproduzir áudio:', error);
+      console.log('🎵 MusicPlayer: Iniciando simulação como fallback');
+      simulatePlayback();
+    }
+  };
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    console.log('🎵 MusicPlayer: Carregando áudio:', defaultAudioUrl);
 
     // Set initial volume
     audio.volume = volume;
@@ -48,63 +117,56 @@ export const MusicPlayer = ({
     };
 
     const handleEnded = () => {
+      console.log('🎵 MusicPlayer: Áudio terminou');
       setIsPlaying(false);
       setCurrentTime(0);
       onEnded?.();
     };
 
     const handleLoadedData = () => {
+      console.log('🎵 MusicPlayer: Áudio carregado com sucesso');
+      setHasAudioError(false);
       if (autoPlay) {
+        console.log('🎵 MusicPlayer: Iniciando reprodução automática');
         togglePlay();
       }
+    };
+
+    const handleError = (error: Event) => {
+      console.error('🎵 MusicPlayer: Erro ao carregar áudio:', error);
+      setHasAudioError(true);
+      
+      // Tentar próxima URL se disponível
+      if (currentSourceIndex < audioSources.length - 1) {
+        console.log('🎵 MusicPlayer: Tentando próxima fonte de áudio...');
+        setCurrentSourceIndex(prev => prev + 1);
+      } else {
+        console.log('🎵 MusicPlayer: Todas as fontes falharam, iniciando simulação');
+        if (autoPlay) {
+          simulatePlayback();
+        }
+      }
+    };
+
+    const handleCanPlay = () => {
+      console.log('🎵 MusicPlayer: Áudio pronto para reprodução');
     };
 
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('loadeddata', handleLoadedData);
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('canplay', handleCanPlay);
 
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('loadeddata', handleLoadedData);
+      audio.removeEventListener('error', handleError);
+      audio.removeEventListener('canplay', handleCanPlay);
     };
-  }, [autoPlay, onTimeUpdate, onEnded, volume]);
+  }, [autoPlay, onTimeUpdate, onEnded, volume, currentSourceIndex]);
 
-  const togglePlay = async () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    try {
-      if (isPlaying) {
-        audio.pause();
-        setIsPlaying(false);
-      } else {
-        await audio.play();
-        setIsPlaying(true);
-      }
-    } catch (error) {
-      console.error('Erro ao reproduzir áudio:', error);
-      // Fallback: simular reprodução
-      simulatePlayback();
-    }
-  };
-
-  // Simulação de reprodução quando não há áudio real
-  const simulatePlayback = () => {
-    setIsPlaying(true);
-    const interval = setInterval(() => {
-      setCurrentTime(prev => {
-        if (prev >= duration) {
-          clearInterval(interval);
-          setIsPlaying(false);
-          onEnded?.();
-          return 0;
-        }
-        onTimeUpdate?.(prev + 1);
-        return prev + 1;
-      });
-    }, 1000);
-  };
 
   const toggleMute = () => {
     const audio = audioRef.current;
@@ -138,7 +200,17 @@ export const MusicPlayer = ({
         src={defaultAudioUrl}
         muted={isMuted}
         preload="metadata"
+        crossOrigin="anonymous"
       />
+
+      {/* Debug info */}
+      {hasAudioError && (
+        <div className="mb-4 p-2 bg-red-500/20 rounded border border-red-500/30">
+          <p className="text-xs text-white/90 text-center">
+            ⚠️ Simulando reprodução (áudio indisponível)
+          </p>
+        </div>
+      )}
 
       {/* Song Info */}
       <div className="text-center mb-4">
@@ -180,6 +252,11 @@ export const MusicPlayer = ({
       {/* Instructions */}
       <p className="text-xs text-white/70 text-center">
         🎧 Ouça atentamente os {duration} segundos da música
+        {isPlaying && (
+          <span className="block text-green-300 mt-1">
+            {hasAudioError ? "🔄 Simulação ativa" : "🎵 Reproduzindo"}
+          </span>
+        )}
       </p>
 
       {/* Quiz Hint */}
