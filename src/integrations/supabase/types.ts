@@ -14,13 +14,371 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      "cluck-and-croon": {
+        Row: {
+          created_at: string
+          id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+        }
+        Update: {
+          created_at?: string
+          id?: number
+        }
+        Relationships: []
+      }
+      game_rooms: {
+        Row: {
+          created_at: string
+          current_players: number | null
+          current_round: number | null
+          current_song_id: string | null
+          eggs_per_correct: number | null
+          finished_at: string | null
+          host_id: string
+          id: string
+          max_players: number | null
+          name: string
+          room_code: string
+          rounds_total: number | null
+          speed_bonus: number | null
+          started_at: string | null
+          status: string | null
+          time_per_question: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_players?: number | null
+          current_round?: number | null
+          current_song_id?: string | null
+          eggs_per_correct?: number | null
+          finished_at?: string | null
+          host_id: string
+          id?: string
+          max_players?: number | null
+          name: string
+          room_code: string
+          rounds_total?: number | null
+          speed_bonus?: number | null
+          started_at?: string | null
+          status?: string | null
+          time_per_question?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_players?: number | null
+          current_round?: number | null
+          current_song_id?: string | null
+          eggs_per_correct?: number | null
+          finished_at?: string | null
+          host_id?: string
+          id?: string
+          max_players?: number | null
+          name?: string
+          room_code?: string
+          rounds_total?: number | null
+          speed_bonus?: number | null
+          started_at?: string | null
+          status?: string | null
+          time_per_question?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_rooms_current_song_id_fkey"
+            columns: ["current_song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      game_rounds: {
+        Row: {
+          correct_answer: string
+          created_at: string
+          ended_at: string | null
+          id: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          room_id: string
+          round_number: number
+          song_id: string
+          started_at: string | null
+        }
+        Insert: {
+          correct_answer: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
+          room_id: string
+          round_number: number
+          song_id: string
+          started_at?: string | null
+        }
+        Update: {
+          correct_answer?: string
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
+          room_id?: string
+          round_number?: number
+          song_id?: string
+          started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "game_rounds_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "game_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_rounds_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      genres: {
+        Row: {
+          chicken_description: string | null
+          created_at: string
+          description: string | null
+          emoji: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          chicken_description?: string | null
+          created_at?: string
+          description?: string | null
+          emoji?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          chicken_description?: string | null
+          created_at?: string
+          description?: string | null
+          emoji?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      player_answers: {
+        Row: {
+          answered_at: string
+          eggs_earned: number | null
+          id: string
+          is_correct: boolean
+          response_time_seconds: number | null
+          round_id: string
+          selected_answer: string
+          user_id: string
+        }
+        Insert: {
+          answered_at?: string
+          eggs_earned?: number | null
+          id?: string
+          is_correct: boolean
+          response_time_seconds?: number | null
+          round_id: string
+          selected_answer: string
+          user_id: string
+        }
+        Update: {
+          answered_at?: string
+          eggs_earned?: number | null
+          id?: string
+          is_correct?: boolean
+          response_time_seconds?: number | null
+          round_id?: string
+          selected_answer?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "player_answers_round_id_fkey"
+            columns: ["round_id"]
+            isOneToOne: false
+            referencedRelation: "game_rounds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_emoji: string | null
+          created_at: string
+          display_name: string
+          games_played: number | null
+          games_won: number | null
+          id: string
+          total_eggs: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_emoji?: string | null
+          created_at?: string
+          display_name: string
+          games_played?: number | null
+          games_won?: number | null
+          id?: string
+          total_eggs?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_emoji?: string | null
+          created_at?: string
+          display_name?: string
+          games_played?: number | null
+          games_won?: number | null
+          id?: string
+          total_eggs?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      room_participants: {
+        Row: {
+          avatar_emoji: string | null
+          current_eggs: number | null
+          display_name: string
+          id: string
+          is_host: boolean | null
+          is_ready: boolean | null
+          joined_at: string
+          room_id: string
+          user_id: string
+        }
+        Insert: {
+          avatar_emoji?: string | null
+          current_eggs?: number | null
+          display_name: string
+          id?: string
+          is_host?: boolean | null
+          is_ready?: boolean | null
+          joined_at?: string
+          room_id: string
+          user_id: string
+        }
+        Update: {
+          avatar_emoji?: string | null
+          current_eggs?: number | null
+          display_name?: string
+          id?: string
+          is_host?: boolean | null
+          is_ready?: boolean | null
+          joined_at?: string
+          room_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_participants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "game_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      songs: {
+        Row: {
+          album_name: string | null
+          artist: string
+          audio_file_url: string | null
+          created_at: string
+          difficulty_level: number | null
+          duration_seconds: number | null
+          genre_id: string | null
+          id: string
+          is_active: boolean | null
+          play_count: number | null
+          preview_url: string | null
+          release_year: number | null
+          spotify_url: string | null
+          title: string
+          updated_at: string
+          youtube_url: string | null
+        }
+        Insert: {
+          album_name?: string | null
+          artist: string
+          audio_file_url?: string | null
+          created_at?: string
+          difficulty_level?: number | null
+          duration_seconds?: number | null
+          genre_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          play_count?: number | null
+          preview_url?: string | null
+          release_year?: number | null
+          spotify_url?: string | null
+          title: string
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Update: {
+          album_name?: string | null
+          artist?: string
+          audio_file_url?: string | null
+          created_at?: string
+          difficulty_level?: number | null
+          duration_seconds?: number | null
+          genre_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          play_count?: number | null
+          preview_url?: string | null
+          release_year?: number | null
+          spotify_url?: string | null
+          title?: string
+          updated_at?: string
+          youtube_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "songs_genre_id_fkey"
+            columns: ["genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_unique_room_code: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never
