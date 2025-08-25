@@ -12,52 +12,64 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Music, Users, Egg, Settings, Plus, Trash2, Edit, LogOut } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Song {
   id: string;
   title: string;
   artist: string;
   genre: string;
-  albumId?: string;
+  genre_id?: string;
+  album_name?: string;
+  release_year?: number;
+  duration_seconds?: number;
+  spotify_url?: string;
+  youtube_url?: string;
+  preview_url?: string;
+  audio_file_url?: string;
+  is_active?: boolean;
+  difficulty_level?: number;
+  play_count?: number;
   source: 'spotify' | 'youtube' | 'manual';
   url?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface Genre {
   id: string;
   name: string;
-  chickenDescription: string;
+  description?: string;
+  chicken_description: string;
   emoji: string;
+  created_at?: string;
 }
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // States for different sections
-  const [songs, setSongs] = useState<Song[]>([
-    { id: '1', title: 'Evidências', artist: 'Chitãozinho & Xororó', genre: 'Sertanejo', source: 'manual' },
-    { id: '2', title: 'Asa Branca', artist: 'Luiz Gonzaga', genre: 'Forró', source: 'manual' },
-    { id: '3', title: 'Garota de Ipanema', artist: 'Tom Jobim', genre: 'Bossa Nova', source: 'manual' },
-  ]);
-
-  const [genres, setGenres] = useState<Genre[]>([
-    { id: '1', name: 'Sertanejo', chickenDescription: 'Sertanejo da Galinha Caipira', emoji: '🤠' },
-    { id: '2', name: 'Rock', chickenDescription: 'Rock do Galo Carijó', emoji: '🎸' },
-    { id: '3', name: 'Forró', chickenDescription: 'Forró do Pintinho Nordestino', emoji: '🪗' },
-    { id: '4', name: 'Bossa Nova', chickenDescription: 'Bossa da Galinha Carioca', emoji: '🎷' },
-  ]);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
 
   const [newSong, setNewSong] = useState({
     title: '',
     artist: '',
-    genre: '',
-    url: ''
+    genre_id: '',
+    album_name: '',
+    release_year: '',
+    duration_seconds: '15',
+    spotify_url: '',
+    youtube_url: '',
+    difficulty_level: '1'
   });
 
   const [newGenre, setNewGenre] = useState({
     name: '',
-    chickenDescription: '',
+    description: '',
+    chicken_description: '',
     emoji: ''
   });
 
@@ -67,6 +79,80 @@ export default function AdminDashboard() {
     totalEggs: 98765,
     activeRooms: 23
   });
+
+  // Load data from Supabase
+  useEffect(() => {
+    loadGenres();
+    loadSongs();
+  }, []);
+
+  const loadGenres = async () => {
+    try {
+      console.log('🎼 AdminDashboard: Carregando gêneros...');
+      const { data, error } = await supabase
+        .from('genres')
+        .select('*')
+        .order('name');
+
+      if (error) {
+        console.error('❌ Erro ao carregar gêneros:', error);
+        throw error;
+      }
+
+      console.log('✅ Gêneros carregados:', data);
+      setGenres(data || []);
+    } catch (error) {
+      console.error('❌ Erro ao carregar gêneros:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível carregar os gêneros",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadSongs = async () => {
+    try {
+      console.log('🎵 AdminDashboard: Carregando músicas...');
+      const { data, error } = await supabase
+        .from('songs')
+        .select(`
+          *,
+          genres (
+            id,
+            name,
+            emoji
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Erro ao carregar músicas:', error);
+        throw error;
+      }
+
+      console.log('✅ Músicas carregadas:', data);
+      
+      // Transformar dados para o formato esperado
+      const songsFormatted = (data || []).map(song => ({
+        ...song,
+        genre: song.genres?.name || 'Sem gênero',
+        source: 'manual' as const,
+        url: song.spotify_url || song.youtube_url || song.audio_file_url
+      }));
+      
+      setSongs(songsFormatted);
+    } catch (error) {
+      console.error('❌ Erro ao carregar músicas:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível carregar as músicas",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Check authentication on mount
   useEffect(() => {
@@ -95,8 +181,8 @@ export default function AdminDashboard() {
     navigate('/');
   };
 
-  const handleAddSong = () => {
-    if (!newSong.title || !newSong.artist || !newSong.genre) {
+  const handleAddSong = async () => {
+    if (!newSong.title || !newSong.artist || !newSong.genre_id) {
       toast({
         title: "❌ Campos obrigatórios",
         description: "Preencha título, artista e gênero da música",
@@ -105,34 +191,100 @@ export default function AdminDashboard() {
       return;
     }
 
-    const song: Song = {
-      id: Date.now().toString(),
-      title: newSong.title,
-      artist: newSong.artist,
-      genre: newSong.genre,
-      source: 'manual',
-      url: newSong.url || undefined
-    };
+    try {
+      console.log('🎵 AdminDashboard: Salvando música...', newSong);
 
-    setSongs(prev => [...prev, song]);
-    setNewSong({ title: '', artist: '', genre: '', url: '' });
-    
-    toast({
-      title: "🎵 Música Adicionada!",
-      description: `${song.title} foi adicionada ao repertório`,
-    });
+      const songData = {
+        title: newSong.title,
+        artist: newSong.artist,
+        genre_id: newSong.genre_id,
+        album_name: newSong.album_name || null,
+        release_year: newSong.release_year ? parseInt(newSong.release_year) : null,
+        duration_seconds: parseInt(newSong.duration_seconds) || 15,
+        spotify_url: newSong.spotify_url || null,
+        youtube_url: newSong.youtube_url || null,
+        difficulty_level: parseInt(newSong.difficulty_level) || 1,
+        is_active: true
+      };
+
+      const { data, error } = await supabase
+        .from('songs')
+        .insert([songData])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao salvar música:', error);
+        throw error;
+      }
+
+      console.log('✅ Música salva com sucesso:', data);
+
+      // Recarregar lista de músicas
+      await loadSongs();
+      
+      // Limpar formulário
+      setNewSong({
+        title: '',
+        artist: '',
+        genre_id: '',
+        album_name: '',
+        release_year: '',
+        duration_seconds: '15',
+        spotify_url: '',
+        youtube_url: '',
+        difficulty_level: '1'
+      });
+
+      toast({
+        title: "🎵 Música Adicionada!",
+        description: `${newSong.title} foi adicionada ao banco de dados`,
+      });
+    } catch (error) {
+      console.error('❌ Erro ao adicionar música:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível salvar a música no banco de dados",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteSong = (songId: string) => {
-    setSongs(prev => prev.filter(s => s.id !== songId));
-    toast({
-      title: "🗑️ Música Removida",
-      description: "A música foi removida do repertório",
-    });
+  const handleDeleteSong = async (songId: string) => {
+    try {
+      console.log('🗑️ AdminDashboard: Deletando música:', songId);
+
+      const { error } = await supabase
+        .from('songs')
+        .delete()
+        .eq('id', songId);
+
+      if (error) {
+        console.error('❌ Erro ao deletar música:', error);
+        throw error;
+      }
+
+      console.log('✅ Música deletada com sucesso');
+
+      // Recarregar lista de músicas
+      await loadSongs();
+      
+      toast({
+        title: "🗑️ Música Removida",
+        description: "A música foi removida do banco de dados",
+      });
+    } catch (error) {
+      console.error('❌ Erro ao deletar música:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível remover a música",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleAddGenre = () => {
-    if (!newGenre.name || !newGenre.chickenDescription || !newGenre.emoji) {
+  const handleAddGenre = async () => {
+    if (!newGenre.name || !newGenre.chicken_description || !newGenre.emoji) {
       toast({
         title: "❌ Campos obrigatórios",
         description: "Preencha todos os campos do gênero",
@@ -141,22 +293,51 @@ export default function AdminDashboard() {
       return;
     }
 
-    const genre: Genre = {
-      id: Date.now().toString(),
-      ...newGenre
-    };
+    try {
+      console.log('🎼 AdminDashboard: Salvando gênero...', newGenre);
 
-    setGenres(prev => [...prev, genre]);
-    setNewGenre({ name: '', chickenDescription: '', emoji: '' });
-    
-    toast({
-      title: "🎼 Gênero Adicionado!",
-      description: `${genre.name} foi adicionado aos gêneros`,
-    });
+      const { data, error } = await supabase
+        .from('genres')
+        .insert([newGenre])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Erro ao salvar gênero:', error);
+        throw error;
+      }
+
+      console.log('✅ Gênero salvo com sucesso:', data);
+
+      // Recarregar lista de gêneros
+      await loadGenres();
+      
+      // Limpar formulário
+      setNewGenre({ name: '', description: '', chicken_description: '', emoji: '' });
+      
+      toast({
+        title: "🎼 Gênero Adicionado!",
+        description: `${newGenre.name} foi adicionado ao banco de dados`,
+      });
+    } catch (error) {
+      console.error('❌ Erro ao adicionar gênero:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível salvar o gênero no banco de dados",
+        variant: "destructive",
+      });
+    }
   };
 
-  if (!isAuthenticated) {
-    return <div>Carregando...</div>;
+  if (!isAuthenticated || loading) {
+    return (
+      <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-chicken-walk">🐔</div>
+          <p className="text-xl text-muted-foreground">Carregando galinheiro...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -270,13 +451,13 @@ export default function AdminDashboard() {
 
                   <div>
                     <Label htmlFor="song-genre">Gênero</Label>
-                    <Select value={newSong.genre} onValueChange={(value) => setNewSong(prev => ({...prev, genre: value}))}>
+                    <Select value={newSong.genre_id} onValueChange={(value) => setNewSong(prev => ({...prev, genre_id: value}))}>
                       <SelectTrigger>
                         <SelectValue placeholder="Escolher gênero" />
                       </SelectTrigger>
                       <SelectContent>
                         {genres.map(genre => (
-                          <SelectItem key={genre.id} value={genre.name}>
+                          <SelectItem key={genre.id} value={genre.id}>
                             {genre.emoji} {genre.name}
                           </SelectItem>
                         ))}
@@ -285,12 +466,32 @@ export default function AdminDashboard() {
                   </div>
 
                   <div>
-                    <Label htmlFor="song-url">URL (YouTube/Spotify)</Label>
+                    <Label htmlFor="song-album">Álbum (opcional)</Label>
                     <Input
-                      id="song-url"
+                      id="song-album"
+                      placeholder="Ex: Os Grandes Sucessos"
+                      value={newSong.album_name}
+                      onChange={(e) => setNewSong(prev => ({...prev, album_name: e.target.value}))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="song-spotify">URL Spotify (opcional)</Label>
+                    <Input
+                      id="song-spotify"
+                      placeholder="https://open.spotify.com/..."
+                      value={newSong.spotify_url}
+                      onChange={(e) => setNewSong(prev => ({...prev, spotify_url: e.target.value}))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="song-youtube">URL YouTube (opcional)</Label>
+                    <Input
+                      id="song-youtube"
                       placeholder="https://youtube.com/..."
-                      value={newSong.url}
-                      onChange={(e) => setNewSong(prev => ({...prev, url: e.target.value}))}
+                      value={newSong.youtube_url}
+                      onChange={(e) => setNewSong(prev => ({...prev, youtube_url: e.target.value}))}
                     />
                   </div>
 
@@ -360,8 +561,17 @@ export default function AdminDashboard() {
                     <Label>Descrição Temática</Label>
                     <Input
                       placeholder="Ex: Sertanejo da Galinha Caipira"
-                      value={newGenre.chickenDescription}
-                      onChange={(e) => setNewGenre(prev => ({...prev, chickenDescription: e.target.value}))}
+                      value={newGenre.chicken_description}
+                      onChange={(e) => setNewGenre(prev => ({...prev, chicken_description: e.target.value}))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Descrição (opcional)</Label>
+                    <Input
+                      placeholder="Ex: Música country brasileira"
+                      value={newGenre.description}
+                      onChange={(e) => setNewGenre(prev => ({...prev, description: e.target.value}))}
                     />
                   </div>
 
@@ -395,7 +605,7 @@ export default function AdminDashboard() {
                         <span className="text-2xl">{genre.emoji}</span>
                         <div className="flex-1">
                           <h4 className="font-semibold">{genre.name}</h4>
-                          <p className="text-sm text-muted-foreground">{genre.chickenDescription}</p>
+                          <p className="text-sm text-muted-foreground">{genre.chicken_description}</p>
                         </div>
                       </div>
                     </div>
