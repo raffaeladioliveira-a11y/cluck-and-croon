@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { ChickenButton } from "@/components/ChickenButton";
@@ -8,6 +8,7 @@ import { EggCounter } from "@/components/EggCounter";
 import { Copy, Users, Music, Trophy, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { getOrCreateClientId } from "@/utils/clientId";
 
 interface Player {
   id: string;
@@ -58,16 +59,25 @@ export default function GameLobby() {
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [player, setPlayer] = useState<any>(null);
+  const [room, setRoom] = useState<{code: string; status: string; game_session_id: string | null} | null>(null);
 
-  // Generate unique user ID for session
-  const mockUserId = (() => {
+  // Generate unique client and user IDs for session
+  const clientId = useMemo(getOrCreateClientId, []);
+  const mockUserId = useMemo(() => {
     let storedId = localStorage.getItem('sessionUserId');
     if (!storedId) {
       storedId = crypto.randomUUID();
       localStorage.setItem('sessionUserId', storedId);
     }
     return storedId;
-  })();
+  }, []);
+
+  const navigatedRef = useRef(false);
+
+  // Determine if current user is host
+  const isHost = useMemo(() => {
+    return room?.status === 'lobby' && players.find(p => p.id === mockUserId)?.isHost === true;
+  }, [room, players, mockUserId]);
 
   // Load genres from database
   const loadGenres = async () => {
@@ -173,7 +183,7 @@ export default function GameLobby() {
         room = newRoom;
       }
 
-      // Join as participant (always is_host: false, derived from server)
+      // Join as participant with client_id for host validation
       const { error: participantError } = await supabase
         .from('room_participants')
         .upsert({
@@ -181,6 +191,7 @@ export default function GameLobby() {
           user_id: mockUserId,
           display_name: player.name,
           avatar_emoji: player.avatar,
+          client_id: clientId,
           is_host: false // Always false, host is derived from room.host_user_id
         }, {
           onConflict: 'room_id,user_id'
@@ -208,9 +219,13 @@ export default function GameLobby() {
           filter: `room_code=eq.${roomCode}`
         }, (payload) => {
           console.log('Room status changed:', payload.new);
-          if (payload.new && (payload.new as any).status === 'playing') {
-            // Host started the game, navigate all players automatically
-            navigate(`/game/play?roomCode=${roomCode}`);
+          const roomData = payload.new as any;
+          setRoom(roomData);
+          
+          // Navigate to game when host starts (with session ID)
+          if (!navigatedRef.current && roomData.status === 'in_progress' && roomData.game_session_id) {
+            navigatedRef.current = true;
+            navigate(`/game/${roomCode}?sid=${roomData.game_session_id}`);
           }
         })
         .subscribe();
@@ -237,7 +252,7 @@ export default function GameLobby() {
   const loadParticipants = async (roomId: string) => {
     const { data: roomData, error: roomError } = await supabase
       .from('game_rooms')
-      .select('host_user_id')
+      .select('host_user_id, status, game_session_id, room_code')
       .eq('id', roomId)
       .single();
 
@@ -245,6 +260,13 @@ export default function GameLobby() {
       console.error('Error loading room:', roomError);
       return;
     }
+
+    // Update room state
+    setRoom({
+      code: roomData.room_code,
+      status: roomData.status || 'lobby',
+      game_session_id: roomData.game_session_id
+    });
 
     const { data, error } = await supabase
       .from('room_participants')
@@ -270,31 +292,40 @@ export default function GameLobby() {
 
   const handleStartGame = async () => {
     try {
-      // Get a random song for the first round
-      const { data: randomSong } = await supabase
-        .from('songs')
-        .select('id')
-        .eq('is_active', true)
-        .order('id', { ascending: false })
-        .limit(1)
-        .single();
-
-      const { error } = await supabase
-        .from('game_rooms')
-        .update({ 
-          status: 'playing',
-          current_round: 1,
-          current_song_id: randomSong?.id || null,
-          started_at: new Date().toISOString()
-        })
-        .eq('room_code', roomCode);
+      console.log('Starting game with clientId:', clientId, 'roomCode:', roomCode);
+      
+      // Call RPC to start game atomically (host-only)
+      const { data: sessionId, error } = await supabase.rpc('start_game', {
+        p_room: roomCode,
+        p_client_id: clientId
+      });
 
       if (error) {
         console.error('Erro completo ao iniciar jogo:', error);
-        throw error;
+        
+        if (error.message === 'NOT_HOST') {
+          toast({
+            title: "Acesso negado",
+            description: "Apenas o host pode iniciar o jogo.",
+            variant: "destructive",
+          });
+        } else if (error.message === 'ROOM_NOT_IN_LOBBY') {
+          toast({
+            title: "Jogo em andamento",
+            description: "Esta sala já está com um jogo em progresso.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Erro ao iniciar jogo",
+            description: error.message || "Não foi possível iniciar o jogo.",
+            variant: "destructive",
+          });
+        }
+        return;
       }
 
-      console.log('Game started, room status updated to playing');
+      console.log('Game started successfully, session ID:', sessionId);
       // Navigation will be handled by realtime subscription automatically
     } catch (error: any) {
       console.error('Error starting game:', error);
@@ -610,7 +641,7 @@ export default function GameLobby() {
                 <p className="text-white/90 mb-6">
                   Mínimo de 1 galinha necessária para iniciar o jogo
                 </p>
-                {players.find(p => p.id === currentUserId)?.isHost ? (
+                {isHost ? (
                   <ChickenButton 
                     variant="feather" 
                     size="xl" 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
@@ -11,9 +12,58 @@ import { Loader2 } from "lucide-react";
 export default function GameArena() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
+  const { search } = useLocation();
+  
+  // Extract session ID from URL
+  const sessionId = new URLSearchParams(search).get('sid');
   
   // Debug states
   const [audioDebug, setAudioDebug] = useState("");
+  const [sessionValid, setSessionValid] = useState(false);
+
+  // Route guard: validate session
+  useEffect(() => {
+    const validateSession = async () => {
+      if (!roomCode) {
+        navigate('/');
+        return;
+      }
+
+      // If no session ID, try to get from room
+      if (!sessionId) {
+        const { data: roomData } = await supabase
+          .from('game_rooms')
+          .select('status, game_session_id')
+          .eq('room_code', roomCode)
+          .single();
+
+        if (!roomData || roomData.status !== 'in_progress' || !roomData.game_session_id) {
+          navigate(`/lobby/${roomCode}`);
+          return;
+        }
+        
+        // Redirect with session ID
+        navigate(`/game/${roomCode}?sid=${roomData.game_session_id}`, { replace: true });
+        return;
+      }
+
+      // Validate session exists and is active
+      const { data: sessionData } = await supabase
+        .from('game_sessions')
+        .select('id, room_code, status')
+        .eq('id', sessionId)
+        .single();
+
+      if (!sessionData || sessionData.status !== 'in_progress') {
+        navigate(`/lobby/${roomCode}`);
+        return;
+      }
+
+      setSessionValid(true);
+    };
+
+    validateSession();
+  }, [sessionId, roomCode, navigate]);
 
   // Listen for navigation events from game logic
   useEffect(() => {
@@ -56,6 +106,18 @@ export default function GameArena() {
     eggs: playerEggs,
     selectedAnswer: selectedAnswer
   };
+
+  // Show loading while validating session
+  if (!sessionValid) {
+    return (
+      <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
+        <BarnCard variant="golden" className="text-center p-8">
+          <div className="text-6xl mb-4 animate-chicken-walk">🐔</div>
+          <p className="text-white text-lg">Validando sessão do jogo...</p>
+        </BarnCard>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
