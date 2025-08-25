@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
@@ -32,9 +32,21 @@ interface SetResult {
 }
 
 export default function GameLobby() {
-  const { roomCode } = useParams<{ roomCode: string }>();
+  const { roomCode: roomCodeParam } = useParams<{ roomCode: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  
+  // Support both URL parameter and query string formats
+  const roomCode = roomCodeParam || searchParams.get("roomCode") || "";
+  
+  // Redirect to home if no room code
+  useEffect(() => {
+    if (!roomCode) {
+      navigate('/');
+      return;
+    }
+  }, [roomCode, navigate]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [setComplete, setSetComplete] = useState(false);
@@ -182,7 +194,7 @@ export default function GameLobby() {
   const shareRoomLink = async () => {
     if (!roomCode) return;
     
-    const link = `${window.location.origin}/join/${roomCode}`;
+    const link = `${window.location.origin}/lobby/${roomCode}`;
     try {
       await navigator.clipboard.writeText(link);
       toast({
