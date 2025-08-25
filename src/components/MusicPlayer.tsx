@@ -46,7 +46,8 @@ export const MusicPlayer = ({
     if (audioUrl && audioUrl.trim() !== '') {
       return audioUrl;
     }
-    return audioSources[currentSourceIndex];
+    // URL de teste mais confiável
+    return "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav";
   };
   
   const defaultAudioUrl = getEffectiveAudioUrl();

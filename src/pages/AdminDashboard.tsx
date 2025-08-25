@@ -59,6 +59,11 @@ export default function AdminDashboard() {
     song_duration: 15
   });
 
+  // Estados para upload de áudio
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+
   // States for different sections
   const [songs, setSongs] = useState<Song[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
@@ -93,6 +98,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadGenres();
     loadSongs();
+    loadGameSettings();
   }, []);
 
   const loadGenres = async () => {
@@ -181,23 +187,48 @@ export default function AdminDashboard() {
     setIsAuthenticated(true);
   }, [navigate]);
 
+  // Carregar configurações do banco
+  const loadGameSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('game_settings')
+        .select('key, value');
+
+      if (error) throw error;
+
+      const settings: any = {};
+      data?.forEach(setting => {
+        settings[setting.key] = parseInt(setting.value as string);
+      });
+
+      setGameSettings(prev => ({ ...prev, ...settings }));
+    } catch (error) {
+      console.error('❌ Erro ao carregar configurações:', error);
+    }
+  };
+
   // Função para salvar configurações
   const saveGameSettings = async () => {
     console.log('💾 AdminDashboard: Salvando configurações:', gameSettings);
     try {
-      // Em um cenário real, você salvaria estas configurações no banco
-      // Por agora, vamos apenas simular o salvamento
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Salvar cada configuração no banco
+      const promises = Object.entries(gameSettings).map(([key, value]) =>
+        supabase
+          .from('game_settings')
+          .upsert({ key, value: value.toString() })
+      );
+
+      await Promise.all(promises);
       
       toast({
-        title: "Configurações salvas!",
+        title: "✅ Configurações salvas!",
         description: "As configurações do galinheiro foram atualizadas com sucesso.",
       });
       
     } catch (error) {
       console.error('❌ AdminDashboard: Erro ao salvar configurações:', error);
       toast({
-        title: "Erro",
+        title: "❌ Erro",
         description: "Erro ao salvar configurações",
         variant: "destructive"
       });
@@ -220,6 +251,79 @@ export default function AdminDashboard() {
     navigate('/');
   };
 
+  // Upload de áudio para Storage
+  const handleAudioUpload = async (file: File) => {
+    if (!newSong.genre_id || !newSong.title) {
+      toast({
+        title: "❌ Preenchimento necessário",
+        description: "Preencha título e gênero antes de fazer upload do áudio",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    setIsUploading(true);
+    try {
+      // Criar nome único para o arquivo
+      const timestamp = Date.now();
+      const slug = newSong.title.toLowerCase().replace(/[^a-z0-9]/gi, '-');
+      const fileName = `${newSong.genre_id}/${slug}-${timestamp}.mp3`;
+
+      console.log('📤 Fazendo upload de áudio:', fileName);
+
+      const { data, error } = await supabase.storage
+        .from('songs')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw error;
+
+      // Obter URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('songs')
+        .getPublicUrl(fileName);
+
+      console.log('✅ Upload concluído. URL:', publicUrl);
+      
+      setAudioPreviewUrl(publicUrl);
+      return publicUrl;
+    } catch (error) {
+      console.error('❌ Erro no upload:', error);
+      toast({
+        title: "❌ Erro no Upload",
+        description: "Não foi possível fazer upload do arquivo de áudio",
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Testar áudio
+  const testAudio = (url: string) => {
+    const audio = new Audio(url);
+    audio.currentTime = 0;
+    audio.volume = 0.5;
+    
+    audio.play().then(() => {
+      setTimeout(() => audio.pause(), 3000); // Tocar 3 segundos
+      toast({
+        title: "🎵 Testando áudio",
+        description: "Reproduzindo 3 segundos do arquivo",
+      });
+    }).catch(error => {
+      console.error('❌ Erro ao testar áudio:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível reproduzir o áudio",
+        variant: "destructive",
+      });
+    });
+  };
+
   const handleAddSong = async () => {
     if (!newSong.title || !newSong.artist || !newSong.genre_id) {
       toast({
@@ -233,6 +337,13 @@ export default function AdminDashboard() {
     try {
       console.log('🎵 AdminDashboard: Salvando música...', newSong);
 
+      // Upload do áudio se fornecido
+      let audioFileUrl = null;
+      if (audioFile) {
+        audioFileUrl = await handleAudioUpload(audioFile);
+        if (!audioFileUrl) return; // Upload falhou
+      }
+
       const songData = {
         title: newSong.title,
         artist: newSong.artist,
@@ -242,6 +353,7 @@ export default function AdminDashboard() {
         duration_seconds: parseInt(newSong.duration_seconds) || 15,
         spotify_url: newSong.spotify_url || null,
         youtube_url: newSong.youtube_url || null,
+        audio_file_url: audioFileUrl,
         difficulty_level: parseInt(newSong.difficulty_level) || 1,
         is_active: true
       };
@@ -274,6 +386,9 @@ export default function AdminDashboard() {
         youtube_url: '',
         difficulty_level: '1'
       });
+      
+      setAudioFile(null);
+      setAudioPreviewUrl(null);
 
       toast({
         title: "🎵 Música Adicionada!",
@@ -534,12 +649,72 @@ export default function AdminDashboard() {
                     />
                   </div>
 
+                  {/* Upload de Áudio */}
+                  <div>
+                    <Label htmlFor="audio-file">Arquivo de Áudio (.mp3)</Label>
+                    <Input
+                      id="audio-file"
+                      type="file"
+                      accept=".mp3,audio/mpeg"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setAudioFile(file);
+                          setAudioPreviewUrl(null);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                    {audioFile && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        📎 {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </p>
+                    )}
+                    {audioPreviewUrl && (
+                      <div className="mt-2">
+                        <ChickenButton
+                          variant="feather"
+                          size="sm"
+                          onClick={() => testAudio(audioPreviewUrl)}
+                        >
+                          🎵 Testar Áudio
+                        </ChickenButton>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="duration">Duração (s)</Label>
+                      <Input
+                        id="duration"
+                        type="number"
+                        value={newSong.duration_seconds}
+                        onChange={(e) => setNewSong(prev => ({...prev, duration_seconds: e.target.value}))}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="difficulty">Dificuldade</Label>
+                      <Select value={newSong.difficulty_level} onValueChange={(value) => setNewSong(prev => ({...prev, difficulty_level: value}))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">🐣 Fácil</SelectItem>
+                          <SelectItem value="2">🐔 Médio</SelectItem>
+                          <SelectItem value="3">🐓 Difícil</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
                   <ChickenButton 
                     variant="corn" 
                     className="w-full"
                     onClick={handleAddSong}
+                    disabled={isUploading}
                   >
-                    🎵 Adicionar ao Repertório
+                    {isUploading ? "📤 Fazendo Upload..." : "🎵 Adicionar ao Repertório"}
                   </ChickenButton>
                 </div>
               </BarnCard>

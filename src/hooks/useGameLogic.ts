@@ -34,6 +34,9 @@ export const useGameLogic = (roomCode: string) => {
   const [players, setPlayers] = useState<Player[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [gameStarted, setGameStarted] = useState(false);
+  const [currentSettings, setCurrentSettings] = useState<any>({});
+  const [playerEggs, setPlayerEggs] = useState(0);
+  const [answerTime, setAnswerTime] = useState<number | null>(null);
   const { toast } = useToast();
 
   // Buscar músicas do banco
@@ -63,27 +66,55 @@ export const useGameLogic = (roomCode: string) => {
     }
   };
 
-  // URLs de áudio sintéticos para demonstração
+  // Carregar configurações do jogo
+  const loadGameSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('game_settings')
+        .select('key, value');
+
+      if (error) throw error;
+
+      const settings: any = {};
+      data?.forEach(setting => {
+        settings[setting.key] = parseInt(setting.value as string);
+      });
+
+      return settings;
+    } catch (error) {
+      console.error('❌ Erro ao carregar configurações:', error);
+      return {
+        eggs_per_correct: 10,
+        speed_bonus: 5,
+        time_per_question: 15
+      };
+    }
+  };
+
+  // URLs de áudio com prioridade para Storage
   const getAudioUrl = (song: Song): string => {
-    // Se tem URL válida do banco, usar ela
-    if (song.preview_url && song.preview_url.trim() !== '') return song.preview_url;
-    if (song.audio_file_url && song.audio_file_url.trim() !== '') return song.audio_file_url;
+    // Prioridade: audio_file_url (Storage) → preview_url → outros
+    if (song.audio_file_url && song.audio_file_url.trim() !== '') {
+      return song.audio_file_url;
+    }
+    if (song.preview_url && song.preview_url.trim() !== '') {
+      return song.preview_url;
+    }
     
-    // Áudio sintético em base64 para demonstração (funciona offline)
-    const audioBase64 = "data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBz6Y3O7QeycHLILM6+OL";
-    
-    return audioBase64;
+    // URL de teste confiável como fallback
+    return "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav";
   };
 
   // Gerar pergunta com títulos como opções
-  const generateQuestion = (songs: Song[]): GameQuestion => {
+  const generateQuestion = (songs: Song[], gameSettings: any): GameQuestion => {
     const shuffled = [...songs].sort(() => Math.random() - 0.5);
     const correctSong = shuffled[0];
     
     // Adicionar URL de áudio à música
     const songWithAudio = {
       ...correctSong,
-      audioUrl: getAudioUrl(correctSong)
+      audioUrl: getAudioUrl(correctSong),
+      duration_seconds: gameSettings.song_duration || correctSong.duration_seconds || 15
     };
     
     const options = shuffled.slice(0, 4).map(song => song.title);
@@ -103,10 +134,17 @@ export const useGameLogic = (roomCode: string) => {
   const initializeGame = async () => {
     setIsLoading(true);
     try {
-      const songs = await fetchRandomSongs();
+      const [songs, gameSettings] = await Promise.all([
+        fetchRandomSongs(),
+        loadGameSettings()
+      ]);
+      
+      setCurrentSettings(gameSettings);
+      
       if (songs.length > 0) {
-        const question = generateQuestion(songs);
+        const question = generateQuestion(songs, gameSettings);
         setCurrentQuestion(question);
+        setTimeLeft(gameSettings.time_per_question || 15);
         setGameStarted(true);
       }
     } catch (error) {
@@ -128,8 +166,27 @@ export const useGameLogic = (roomCode: string) => {
 
   // Selecionar resposta
   const handleAnswerSelect = (answerIndex: number) => {
-    if (!showResults && selectedAnswer === null) {
+    if (!showResults && selectedAnswer === null && currentSettings) {
       setSelectedAnswer(answerIndex);
+      setAnswerTime(currentSettings.time_per_question - timeLeft); // Tempo que levou para responder
+
+      // Calcular pontos
+      const isCorrect = answerIndex === currentQuestion?.correctAnswer;
+      if (isCorrect) {
+        const baseEggs = currentSettings.eggs_per_correct || 10;
+        const timeBonus = timeLeft > (currentSettings.time_per_question * 0.8) ? 
+          (currentSettings.speed_bonus || 5) : 0; // Bônus se respondeu em 80% do tempo
+        
+        const totalEggs = baseEggs + timeBonus;
+        setPlayerEggs(prev => prev + totalEggs);
+        
+        console.log('🥚 Pontuação:', { baseEggs, timeBonus, totalEggs, timeLeft });
+      }
+
+      // Auto-avanço em single-player após 2 segundos
+      setTimeout(() => {
+        setShowResults(true);
+      }, 2000);
     }
   };
 
@@ -139,19 +196,26 @@ export const useGameLogic = (roomCode: string) => {
       setCurrentRound(prev => prev + 1);
       setSelectedAnswer(null);
       setShowResults(false);
-      setTimeLeft(15);
+      setAnswerTime(null);
       
-      // Gerar nova pergunta
-      const songs = await fetchRandomSongs();
+      // Gerar nova pergunta com configurações atualizadas
+      const [songs, gameSettings] = await Promise.all([
+        fetchRandomSongs(),
+        loadGameSettings()
+      ]);
+      
+      setCurrentSettings(gameSettings);
+      
       if (songs.length > 0) {
-        const question = generateQuestion(songs);
+        const question = generateQuestion(songs, gameSettings);
         setCurrentQuestion(question);
+        setTimeLeft(gameSettings.time_per_question || 15);
       }
     } else {
       // Fim do jogo
       toast({
-        title: "Fim do jogo!",
-        description: "Parabéns por completar todas as rodadas!"
+        title: "🎉 Fim do jogo!",
+        description: `Parabéns! Você coletou ${playerEggs} ovos em 10 rodadas!`
       });
     }
   };
@@ -173,6 +237,9 @@ export const useGameLogic = (roomCode: string) => {
     handleAnswerSelect,
     nextRound,
     setPlayers,
-    setShowResults
+    setShowResults,
+    playerEggs,
+    answerTime,
+    currentSettings
   };
 };

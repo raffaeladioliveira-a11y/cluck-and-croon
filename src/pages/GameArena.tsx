@@ -21,16 +21,20 @@ export default function GameArena() {
     handleAnswerSelect,
     nextRound,
     setPlayers,
-    setShowResults
+    setShowResults,
+    playerEggs,
+    answerTime,
+    currentSettings
   } = useGameLogic(roomCode || '');
 
-  // Players mockados por enquanto - depois conectar com o Supabase
-  const mockPlayers = [
-    { id: "1", name: "Galinha Pititica", avatar: "🐔", eggs: 85, selectedAnswer: 0 },
-    { id: "2", name: "Galo Carijó", avatar: "🐓", eggs: 70, selectedAnswer: 1 },
-    { id: "3", name: "Pintinho Pio", avatar: "🐣", eggs: 60, selectedAnswer: 0 },
-    { id: "4", name: "Dona Cacarejá", avatar: "🐥", eggs: 45 },
-  ];
+  // Single player atual
+  const currentPlayer = {
+    id: "current",
+    name: "Você",
+    avatar: "🐔",
+    eggs: playerEggs,
+    selectedAnswer: selectedAnswer
+  };
 
   if (isLoading) {
     return (
@@ -69,7 +73,7 @@ export default function GameArena() {
   };
 
   const playersOnOption = (optionIndex: number) => {
-    return mockPlayers.filter(p => p.selectedAnswer === optionIndex);
+    return selectedAnswer === optionIndex ? [currentPlayer] : [];
   };
 
   return (
@@ -101,8 +105,9 @@ export default function GameArena() {
             <div className="flex items-center justify-center gap-2">
               <span className="text-2xl animate-egg-bounce">🥚</span>
               <div>
-                <p className="text-sm text-muted-foreground">Vale</p>
-                <p className="text-xl font-bold text-barn-brown">10 ovos</p>
+                <p className="text-sm text-muted-foreground">Valendo</p>
+                <p className="text-xl font-bold text-barn-brown">{currentSettings?.eggs_per_correct || 10} ovos</p>
+                <p className="text-xs text-muted-foreground">+{currentSettings?.speed_bonus || 5} bônus velocidade</p>
               </div>
             </div>
           </BarnCard>
@@ -161,59 +166,44 @@ export default function GameArena() {
           ))}
         </div>
 
-        {/* Players Ranking */}
+        {/* Player Score */}
         <BarnCard variant="coop">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-xl">🏆</span>
             <h3 className="text-xl font-bold text-barn-brown">
-              Poleiro da Fama - Rodada {currentRound}
+              Sua Pontuação - Rodada {currentRound}
             </h3>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {mockPlayers
-              .sort((a, b) => b.eggs - a.eggs)
-              .map((player, index) => (
-              <div
-                key={player.id}
-                className={`relative p-4 rounded-lg border-2 text-center transition-all duration-300 ${
-                  index === 0 
-                    ? 'bg-gradient-sunrise text-white border-corn-golden shadow-barn' 
-                    : 'bg-white/50 border-primary/20'
-                }`}
-              >
-                {/* Position Medal */}
-                <div className="absolute -top-2 -right-2">
-                  {index === 0 && <span className="text-2xl">🥇</span>}
-                  {index === 1 && <span className="text-xl">🥈</span>}
-                  {index === 2 && <span className="text-lg">🥉</span>}
-                </div>
-                
-                <ChickenAvatar 
-                  emoji={player.avatar} 
-                  size="lg" 
-                  animated 
-                  className="mb-2"
-                />
-                <p className="font-semibold text-sm truncate mb-2">
-                  {player.name}
+          <div className="text-center">
+            <ChickenAvatar 
+              emoji={currentPlayer.avatar} 
+              size="lg" 
+              animated 
+              className="mb-2"
+            />
+            <p className="font-semibold text-lg mb-2">
+              {currentPlayer.name}
+            </p>
+            <EggCounter 
+              count={currentPlayer.eggs} 
+              size="lg"
+              variant="golden"
+            />
+            
+            {/* Answer feedback */}
+            {selectedAnswer !== null && (
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium">
+                  Sua resposta: <span className="font-bold">{currentQuestion?.options[selectedAnswer]}</span>
                 </p>
-                <EggCounter 
-                  count={player.eggs} 
-                  size="sm"
-                  variant={index === 0 ? "golden" : "default"}
-                />
-                
-                {/* Selection indicator */}
-                {player.selectedAnswer !== undefined && (
-                  <div className="mt-2">
-                    <span className="text-xs px-2 py-1 bg-muted rounded-full">
-                      Resposta: {String.fromCharCode(65 + player.selectedAnswer)}
-                    </span>
-                  </div>
+                {answerTime && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Tempo de resposta: {answerTime.toFixed(1)}s
+                  </p>
                 )}
               </div>
-            ))}
+            )}
           </div>
         </BarnCard>
 
@@ -227,7 +217,10 @@ export default function GameArena() {
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-2">
                   {selectedAnswer === currentQuestion.correctAnswer 
-                    ? "🥚 Parabéns! Você ganhou 10 ovos!" 
+                    ? `🥚 Parabéns! Você ganhou ${currentSettings?.eggs_per_correct || 10} ovos${
+                        timeLeft > ((currentSettings?.time_per_question || 15) * 0.8) ? 
+                        ` + ${currentSettings?.speed_bonus || 5} bônus velocidade!` : '!'
+                      }` 
                     : "💔 Que pena! A resposta correta era: " + currentQuestion.options[currentQuestion.correctAnswer]
                   }
                 </h3>
