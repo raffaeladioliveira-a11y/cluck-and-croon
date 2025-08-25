@@ -3,6 +3,7 @@ import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
+import { MusicPlayer } from "@/components/MusicPlayer";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 
@@ -116,33 +117,20 @@ export default function GameArena() {
 
         {/* Music Player Section */}
         <BarnCard variant="golden" className="mb-6">
-          <div className="text-center">
-            <div className="mb-4">
-              <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
-              <h2 className="text-2xl font-bold text-white mb-2">
-                {currentQuestion.song}
-              </h2>
-              <p className="text-white/80">
-                Quem é o intérprete desta música?
-              </p>
-            </div>
-            
-            {/* Mock Music Player */}
-            <div className="bg-white/20 rounded-lg p-4 border border-white/30">
-              <div className="flex items-center justify-center gap-4 mb-3">
-                <Button variant="outline" size="icon" className="bg-white/20 hover:bg-white/30 border-white/30 text-white">
-                  ⏸️
-                </Button>
-                <div className="text-white/90 font-medium">
-                  0:08 / 0:15
-                </div>
-              </div>
-              <Progress value={53} className="h-2 bg-white/20" />
-              <p className="text-xs text-white/70 mt-2">
-                🎧 Ouça atentamente os 15 segundos da música
-              </p>
-            </div>
-          </div>
+          <MusicPlayer
+            songTitle={currentQuestion.song}
+            artist={currentQuestion.artist}
+            duration={15}
+            autoPlay={!showResults}
+            onTimeUpdate={(time) => {
+              // Lógica do timer pode ser atualizada aqui
+            }}
+            onEnded={() => {
+              if (!showResults) {
+                setShowResults(true);
+              }
+            }}
+          />
         </BarnCard>
 
         {/* Answer Options */}

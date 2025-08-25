@@ -261,6 +261,18 @@ export default function Home() {
               <div className="text-sm text-muted-foreground">Galinhas de Ouro</div>
             </div>
           </div>
+
+          {/* Admin Access */}
+          <div className="mt-8 text-center">
+            <ChickenButton 
+              variant="barn" 
+              size="sm"
+              onClick={() => navigate('/admin')}
+              className="opacity-75 hover:opacity-100"
+            >
+              🚜 Acesso Administrativo
+            </ChickenButton>
+          </div>
         </div>
       </section>
     </div>
