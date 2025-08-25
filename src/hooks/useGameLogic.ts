@@ -51,6 +51,7 @@ export const useGameLogic = (roomCode: string) => {
   const [answersCount, setAnswersCount] = useState(0);
   const [expectedPlayers, setExpectedPlayers] = useState(1); // Single-player default
   const [isHost, setIsHost] = useState(true); // Single-player default
+  const [previousSongId, setPreviousSongId] = useState<string | null>(null);
   
   // Refs for cleanup
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -134,9 +135,19 @@ export const useGameLogic = (roomCode: string) => {
     return "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav";
   };
 
-  // Gerar pergunta com títulos como opções
-  const generateQuestion = (songs: Song[], gameSettings: any): GameQuestion => {
-    const shuffled = [...songs].sort(() => Math.random() - 0.5);
+  // Gerar pergunta com títulos como opções (anti-repetição)
+  const generateQuestion = async (songs: Song[], gameSettings: any, previousSongId?: string): Promise<GameQuestion> => {
+    // Filter out previous song to avoid immediate repetition
+    let filteredSongs = previousSongId 
+      ? songs.filter(song => song.id !== previousSongId)
+      : songs;
+    
+    // If we have less than 4 songs after filtering, use all available
+    if (filteredSongs.length < 4) {
+      filteredSongs = songs;
+    }
+    
+    const shuffled = [...filteredSongs].sort(() => Math.random() - 0.5);
     const correctSong = shuffled[0];
     
     // Adicionar URL de áudio à música
@@ -187,7 +198,7 @@ export const useGameLogic = (roomCode: string) => {
       setCurrentSettings(gameSettings);
       
       if (songs.length > 0) {
-        const question = generateQuestion(songs, gameSettings);
+        const question = await generateQuestion(songs, gameSettings);
         setCurrentQuestion(question);
         setTimeLeft(gameSettings.time_per_question || 15);
       }
@@ -242,11 +253,15 @@ export const useGameLogic = (roomCode: string) => {
         
         // Navigate to lobby with set completion data
         setTimeout(() => {
-          // Use proper navigation instead of window.location
-          const url = `/game/lobby?roomCode=${roomCode}&setComplete=true&eggs=${playerEggs}`;
-          // This will be handled by the calling component with navigate()
-          console.log('🚀 Redirecting to:', url);
-          window.dispatchEvent(new CustomEvent('navigateToLobby', { detail: { url } }));
+          // Properly dispatch navigation event
+          console.log('🚀 Redirecting to lobby with', playerEggs, 'eggs');
+          window.dispatchEvent(new CustomEvent('navigateToLobby', { 
+            detail: { 
+              roomCode, 
+              setComplete: true, 
+              eggs: playerEggs 
+            } 
+          }));
         }, 1000);
         
         toast({
@@ -279,8 +294,9 @@ export const useGameLogic = (roomCode: string) => {
     setCurrentSettings(gameSettings);
     
     if (songs.length > 0) {
-      const question = generateQuestion(songs, gameSettings);
+      const question = await generateQuestion(songs, gameSettings, previousSongId || undefined);
       setCurrentQuestion(question);
+      setPreviousSongId(question.song.id);
       setGameState('playing');
       startRoundTimer(gameSettings.time_per_question || 15);
     }

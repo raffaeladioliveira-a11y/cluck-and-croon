@@ -109,37 +109,33 @@ export default function GameLobby() {
       }
     }
     
-    // Simular outros jogadores no galinheiro
-    const mockPlayers: Player[] = [
+    // Single player setup - no fake players needed
+    const singlePlayer: Player[] = [
       { 
         id: "current", 
         name: player.name, 
         avatar: player.avatar, 
-        isHost: player.isHost,
+        isHost: true, // Single player is always host
         eggs: setEggs
       },
     ];
 
-    // Adicionar alguns jogadores simulados se não for o host
-    if (!player.isHost) {
-      mockPlayers.unshift(
-        { id: "host", name: "Fazendeiro Silva", avatar: "👑🐓", isHost: true }
-      );
-    }
-
-    // Adicionar alguns jogadores aleatórios
-    const randomPlayers = [
-      { id: "2", name: "Galinha Cacarejá", avatar: "🐔", isHost: false },
-      { id: "3", name: "Pintinho Pio", avatar: "🐣", isHost: false },
-    ];
-
-    setPlayers([...mockPlayers, ...randomPlayers.slice(0, Math.floor(Math.random() * 3))]);
+    setPlayers(singlePlayer);
     
     // Load genres for picker mode
     loadGenres();
   }, [navigate, searchParams]);
 
   const handleStartGame = () => {
+    if (!roomCode) {
+      toast({
+        title: "❌ Erro",
+        description: "Código da sala não encontrado",
+        variant: "destructive"
+      });
+      return;
+    }
+
     toast({
       title: "🎵 Iniciando Cantoria!",
       description: "Carregando as músicas do galinheiro...",
@@ -151,6 +147,8 @@ export default function GameLobby() {
   };
 
   const handleGenreSelect = (genreId: string) => {
+    if (!roomCode) return;
+    
     setSelectedGenre(genreId);
     
     toast({

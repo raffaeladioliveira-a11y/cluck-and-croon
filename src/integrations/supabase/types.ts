@@ -34,6 +34,7 @@ export type Database = {
           created_at: string
           current_players: number | null
           current_round: number | null
+          current_set: number | null
           current_song_id: string | null
           eggs_per_correct: number | null
           finished_at: string | null
@@ -41,6 +42,7 @@ export type Database = {
           id: string
           max_players: number | null
           name: string
+          next_genre_id: string | null
           room_code: string
           rounds_total: number | null
           speed_bonus: number | null
@@ -53,6 +55,7 @@ export type Database = {
           created_at?: string
           current_players?: number | null
           current_round?: number | null
+          current_set?: number | null
           current_song_id?: string | null
           eggs_per_correct?: number | null
           finished_at?: string | null
@@ -60,6 +63,7 @@ export type Database = {
           id?: string
           max_players?: number | null
           name: string
+          next_genre_id?: string | null
           room_code: string
           rounds_total?: number | null
           speed_bonus?: number | null
@@ -72,6 +76,7 @@ export type Database = {
           created_at?: string
           current_players?: number | null
           current_round?: number | null
+          current_set?: number | null
           current_song_id?: string | null
           eggs_per_correct?: number | null
           finished_at?: string | null
@@ -79,6 +84,7 @@ export type Database = {
           id?: string
           max_players?: number | null
           name?: string
+          next_genre_id?: string | null
           room_code?: string
           rounds_total?: number | null
           speed_bonus?: number | null
@@ -93,6 +99,13 @@ export type Database = {
             columns: ["current_song_id"]
             isOneToOne: false
             referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_rooms_next_genre_id_fkey"
+            columns: ["next_genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
             referencedColumns: ["id"]
           },
         ]

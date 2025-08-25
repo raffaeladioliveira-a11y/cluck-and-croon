@@ -18,8 +18,9 @@ export default function GameArena() {
   // Listen for navigation events from game logic
   useEffect(() => {
     const handleNavigateToLobby = (event: CustomEvent) => {
-      const { url } = event.detail;
-      navigate(url);
+      const { roomCode: navRoomCode, setComplete, eggs } = event.detail;
+      console.log('🚀 Received navigation event:', event.detail);
+      navigate(`/game/lobby/${navRoomCode}?setComplete=${setComplete}&eggs=${eggs}`);
     };
 
     window.addEventListener('navigateToLobby', handleNavigateToLobby as EventListener);
