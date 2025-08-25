@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
 import { Copy, Users, Music, Trophy, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 interface Player {
@@ -80,7 +80,16 @@ export default function GameLobby() {
     }
 
     const player = JSON.parse(playerData);
-    setCurrentUserId(player.id || 'current');
+    
+    // Generate or get user ID
+    let userId = player.id;
+    if (!userId) {
+      userId = crypto.randomUUID();
+      player.id = userId;
+      localStorage.setItem('playerData', JSON.stringify(player));
+    }
+    
+    setCurrentUserId(userId);
     
     // Check if we're coming from a completed set
     const wasSetComplete = searchParams.get('setComplete') === 'true';
@@ -114,12 +123,9 @@ export default function GameLobby() {
   // Join room function
   const joinRoom = async (player: any) => {
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate('/auth');
-        return;
-      }
+      // For demo purposes, we'll use the player ID as user identifier
+      // In production, this would use actual Supabase auth
+      const mockUserId = player.id;
 
       // Find or create room
       const { data: existingRoom } = await supabase
@@ -137,7 +143,7 @@ export default function GameLobby() {
           .insert({
             room_code: roomCode,
             name: `Sala ${roomCode}`,
-            host_id: user.id,
+            host_id: mockUserId,
             status: 'waiting'
           })
           .select()
@@ -152,10 +158,10 @@ export default function GameLobby() {
         .from('room_participants')
         .upsert({
           room_id: room.id,
-          user_id: user.id,
+          user_id: mockUserId,
           display_name: player.name,
           avatar_emoji: player.avatar,
-          is_host: user.id === room.host_id
+          is_host: mockUserId === room.host_id
         }, {
           onConflict: 'room_id,user_id'
         });
@@ -237,11 +243,8 @@ export default function GameLobby() {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Check if user is host
-      const currentPlayer = players.find(p => p.id === user.id);
+      // Use the current user ID from state
+      const currentPlayer = players.find(p => p.id === currentUserId);
       if (!currentPlayer?.isHost) {
         toast({
           title: "❌ Acesso Negado",
@@ -270,15 +273,6 @@ export default function GameLobby() {
         variant: "destructive"
       });
     }
-
-    toast({
-      title: "🎵 Iniciando Cantoria!",
-      description: "Carregando as músicas do galinheiro...",
-    });
-
-    setTimeout(() => {
-      navigate(`/game/${roomCode}`);
-    }, 1500);
   };
 
   const handleGenreSelect = (genreId: string) => {
