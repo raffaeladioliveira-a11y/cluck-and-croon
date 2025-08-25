@@ -226,17 +226,24 @@ export const useGameLogic = (roomCode: string) => {
     // Show results for 3 seconds, then transition
     timeoutRef.current = setTimeout(() => {
       if (currentRound >= 10) {
+        // End of set - redirect to lobby
         setGameState('finished');
+        
+        // Navigate to lobby with set completion data
+        setTimeout(() => {
+          window.location.href = `/game/lobby/${roomCode}?setComplete=true&eggs=${playerEggs}`;
+        }, 1000);
+        
         toast({
-          title: "🎉 Fim do jogo!",
-          description: `Parabéns! Você coletou ${playerEggs} ovos em 10 rodadas!`
+          title: "🎉 Set completo!",
+          description: `Você coletou ${playerEggs} ovos! Voltando ao lobby...`
         });
       } else {
         setGameState('transition');
         setTimeout(() => startNextRound(), 100);
       }
     }, 3000);
-  }, [isHost, currentRound, playerEggs]);
+  }, [isHost, currentRound, playerEggs, roomCode]);
 
   // Start next round
   const startNextRound = useCallback(async () => {

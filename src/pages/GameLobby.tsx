@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
-import { Copy, Users, Music } from "lucide-react";
+import { Copy, Users, Music, Trophy, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 interface Player {
@@ -13,12 +14,50 @@ interface Player {
   name: string;
   avatar: string;
   isHost: boolean;
+  eggs?: number;
+}
+
+interface Genre {
+  id: string;
+  name: string;
+  emoji: string;
+  description?: string;
+}
+
+interface SetResult {
+  playerId: string;
+  playerName: string;
+  setEggs: number;
+  totalEggs: number;
 }
 
 export default function GameLobby() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [players, setPlayers] = useState<Player[]>([]);
+  const [genres, setGenres] = useState<Genre[]>([]);
+  const [setComplete, setSetComplete] = useState(false);
+  const [setResults, setSetResults] = useState<SetResult[]>([]);
+  const [mvpPlayer, setMvpPlayer] = useState<SetResult | null>(null);
+  const [isPickerMode, setIsPickerMode] = useState(false);
+  const [selectedGenre, setSelectedGenre] = useState<string>('');
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+
+  // Load genres from database
+  const loadGenres = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('genres')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      setGenres(data || []);
+    } catch (error) {
+      console.error('Error loading genres:', error);
+    }
+  };
 
   // Carregar dados do jogador e simular outros jogadores
   useEffect(() => {
@@ -30,6 +69,45 @@ export default function GameLobby() {
     }
 
     const player = JSON.parse(playerData);
+    setCurrentUserId(player.id || 'current');
+    
+    // Check if we're coming from a completed set
+    const wasSetComplete = searchParams.get('setComplete') === 'true';
+    const setEggs = parseInt(searchParams.get('eggs') || '0');
+    
+    if (wasSetComplete) {
+      setSetComplete(true);
+      
+      // Simulate set results (in real app, this would come from database)
+      const mockResults: SetResult[] = [
+        {
+          playerId: 'current',
+          playerName: player.name,
+          setEggs: setEggs,
+          totalEggs: setEggs // In real app, would be cumulative
+        },
+        {
+          playerId: '2',
+          playerName: 'Galinha Cacarejá',
+          setEggs: Math.floor(Math.random() * 50) + 20,
+          totalEggs: Math.floor(Math.random() * 150) + 50
+        },
+        {
+          playerId: '3',
+          playerName: 'Pintinho Pio',
+          setEggs: Math.floor(Math.random() * 40) + 10,
+          totalEggs: Math.floor(Math.random() * 100) + 30
+        }
+      ].sort((a, b) => b.setEggs - a.setEggs);
+      
+      setSetResults(mockResults);
+      setMvpPlayer(mockResults[0]);
+      
+      // Check if current player is the winner (picker)
+      if (mockResults[0].playerId === 'current') {
+        setIsPickerMode(true);
+      }
+    }
     
     // Simular outros jogadores no galinheiro
     const mockPlayers: Player[] = [
@@ -37,7 +115,8 @@ export default function GameLobby() {
         id: "current", 
         name: player.name, 
         avatar: player.avatar, 
-        isHost: player.isHost 
+        isHost: player.isHost,
+        eggs: setEggs
       },
     ];
 
@@ -55,7 +134,10 @@ export default function GameLobby() {
     ];
 
     setPlayers([...mockPlayers, ...randomPlayers.slice(0, Math.floor(Math.random() * 3))]);
-  }, [navigate]);
+    
+    // Load genres for picker mode
+    loadGenres();
+  }, [navigate, searchParams]);
 
   const handleStartGame = () => {
     toast({
@@ -66,6 +148,19 @@ export default function GameLobby() {
     setTimeout(() => {
       navigate(`/game/${roomCode}`);
     }, 1500);
+  };
+
+  const handleGenreSelect = (genreId: string) => {
+    setSelectedGenre(genreId);
+    
+    toast({
+      title: "🎼 Estilo Escolhido!",
+      description: "Iniciando novo set com o estilo selecionado...",
+    });
+
+    setTimeout(() => {
+      navigate(`/game/${roomCode}?genre=${genreId}&newSet=true`);
+    }, 2000);
   };
 
   const copyRoomCode = async () => {
@@ -118,40 +213,132 @@ export default function GameLobby() {
           </p>
         </div>
 
-        {/* Room Info */}
-        <BarnCard variant="golden" className="mb-8">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <div className="text-6xl animate-chicken-walk">🏠</div>
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Código do Galinheiro</h2>
-                <div className="flex items-center gap-2 justify-center">
-                  <span className="text-4xl font-bold font-mono tracking-wider text-white bg-white/20 px-4 py-2 rounded-lg">
-                    {roomCode}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={copyRoomCode}
-                    className="bg-white/20 border-white/30 hover:bg-white/30 text-white h-12 w-12"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
+        {/* Set Results (if just completed) */}
+        {setComplete && (
+          <BarnCard variant="golden" className="mb-8">
+            <div className="text-center">
+              <div className="text-6xl mb-4 animate-egg-bounce">🏆</div>
+              <h2 className="text-3xl font-bold text-white mb-6">🎉 Set Completo! 🎉</h2>
+              
+              {/* MVP */}
+              {mvpPlayer && (
+                <div className="bg-white/20 rounded-lg p-6 mb-6">
+                  <div className="flex items-center justify-center gap-4 mb-4">
+                    <Crown className="w-8 h-8 text-yellow-300" />
+                    <h3 className="text-2xl font-bold text-white">MVP do Set</h3>
+                    <Crown className="w-8 h-8 text-yellow-300" />
+                  </div>
+                  <div className="text-4xl mb-2">🐓👑</div>
+                  <p className="text-xl font-bold text-white">{mvpPlayer.playerName}</p>
+                  <p className="text-white/90">{mvpPlayer.setEggs} ovos coletados</p>
+                </div>
+              )}
+
+              {/* Set Ranking */}
+              <div className="bg-white/10 rounded-lg p-4 mb-6">
+                <h4 className="text-lg font-bold text-white mb-4">📊 Ranking do Set</h4>
+                <div className="space-y-2">
+                  {setResults.slice(0, 5).map((result, index) => (
+                    <div key={result.playerId} className="flex items-center justify-between bg-white/10 rounded p-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🐔'}
+                        </span>
+                        <span className="text-white font-semibold">{result.playerName}</span>
+                      </div>
+                      <span className="text-white">{result.setEggs} 🥚</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Cumulative Ranking */}
+              <div className="bg-white/10 rounded-lg p-4">
+                <h4 className="text-lg font-bold text-white mb-4">🏆 Ranking Geral</h4>
+                <div className="space-y-2">
+                  {setResults.sort((a, b) => b.totalEggs - a.totalEggs).slice(0, 5).map((result, index) => (
+                    <div key={result.playerId} className="flex items-center justify-between bg-white/10 rounded p-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">
+                          {index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : '🐔'}
+                        </span>
+                        <span className="text-white font-semibold">{result.playerName}</span>
+                      </div>
+                      <span className="text-white">{result.totalEggs} 🥚</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
-            
-            <div className="grid md:grid-cols-2 gap-4">
-              <ChickenButton variant="feather" size="lg" onClick={copyRoomCode}>
-                <Copy className="w-4 h-4 mr-2" />
-                Copiar Código
-              </ChickenButton>
-              <ChickenButton variant="feather" size="lg" onClick={shareRoomLink}>
-                🔗 Compartilhar Link
-              </ChickenButton>
+          </BarnCard>
+        )}
+
+        {/* Genre Selection (for MVP) */}
+        {isPickerMode && (
+          <BarnCard variant="coop" className="mb-8">
+            <div className="text-center">
+              <div className="text-6xl mb-4 animate-chicken-walk">🎼</div>
+              <h2 className="text-2xl font-bold text-barn-brown mb-4">
+                👑 Você é o MVP! Escolha o próximo estilo musical:
+              </h2>
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                {genres.map((genre) => (
+                  <ChickenButton
+                    key={genre.id}
+                    variant={selectedGenre === genre.id ? "corn" : "feather"}
+                    onClick={() => handleGenreSelect(genre.id)}
+                    className="h-20 flex-col gap-2"
+                  >
+                    <span className="text-2xl">{genre.emoji}</span>
+                    <span className="text-sm font-semibold">{genre.name}</span>
+                  </ChickenButton>
+                ))}
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                Como MVP do set anterior, você tem o privilégio de escolher o estilo do próximo set!
+              </p>
             </div>
-          </div>
-        </BarnCard>
+          </BarnCard>
+        )}
+
+        {/* Room Info */}
+        {!setComplete && (
+          <BarnCard variant="golden" className="mb-8">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <div className="text-6xl animate-chicken-walk">🏠</div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Código do Galinheiro</h2>
+                  <div className="flex items-center gap-2 justify-center">
+                    <span className="text-4xl font-bold font-mono tracking-wider text-white bg-white/20 px-4 py-2 rounded-lg">
+                      {roomCode}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={copyRoomCode}
+                      className="bg-white/20 border-white/30 hover:bg-white/30 text-white h-12 w-12"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid md:grid-cols-2 gap-4">
+                <ChickenButton variant="feather" size="lg" onClick={copyRoomCode}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copiar Código
+                </ChickenButton>
+                <ChickenButton variant="feather" size="lg" onClick={shareRoomLink}>
+                  🔗 Compartilhar Link
+                </ChickenButton>
+              </div>
+            </div>
+          </BarnCard>
+        )}
 
         {/* Players Section */}
         <div className="grid lg:grid-cols-3 gap-6 mb-8">
@@ -243,29 +430,31 @@ export default function GameLobby() {
         </div>
 
         {/* Start Game Section */}
-        <div className="text-center">
-          <BarnCard variant="golden">
-            <div className="text-center">
-              <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
-              <h3 className="text-2xl font-bold text-white mb-4">
-                Pronto para começar a cantoria?
-              </h3>
-              <p className="text-white/90 mb-6">
-                Mínimo de 1 galinha necessária para iniciar o jogo
-              </p>
-              <ChickenButton 
-                variant="feather" 
-                  size="xl" 
-                  disabled={players.length < 1}
-                  chickenStyle="bounce"
-                  className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-2xl px-8"
-                  onClick={handleStartGame}
-                >
-                🎵 Começar a Cantoria! 🎵
-              </ChickenButton>
-            </div>
-          </BarnCard>
-        </div>
+        {!setComplete && !isPickerMode && (
+          <div className="text-center">
+            <BarnCard variant="golden">
+              <div className="text-center">
+                <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
+                <h3 className="text-2xl font-bold text-white mb-4">
+                  Pronto para começar a cantoria?
+                </h3>
+                <p className="text-white/90 mb-6">
+                  Mínimo de 1 galinha necessária para iniciar o jogo
+                </p>
+                <ChickenButton 
+                  variant="feather" 
+                    size="xl" 
+                    disabled={players.length < 1}
+                    chickenStyle="bounce"
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-2xl px-8"
+                    onClick={handleStartGame}
+                  >
+                  🎵 Começar a Cantoria! 🎵
+                </ChickenButton>
+              </div>
+            </BarnCard>
+          </div>
+        )}
 
         {/* Animated Background Elements */}
         <div className="fixed inset-0 pointer-events-none z-0">
