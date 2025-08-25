@@ -157,6 +157,27 @@ export type Database = {
           },
         ]
       }
+      game_settings: {
+        Row: {
+          created_at: string | null
+          key: string
+          updated_at: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string | null
+          key: string
+          updated_at?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string | null
+          key?: string
+          updated_at?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       genres: {
         Row: {
           chicken_description: string | null
