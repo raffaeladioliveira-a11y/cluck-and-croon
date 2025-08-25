@@ -31,11 +31,11 @@ export const MusicPlayer = ({
   const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // URLs de músicas de exemplo com fallbacks
+  // URLs de músicas de exemplo com fallbacks mais confiáveis
   const audioSources = [
-    "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav",
-    "https://archive.org/download/testmp3testfile/mpthreetest.mp3",
-    "https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3"
+    "https://commondatastorage.googleapis.com/codeskulptor-demos/DDR_assets/Kangaroo_MusiQue_-_The_Neverwritten_Role_Playing_Game.mp3",
+    "https://commondatastorage.googleapis.com/codeskulptor-assets/week7-button.m4a",
+    "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav"
   ];
   
   const [currentSourceIndex, setCurrentSourceIndex] = useState(0);
@@ -264,7 +264,7 @@ export const MusicPlayer = ({
         <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
           <span className="animate-egg-bounce">🎯</span>
           <span className="text-white/90 text-sm font-medium">
-            Quem é o intérprete desta música?
+            Qual é o título desta música?
           </span>
         </div>
       </div>

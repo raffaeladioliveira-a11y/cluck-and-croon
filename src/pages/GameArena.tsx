@@ -1,66 +1,59 @@
-import { useState, useEffect } from "react";
+import { useParams } from "react-router-dom";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
 import { MusicPlayer } from "@/components/MusicPlayer";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-
-interface Player {
-  id: string;
-  name: string;
-  avatar: string;
-  eggs: number;
-  selectedAnswer?: number;
-}
-
-interface Question {
-  song: string;
-  artist: string;
-  options: string[];
-  correctAnswer: number;
-}
+import { useGameLogic } from "@/hooks/useGameLogic";
+import { Loader2 } from "lucide-react";
 
 export default function GameArena() {
-  const [currentRound, setCurrentRound] = useState(3);
-  const [timeLeft, setTimeLeft] = useState(12);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showResults, setShowResults] = useState(false);
-  
-  const [players] = useState<Player[]>([
+  const { roomCode } = useParams<{ roomCode: string }>();
+  const {
+    currentRound,
+    timeLeft,
+    selectedAnswer,
+    showResults,
+    currentQuestion,
+    players,
+    isLoading,
+    gameStarted,
+    handleAnswerSelect,
+    nextRound,
+    setPlayers,
+    setShowResults
+  } = useGameLogic(roomCode || '');
+
+  // Players mockados por enquanto - depois conectar com o Supabase
+  const mockPlayers = [
     { id: "1", name: "Galinha Pititica", avatar: "🐔", eggs: 85, selectedAnswer: 0 },
     { id: "2", name: "Galo Carijó", avatar: "🐓", eggs: 70, selectedAnswer: 1 },
     { id: "3", name: "Pintinho Pio", avatar: "🐣", eggs: 60, selectedAnswer: 0 },
     { id: "4", name: "Dona Cacarejá", avatar: "🐥", eggs: 45 },
-  ]);
+  ];
 
-  const currentQuestion: Question = {
-    song: "Evidências",
-    artist: "Chitãozinho & Xororó",
-    options: [
-      "Chitãozinho & Xororó",
-      "Zezé Di Camargo & Luciano", 
-      "Leandro & Leonardo",
-      "Bruno & Marrone"
-    ],
-    correctAnswer: 0
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
+        <BarnCard variant="golden" className="text-center p-8">
+          <div className="text-6xl mb-4 animate-chicken-walk">🐔</div>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-white" />
+          <p className="text-white text-lg">Preparando o galinheiro musical...</p>
+        </BarnCard>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    if (timeLeft > 0 && !showResults) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0) {
-      setShowResults(true);
-    }
-  }, [timeLeft, showResults]);
-
-  const handleAnswerSelect = (answerIndex: number) => {
-    if (!showResults && selectedAnswer === null) {
-      setSelectedAnswer(answerIndex);
-    }
-  };
+  if (!currentQuestion) {
+    return (
+      <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
+        <BarnCard variant="coop" className="text-center p-8">
+          <div className="text-6xl mb-4">😞</div>
+          <p className="text-lg">Não foi possível carregar o jogo. Tente novamente.</p>
+        </BarnCard>
+      </div>
+    );
+  }
 
   const getAnswerColor = (index: number) => {
     if (!showResults) {
@@ -76,7 +69,7 @@ export default function GameArena() {
   };
 
   const playersOnOption = (optionIndex: number) => {
-    return players.filter(p => p.selectedAnswer === optionIndex);
+    return mockPlayers.filter(p => p.selectedAnswer === optionIndex);
   };
 
   return (
@@ -118,9 +111,10 @@ export default function GameArena() {
         {/* Music Player Section */}
         <BarnCard variant="golden" className="mb-6">
           <MusicPlayer
-            songTitle={currentQuestion.song}
-            artist={currentQuestion.artist}
-            duration={15}
+            songTitle={currentQuestion.song.title}
+            artist={currentQuestion.song.artist}
+            audioUrl={currentQuestion.song.preview_url || currentQuestion.song.audio_file_url}
+            duration={currentQuestion.song.duration_seconds || 15}
             autoPlay={!showResults}
             onTimeUpdate={(time) => {
               // Lógica do timer pode ser atualizada aqui
@@ -177,7 +171,7 @@ export default function GameArena() {
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {players
+            {mockPlayers
               .sort((a, b) => b.eggs - a.eggs)
               .map((player, index) => (
               <div
@@ -244,6 +238,7 @@ export default function GameArena() {
                 size="lg" 
                 className="bg-white/20 hover:bg-white/30 text-white border-white/30"
                 chickenStyle="bounce"
+                onClick={nextRound}
               >
                 🎵 Próxima Música 🎵
               </ChickenButton>
