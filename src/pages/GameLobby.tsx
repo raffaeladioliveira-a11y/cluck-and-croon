@@ -71,11 +71,10 @@ export default function GameLobby() {
     }
   };
 
-  // Carregar dados do jogador e simular outros jogadores
+  // Carregar dados do jogador e se conectar à sala
   useEffect(() => {
     const playerData = localStorage.getItem('playerData');
     if (!playerData) {
-      // Se não há dados do jogador, redirecionar para home
       navigate('/');
       return;
     }
@@ -90,55 +89,144 @@ export default function GameLobby() {
     if (wasSetComplete) {
       setSetComplete(true);
       
-      // Simulate set results (in real app, this would come from database)
+      // Load set results from database in production
       const mockResults: SetResult[] = [
         {
           playerId: 'current',
           playerName: player.name,
           setEggs: setEggs,
-          totalEggs: setEggs // In real app, would be cumulative
-        },
-        {
-          playerId: '2',
-          playerName: 'Galinha Cacarejá',
-          setEggs: Math.floor(Math.random() * 50) + 20,
-          totalEggs: Math.floor(Math.random() * 150) + 50
-        },
-        {
-          playerId: '3',
-          playerName: 'Pintinho Pio',
-          setEggs: Math.floor(Math.random() * 40) + 10,
-          totalEggs: Math.floor(Math.random() * 100) + 30
+          totalEggs: setEggs
         }
-      ].sort((a, b) => b.setEggs - a.setEggs);
+      ];
       
       setSetResults(mockResults);
       setMvpPlayer(mockResults[0]);
-      
-      // Check if current player is the winner (picker)
-      if (mockResults[0].playerId === 'current') {
-        setIsPickerMode(true);
-      }
+      setIsPickerMode(true);
     }
     
-    // Single player setup - no fake players needed
-    const singlePlayer: Player[] = [
-      { 
-        id: "current", 
-        name: player.name, 
-        avatar: player.avatar, 
-        isHost: true, // Single player is always host
-        eggs: setEggs
-      },
-    ];
-
-    setPlayers(singlePlayer);
+    // Join or create room
+    joinRoom(player);
     
     // Load genres for picker mode
     loadGenres();
-  }, [navigate, searchParams]);
+  }, [navigate, searchParams, roomCode]);
 
-  const handleStartGame = () => {
+  // Join room function
+  const joinRoom = async (player: any) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+
+      // Find or create room
+      const { data: existingRoom } = await supabase
+        .from('game_rooms')
+        .select('*')
+        .eq('room_code', roomCode)
+        .single();
+
+      let room = existingRoom;
+      
+      if (!room) {
+        // Create new room if it doesn't exist
+        const { data: newRoom, error: roomError } = await supabase
+          .from('game_rooms')
+          .insert({
+            room_code: roomCode,
+            name: `Sala ${roomCode}`,
+            host_id: user.id,
+            status: 'waiting'
+          })
+          .select()
+          .single();
+
+        if (roomError) throw roomError;
+        room = newRoom;
+      }
+
+      // Join as participant
+      const { error: participantError } = await supabase
+        .from('room_participants')
+        .upsert({
+          room_id: room.id,
+          user_id: user.id,
+          display_name: player.name,
+          avatar_emoji: player.avatar,
+          is_host: user.id === room.host_id
+        }, {
+          onConflict: 'room_id,user_id'
+        });
+
+      if (participantError) throw participantError;
+
+      // Subscribe to room changes
+      const channel = supabase.channel(`room:${roomCode}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'room_participants',
+          filter: `room_id=eq.${room.id}`
+        }, () => {
+          loadParticipants(room.id);
+        })
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'game_rooms',
+          filter: `id=eq.${room.id}`
+        }, (payload) => {
+          if (payload.new.status === 'playing') {
+            // Host started the game, navigate all players
+            navigate(`/game/${roomCode}`);
+          }
+        })
+        .subscribe();
+
+      // Load initial participants
+      loadParticipants(room.id);
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+
+    } catch (error) {
+      console.error('Error joining room:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível entrar na sala",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Load participants from database
+  const loadParticipants = async (roomId: string) => {
+    try {
+      const { data: participants, error } = await supabase
+        .from('room_participants')
+        .select('*')
+        .eq('room_id', roomId);
+
+      if (error) throw error;
+
+      const formattedPlayers: Player[] = participants.map(p => ({
+        id: p.user_id,
+        name: p.display_name,
+        avatar: p.avatar_emoji,
+        isHost: p.is_host,
+        eggs: p.current_eggs || 0
+      }));
+
+      setPlayers(formattedPlayers);
+    } catch (error) {
+      console.error('Error loading participants:', error);
+    }
+  };
+
+  const handleStartGame = async () => {
     if (!roomCode) {
       toast({
         title: "❌ Erro",
@@ -146,6 +234,41 @@ export default function GameLobby() {
         variant: "destructive"
       });
       return;
+    }
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check if user is host
+      const currentPlayer = players.find(p => p.id === user.id);
+      if (!currentPlayer?.isHost) {
+        toast({
+          title: "❌ Acesso Negado",
+          description: "Apenas o fazendeiro pode iniciar o jogo",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update room status to start game for all players
+      const { error } = await supabase
+        .from('game_rooms')
+        .update({ status: 'playing' })
+        .eq('room_code', roomCode);
+
+      if (error) throw error;
+
+      // Navigate immediately - realtime will handle other players
+      navigate(`/game/${roomCode}`);
+
+    } catch (error) {
+      console.error('Error starting game:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível iniciar o jogo",
+        variant: "destructive"
+      });
     }
 
     toast({
@@ -451,16 +574,22 @@ export default function GameLobby() {
                 <p className="text-white/90 mb-6">
                   Mínimo de 1 galinha necessária para iniciar o jogo
                 </p>
-                <ChickenButton 
-                  variant="feather" 
+                {players.find(p => p.id === currentUserId)?.isHost ? (
+                  <ChickenButton 
+                    variant="feather" 
                     size="xl" 
                     disabled={players.length < 1}
                     chickenStyle="bounce"
                     className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-2xl px-8"
                     onClick={handleStartGame}
                   >
-                  🎵 Começar a Cantoria! 🎵
-                </ChickenButton>
+                    🎵 Começar a Cantoria! 🎵
+                  </ChickenButton>
+                ) : (
+                  <div className="text-white/80 text-lg">
+                    ⏳ Aguardando o fazendeiro iniciar o jogo...
+                  </div>
+                )}
               </div>
             </BarnCard>
           </div>
