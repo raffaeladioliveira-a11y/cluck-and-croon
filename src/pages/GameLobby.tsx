@@ -10,12 +10,19 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { getOrCreateClientId } from "@/utils/clientId";
 
+interface Room {
+  code: string;
+  status: string;
+  game_session_id: string | null;
+}
+
 interface Player {
   id: string;
   name: string;
   avatar: string;
   isHost: boolean;
   eggs?: number;
+  client_id?: string;
 }
 
 interface Genre {
