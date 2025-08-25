@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Music, Users, Egg, Settings, Plus, Trash2, Edit, LogOut } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -77,8 +78,13 @@ export default function AdminDashboard() {
     duration_seconds: '15',
     spotify_url: '',
     youtube_url: '',
+    audio_file_url: '',
     difficulty_level: '1'
   });
+
+  // Editing state
+  const [editingSong, setEditingSong] = useState<Song | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const [newGenre, setNewGenre] = useState({
     name: '',
@@ -353,7 +359,7 @@ export default function AdminDashboard() {
         duration_seconds: parseInt(newSong.duration_seconds) || 15,
         spotify_url: newSong.spotify_url || null,
         youtube_url: newSong.youtube_url || null,
-        audio_file_url: audioFileUrl,
+        audio_file_url: audioFileUrl || newSong.audio_file_url || null,
         difficulty_level: parseInt(newSong.difficulty_level) || 1,
         is_active: true
       };
@@ -384,6 +390,7 @@ export default function AdminDashboard() {
         duration_seconds: '15',
         spotify_url: '',
         youtube_url: '',
+        audio_file_url: '',
         difficulty_level: '1'
       });
       
@@ -399,6 +406,62 @@ export default function AdminDashboard() {
       toast({
         title: "❌ Erro",
         description: "Não foi possível salvar a música no banco de dados",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle song editing
+  const handleEditSong = (song: Song) => {
+    setEditingSong(song);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateSong = async () => {
+    if (!editingSong) return;
+
+    try {
+      console.log('✏️ AdminDashboard: Atualizando música...', editingSong);
+
+      const { error } = await supabase
+        .from('songs')
+        .update({
+          title: editingSong.title,
+          artist: editingSong.artist,
+          genre_id: editingSong.genre_id,
+          album_name: editingSong.album_name || null,
+          release_year: editingSong.release_year || null,
+          duration_seconds: editingSong.duration_seconds || 15,
+          spotify_url: editingSong.spotify_url || null,
+          youtube_url: editingSong.youtube_url || null,
+          audio_file_url: editingSong.audio_file_url || null,
+          difficulty_level: editingSong.difficulty_level || 1,
+        })
+        .eq('id', editingSong.id);
+
+      if (error) {
+        console.error('❌ Erro ao atualizar música:', error);
+        throw error;
+      }
+
+      console.log('✅ Música atualizada com sucesso');
+
+      // Recarregar lista de músicas
+      await loadSongs();
+      
+      // Fechar modal
+      setIsEditModalOpen(false);
+      setEditingSong(null);
+      
+      toast({
+        title: "✅ Música Atualizada!",
+        description: `${editingSong.title} foi atualizada com sucesso`,
+      });
+    } catch (error) {
+      console.error('❌ Erro ao atualizar música:', error);
+      toast({
+        title: "❌ Erro",
+        description: "Não foi possível atualizar a música",
         variant: "destructive",
       });
     }
@@ -639,15 +702,25 @@ export default function AdminDashboard() {
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="song-youtube">URL YouTube (opcional)</Label>
-                    <Input
-                      id="song-youtube"
-                      placeholder="https://youtube.com/..."
-                      value={newSong.youtube_url}
-                      onChange={(e) => setNewSong(prev => ({...prev, youtube_url: e.target.value}))}
-                    />
-                  </div>
+                     <div>
+                     <Label htmlFor="song-youtube">URL YouTube (opcional)</Label>
+                     <Input
+                       id="song-youtube"
+                       placeholder="https://youtube.com/..."
+                       value={newSong.youtube_url}
+                       onChange={(e) => setNewSong(prev => ({...prev, youtube_url: e.target.value}))}
+                     />
+                   </div>
+
+                   <div>
+                     <Label htmlFor="audio-file-url">URL do arquivo de áudio (opcional)</Label>
+                     <Input
+                       id="audio-file-url"
+                       placeholder="https://nxhtmdgzheqauonacazk.supabase.co/storage/v1/object/public/songs/..."
+                       value={newSong.audio_file_url}
+                       onChange={(e) => setNewSong(prev => ({...prev, audio_file_url: e.target.value}))}
+                     />
+                   </div>
 
                   {/* Upload de Áudio */}
                   <div>
@@ -737,14 +810,14 @@ export default function AdminDashboard() {
                           <Badge variant="outline">{song.source}</Badge>
                         </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button variant="outline" size="icon">
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" onClick={() => handleDeleteSong(song.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                       <div className="flex gap-1">
+                         <Button variant="outline" size="icon" onClick={() => handleEditSong(song)}>
+                           <Edit className="w-4 h-4" />
+                         </Button>
+                         <Button variant="outline" size="icon" onClick={() => handleDeleteSong(song.id)}>
+                           <Trash2 className="w-4 h-4" />
+                         </Button>
+                       </div>
                     </div>
                   ))}
                 </div>
@@ -945,6 +1018,124 @@ export default function AdminDashboard() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Edit Song Modal */}
+        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>✏️ Editar Música</DialogTitle>
+            </DialogHeader>
+            
+            {editingSong && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Título da Música</Label>
+                  <Input
+                    value={editingSong.title}
+                    onChange={(e) => setEditingSong(prev => prev ? {...prev, title: e.target.value} : null)}
+                  />
+                </div>
+                
+                <div>
+                  <Label>Artista</Label>
+                  <Input
+                    value={editingSong.artist}
+                    onChange={(e) => setEditingSong(prev => prev ? {...prev, artist: e.target.value} : null)}
+                  />
+                </div>
+
+                <div>
+                  <Label>Gênero</Label>
+                  <Select value={editingSong.genre_id || ''} onValueChange={(value) => setEditingSong(prev => prev ? {...prev, genre_id: value} : null)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Escolher gênero" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {genres.map(genre => (
+                        <SelectItem key={genre.id} value={genre.id}>
+                          {genre.emoji} {genre.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>Álbum (opcional)</Label>
+                  <Input
+                    value={editingSong.album_name || ''}
+                    onChange={(e) => setEditingSong(prev => prev ? {...prev, album_name: e.target.value} : null)}
+                  />
+                </div>
+
+                <div>
+                  <Label>URL Spotify (opcional)</Label>
+                  <Input
+                    value={editingSong.spotify_url || ''}
+                    onChange={(e) => setEditingSong(prev => prev ? {...prev, spotify_url: e.target.value} : null)}
+                  />
+                </div>
+
+                <div>
+                  <Label>URL YouTube (opcional)</Label>
+                  <Input
+                    value={editingSong.youtube_url || ''}
+                    onChange={(e) => setEditingSong(prev => prev ? {...prev, youtube_url: e.target.value} : null)}
+                  />
+                </div>
+
+                <div>
+                  <Label>URL do arquivo de áudio (opcional)</Label>
+                  <Input
+                    value={editingSong.audio_file_url || ''}
+                    onChange={(e) => setEditingSong(prev => prev ? {...prev, audio_file_url: e.target.value} : null)}
+                    placeholder="https://nxhtmdgzheqauonacazk.supabase.co/storage/v1/object/public/songs/..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label>Duração (s)</Label>
+                    <Input
+                      type="number"
+                      value={editingSong.duration_seconds || 15}
+                      onChange={(e) => setEditingSong(prev => prev ? {...prev, duration_seconds: parseInt(e.target.value) || 15} : null)}
+                    />
+                  </div>
+                  <div>
+                    <Label>Dificuldade</Label>
+                    <Select value={(editingSong.difficulty_level || 1).toString()} onValueChange={(value) => setEditingSong(prev => prev ? {...prev, difficulty_level: parseInt(value)} : null)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">🐣 Fácil</SelectItem>
+                        <SelectItem value="2">🐔 Médio</SelectItem>
+                        <SelectItem value="3">🐓 Difícil</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <ChickenButton 
+                    variant="corn" 
+                    className="flex-1"
+                    onClick={handleUpdateSong}
+                  >
+                    ✅ Salvar Alterações
+                  </ChickenButton>
+                  <ChickenButton 
+                    variant="feather" 
+                    onClick={() => setIsEditModalOpen(false)}
+                  >
+                    ❌ Cancelar
+                  </ChickenButton>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

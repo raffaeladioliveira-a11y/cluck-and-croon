@@ -1,4 +1,5 @@
-import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
@@ -9,6 +10,25 @@ import { Loader2 } from "lucide-react";
 
 export default function GameArena() {
   const { roomCode } = useParams<{ roomCode: string }>();
+  const navigate = useNavigate();
+  
+  // Debug states
+  const [audioDebug, setAudioDebug] = useState("");
+
+  // Listen for navigation events from game logic
+  useEffect(() => {
+    const handleNavigateToLobby = (event: CustomEvent) => {
+      const { url } = event.detail;
+      navigate(url);
+    };
+
+    window.addEventListener('navigateToLobby', handleNavigateToLobby as EventListener);
+    
+    return () => {
+      window.removeEventListener('navigateToLobby', handleNavigateToLobby as EventListener);
+    };
+  }, [navigate]);
+
   const {
     gameState,
     currentRound,

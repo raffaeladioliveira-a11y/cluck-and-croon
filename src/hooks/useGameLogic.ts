@@ -89,6 +89,7 @@ export const useGameLogic = (roomCode: string) => {
   // Carregar configurações do jogo
   const loadGameSettings = async () => {
     try {
+      console.log('⚙️ Carregando configurações do jogo...');
       const { data, error } = await supabase
         .from('game_settings')
         .select('key, value');
@@ -100,13 +101,21 @@ export const useGameLogic = (roomCode: string) => {
         settings[setting.key] = parseInt(setting.value as string);
       });
 
-      return settings;
+      console.log('✅ Configurações carregadas:', settings);
+      return {
+        eggs_per_correct: 10,
+        speed_bonus: 5,
+        time_per_question: 15,
+        song_duration: 15,
+        ...settings
+      };
     } catch (error) {
       console.error('❌ Erro ao carregar configurações:', error);
       return {
         eggs_per_correct: 10,
         speed_bonus: 5,
-        time_per_question: 15
+        time_per_question: 15,
+        song_duration: 15
       };
     }
   };
@@ -136,6 +145,8 @@ export const useGameLogic = (roomCode: string) => {
       audioUrl: getAudioUrl(correctSong),
       duration_seconds: gameSettings.song_duration || correctSong.duration_seconds || 15
     };
+
+    console.log('🎵 Música selecionada:', songWithAudio.title, 'Duração:', songWithAudio.duration_seconds, 's');
     
     // Gerar 4 opções, repetindo músicas se necessário
     const availableOptions = shuffled.map(song => song.title);
@@ -231,7 +242,11 @@ export const useGameLogic = (roomCode: string) => {
         
         // Navigate to lobby with set completion data
         setTimeout(() => {
-          window.location.href = `/game/lobby/${roomCode}?setComplete=true&eggs=${playerEggs}`;
+          // Use proper navigation instead of window.location
+          const url = `/game/lobby?roomCode=${roomCode}&setComplete=true&eggs=${playerEggs}`;
+          // This will be handled by the calling component with navigate()
+          console.log('🚀 Redirecting to:', url);
+          window.dispatchEvent(new CustomEvent('navigateToLobby', { detail: { url } }));
         }, 1000);
         
         toast({
