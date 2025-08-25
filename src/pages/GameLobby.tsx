@@ -47,6 +47,7 @@ export default function GameLobby() {
       return;
     }
   }, [roomCode, navigate]);
+
   const [players, setPlayers] = useState<Player[]>([]);
   const [genres, setGenres] = useState<Genre[]>([]);
   const [setComplete, setSetComplete] = useState(false);
@@ -55,6 +56,18 @@ export default function GameLobby() {
   const [isPickerMode, setIsPickerMode] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [player, setPlayer] = useState<any>(null);
+
+  // Generate unique user ID for session
+  const mockUserId = (() => {
+    let storedId = localStorage.getItem('sessionUserId');
+    if (!storedId) {
+      storedId = crypto.randomUUID();
+      localStorage.setItem('sessionUserId', storedId);
+    }
+    return storedId;
+  })();
 
   // Load genres from database
   const loadGenres = async () => {
@@ -71,25 +84,8 @@ export default function GameLobby() {
     }
   };
 
-  // Carregar dados do jogador e se conectar à sala
   useEffect(() => {
-    const playerData = localStorage.getItem('playerData');
-    if (!playerData) {
-      navigate('/');
-      return;
-    }
-
-    const player = JSON.parse(playerData);
-    
-    // Generate or get user ID
-    let userId = player.id;
-    if (!userId) {
-      userId = crypto.randomUUID();
-      player.id = userId;
-      localStorage.setItem('playerData', JSON.stringify(player));
-    }
-    
-    setCurrentUserId(userId);
+    setCurrentUserId(mockUserId);
     
     // Check if we're coming from a completed set
     const wasSetComplete = searchParams.get('setComplete') === 'true';
@@ -102,7 +98,7 @@ export default function GameLobby() {
       const mockResults: SetResult[] = [
         {
           playerId: 'current',
-          playerName: player.name,
+          playerName: 'Galinha MVP',
           setEggs: setEggs,
           totalEggs: setEggs
         }
@@ -113,47 +109,71 @@ export default function GameLobby() {
       setIsPickerMode(true);
     }
     
-    // Join or create room
-    joinRoom(player);
+    // Auto-join room
+    joinRoom();
     
     // Load genres for picker mode
     loadGenres();
   }, [navigate, searchParams, roomCode]);
 
-  // Join room function
-  const joinRoom = async (player: any) => {
+  const joinRoom = async () => {
     try {
-      // For demo purposes, we'll use the player ID as user identifier
-      // In production, this would use actual Supabase auth
-      const mockUserId = player.id;
+      setIsLoading(true);
+      
+      // Load or generate player data
+      let playerData = localStorage.getItem(`player_${roomCode}`);
+      if (!playerData) {
+        const defaultPlayer = {
+          id: mockUserId,
+          name: `Galinha ${Math.floor(Math.random() * 1000)}`,
+          avatar: '🐔',
+          isHost: false,
+          eggs: 0
+        };
+        localStorage.setItem(`player_${roomCode}`, JSON.stringify(defaultPlayer));
+        setPlayer(defaultPlayer);
+        playerData = JSON.stringify(defaultPlayer);
+      } else {
+        setPlayer(JSON.parse(playerData));
+      }
 
-      // Find or create room
-      const { data: existingRoom } = await supabase
+      const player = JSON.parse(playerData);
+
+      // Check if room exists, create if not
+      let { data: existingRoom } = await supabase
         .from('game_rooms')
         .select('*')
         .eq('room_code', roomCode)
         .single();
 
       let room = existingRoom;
-      
       if (!room) {
-        // Create new room if it doesn't exist
+        // Create room with host_user_id (server-controlled host)
         const { data: newRoom, error: roomError } = await supabase
           .from('game_rooms')
           .insert({
             room_code: roomCode,
             name: `Sala ${roomCode}`,
             host_id: mockUserId,
-            status: 'waiting'
+            host_user_id: mockUserId, // Server-controlled host
+            status: 'waiting',
+            max_players: 10,
+            rounds_total: 10,
+            time_per_question: 15,
+            eggs_per_correct: 10,
+            speed_bonus: 5
           })
           .select()
           .single();
 
-        if (roomError) throw roomError;
+        if (roomError) {
+          console.error('Erro completo ao criar sala:', roomError);
+          throw roomError;
+        }
         room = newRoom;
       }
 
-      // Join as participant
+      // Join as participant (always is_host: false, derived from server)
       const { error: participantError } = await supabase
         .from('room_participants')
         .upsert({
@@ -161,12 +181,15 @@ export default function GameLobby() {
           user_id: mockUserId,
           display_name: player.name,
           avatar_emoji: player.avatar,
-          is_host: mockUserId === room.host_id
+          is_host: false // Always false, host is derived from room.host_user_id
         }, {
           onConflict: 'room_id,user_id'
         });
 
-      if (participantError) throw participantError;
+      if (participantError) {
+        console.error('Erro completo ao participar da sala:', participantError);
+        throw participantError;
+      }
 
       // Subscribe to room changes
       const channel = supabase.channel(`room:${roomCode}`)
@@ -179,14 +202,15 @@ export default function GameLobby() {
           loadParticipants(room.id);
         })
         .on('postgres_changes', {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
           table: 'game_rooms',
-          filter: `id=eq.${room.id}`
+          filter: `room_code=eq.${roomCode}`
         }, (payload) => {
-          if (payload.new.status === 'playing') {
-            // Host started the game, navigate all players
-            navigate(`/game/${roomCode}`);
+          console.log('Room status changed:', payload.new);
+          if (payload.new && (payload.new as any).status === 'playing') {
+            // Host started the game, navigate all players automatically
+            navigate(`/game/play?roomCode=${roomCode}`);
           }
         })
         .subscribe();
@@ -198,79 +222,86 @@ export default function GameLobby() {
         supabase.removeChannel(channel);
       };
 
-    } catch (error) {
-      console.error('Error joining room:', error);
+    } catch (error: any) {
+      console.error('Error joining room - Erro completo do Supabase:', error);
       toast({
-        title: "❌ Erro",
-        description: "Não foi possível entrar na sala",
-        variant: "destructive"
+        title: "Erro ao entrar na sala",
+        description: error.message || "Não foi possível entrar na sala. Tente novamente.",
+        variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Load participants from database
   const loadParticipants = async (roomId: string) => {
-    try {
-      const { data: participants, error } = await supabase
-        .from('room_participants')
-        .select('*')
-        .eq('room_id', roomId);
+    const { data: roomData, error: roomError } = await supabase
+      .from('game_rooms')
+      .select('host_user_id')
+      .eq('id', roomId)
+      .single();
 
-      if (error) throw error;
-
-      const formattedPlayers: Player[] = participants.map(p => ({
-        id: p.user_id,
-        name: p.display_name,
-        avatar: p.avatar_emoji,
-        isHost: p.is_host,
-        eggs: p.current_eggs || 0
-      }));
-
-      setPlayers(formattedPlayers);
-    } catch (error) {
-      console.error('Error loading participants:', error);
-    }
-  };
-
-  const handleStartGame = async () => {
-    if (!roomCode) {
-      toast({
-        title: "❌ Erro",
-        description: "Código da sala não encontrado",
-        variant: "destructive"
-      });
+    if (roomError) {
+      console.error('Error loading room:', roomError);
       return;
     }
 
-    try {
-      // Use the current user ID from state
-      const currentPlayer = players.find(p => p.id === currentUserId);
-      if (!currentPlayer?.isHost) {
-        toast({
-          title: "❌ Acesso Negado",
-          description: "Apenas o fazendeiro pode iniciar o jogo",
-          variant: "destructive"
-        });
-        return;
-      }
+    const { data, error } = await supabase
+      .from('room_participants')
+      .select('*')
+      .eq('room_id', roomId);
 
-      // Update room status to start game for all players
+    if (error) {
+      console.error('Error loading participants:', error);
+      return;
+    }
+
+    // Host is always derived from room.host_user_id (server-controlled)
+    const mappedPlayers = data.map(participant => ({
+      id: participant.user_id,
+      name: participant.display_name,
+      avatar: participant.avatar_emoji,
+      isHost: participant.user_id === roomData.host_user_id, // Derived from server
+      eggs: participant.current_eggs || 0
+    }));
+
+    setPlayers(mappedPlayers);
+  };
+
+  const handleStartGame = async () => {
+    try {
+      // Get a random song for the first round
+      const { data: randomSong } = await supabase
+        .from('songs')
+        .select('id')
+        .eq('is_active', true)
+        .order('id', { ascending: false })
+        .limit(1)
+        .single();
+
       const { error } = await supabase
         .from('game_rooms')
-        .update({ status: 'playing' })
+        .update({ 
+          status: 'playing',
+          current_round: 1,
+          current_song_id: randomSong?.id || null,
+          started_at: new Date().toISOString()
+        })
         .eq('room_code', roomCode);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro completo ao iniciar jogo:', error);
+        throw error;
+      }
 
-      // Navigate immediately - realtime will handle other players
-      navigate(`/game/${roomCode}`);
-
-    } catch (error) {
+      console.log('Game started, room status updated to playing');
+      // Navigation will be handled by realtime subscription automatically
+    } catch (error: any) {
       console.error('Error starting game:', error);
       toast({
-        title: "❌ Erro",
-        description: "Não foi possível iniciar o jogo",
-        variant: "destructive"
+        title: "Erro ao iniciar jogo",
+        description: error.message || "Não foi possível iniciar o jogo. Tente novamente.",
+        variant: "destructive",
       });
     }
   };
@@ -326,6 +357,17 @@ export default function GameLobby() {
       });
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-sky p-4 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl animate-chicken-walk mb-4">🐔</div>
+          <p className="text-xl text-muted-foreground">Entrando no galinheiro...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-sky p-4">

@@ -39,6 +39,7 @@ export type Database = {
           eggs_per_correct: number | null
           finished_at: string | null
           host_id: string
+          host_user_id: string | null
           id: string
           max_players: number | null
           name: string
@@ -60,6 +61,7 @@ export type Database = {
           eggs_per_correct?: number | null
           finished_at?: string | null
           host_id: string
+          host_user_id?: string | null
           id?: string
           max_players?: number | null
           name: string
@@ -81,6 +83,7 @@ export type Database = {
           eggs_per_correct?: number | null
           finished_at?: string | null
           host_id?: string
+          host_user_id?: string | null
           id?: string
           max_players?: number | null
           name?: string
