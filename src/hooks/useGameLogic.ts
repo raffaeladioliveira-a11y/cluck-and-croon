@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,18 +25,38 @@ export interface Player {
   selectedAnswer?: number;
 }
 
+export type GameState = 'idle' | 'playing' | 'reveal' | 'transition' | 'finished';
+
+export interface GameRound {
+  id: string;
+  question: GameQuestion;
+  answersCount: number;
+  timeLeft: number;
+  state: GameState;
+}
+
 export const useGameLogic = (roomCode: string) => {
+  // State machine
+  const [gameState, setGameState] = useState<GameState>('idle');
   const [currentRound, setCurrentRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(15);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [showResults, setShowResults] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<GameQuestion | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [gameStarted, setGameStarted] = useState(false);
   const [currentSettings, setCurrentSettings] = useState<any>({});
   const [playerEggs, setPlayerEggs] = useState(0);
   const [answerTime, setAnswerTime] = useState<number | null>(null);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const [answersCount, setAnswersCount] = useState(0);
+  const [expectedPlayers, setExpectedPlayers] = useState(1); // Single-player default
+  const [isHost, setIsHost] = useState(true); // Single-player default
+  
+  // Refs for cleanup
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const realtimeChannelRef = useRef<any>(null);
+  
   const { toast } = useToast();
 
   // Buscar músicas do banco
@@ -159,7 +179,6 @@ export const useGameLogic = (roomCode: string) => {
         const question = generateQuestion(songs, gameSettings);
         setCurrentQuestion(question);
         setTimeLeft(gameSettings.time_per_question || 15);
-        setGameStarted(true);
       }
     } catch (error) {
       console.error('Erro ao inicializar jogo:', error);
@@ -168,92 +187,173 @@ export const useGameLogic = (roomCode: string) => {
     }
   };
 
-  // Timer do jogo
-  useEffect(() => {
-    if (gameStarted && timeLeft > 0 && !showResults) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && gameStarted) {
-      setShowResults(true);
+  // Clear all timers
+  const clearTimers = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
-  }, [timeLeft, showResults, gameStarted]);
-
-  // Selecionar resposta
-  const handleAnswerSelect = (answerIndex: number) => {
-    if (!showResults && selectedAnswer === null && currentSettings) {
-      setSelectedAnswer(answerIndex);
-      setAnswerTime(currentSettings.time_per_question - timeLeft); // Tempo que levou para responder
-
-      // Calcular pontos
-      const isCorrect = answerIndex === currentQuestion?.correctAnswer;
-      if (isCorrect) {
-        const baseEggs = currentSettings.eggs_per_correct || 10;
-        const timeBonus = timeLeft > (currentSettings.time_per_question * 0.8) ? 
-          (currentSettings.speed_bonus || 5) : 0; // Bônus se respondeu em 80% do tempo
-        
-        const totalEggs = baseEggs + timeBonus;
-        setPlayerEggs(prev => prev + totalEggs);
-        
-        console.log('🥚 Pontuação:', { baseEggs, timeBonus, totalEggs, timeLeft });
-      }
-
-      // Auto-avanço em single-player após 2 segundos
-      setTimeout(() => {
-        setShowResults(true);
-      }, 2000);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
-  };
-
-  // Próxima rodada
-  const nextRound = async () => {
-    if (currentRound < 10) {
-      setCurrentRound(prev => prev + 1);
-      setSelectedAnswer(null);
-      setShowResults(false);
-      setAnswerTime(null);
-      
-      // Gerar nova pergunta com configurações atualizadas
-      const [songs, gameSettings] = await Promise.all([
-        fetchRandomSongs(),
-        loadGameSettings()
-      ]);
-      
-      setCurrentSettings(gameSettings);
-      
-      if (songs.length > 0) {
-        const question = generateQuestion(songs, gameSettings);
-        setCurrentQuestion(question);
-        setTimeLeft(gameSettings.time_per_question || 15);
-      }
-    } else {
-      // Fim do jogo
-      toast({
-        title: "🎉 Fim do jogo!",
-        description: `Parabéns! Você coletou ${playerEggs} ovos em 10 rodadas!`
-      });
-    }
-  };
-
-  // Inicializar quando o hook é montado
-  useEffect(() => {
-    initializeGame();
   }, []);
 
+  // Start round timer
+  const startRoundTimer = useCallback((duration: number) => {
+    clearTimers();
+    setTimeLeft(duration);
+    
+    intervalRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          if (isHost) endRound('timeout');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [isHost]);
+
+  // End round (host only)
+  const endRound = useCallback((reason: 'timeout' | 'all_answered') => {
+    if (!isHost) return;
+    
+    console.log('🏁 Ending round:', reason);
+    clearTimers();
+    setGameState('reveal');
+    
+    // Show results for 3 seconds, then transition
+    timeoutRef.current = setTimeout(() => {
+      if (currentRound >= 10) {
+        setGameState('finished');
+        toast({
+          title: "🎉 Fim do jogo!",
+          description: `Parabéns! Você coletou ${playerEggs} ovos em 10 rodadas!`
+        });
+      } else {
+        setGameState('transition');
+        setTimeout(() => startNextRound(), 100);
+      }
+    }, 3000);
+  }, [isHost, currentRound, playerEggs]);
+
+  // Start next round
+  const startNextRound = useCallback(async () => {
+    if (!isHost) return;
+    
+    console.log('🚀 Starting next round');
+    setCurrentRound(prev => prev + 1);
+    setSelectedAnswer(null);
+    setAnswerTime(null);
+    setAnswersCount(0);
+    
+    // Generate new question
+    const [songs, gameSettings] = await Promise.all([
+      fetchRandomSongs(),
+      loadGameSettings()
+    ]);
+    
+    setCurrentSettings(gameSettings);
+    
+    if (songs.length > 0) {
+      const question = generateQuestion(songs, gameSettings);
+      setCurrentQuestion(question);
+      setGameState('playing');
+      startRoundTimer(gameSettings.time_per_question || 15);
+    }
+  }, [isHost, startRoundTimer]);
+
+  // Handle answer selection
+  const handleAnswerSelect = useCallback((answerIndex: number) => {
+    if (gameState !== 'playing' || selectedAnswer !== null) return;
+    
+    setSelectedAnswer(answerIndex);
+    setAnswerTime((currentSettings.time_per_question || 15) - timeLeft);
+
+    // Calculate score
+    const isCorrect = answerIndex === currentQuestion?.correctAnswer;
+    if (isCorrect) {
+      const baseEggs = currentSettings.eggs_per_correct || 10;
+      const timeBonus = timeLeft > ((currentSettings.time_per_question || 15) * 0.8) ? 
+        (currentSettings.speed_bonus || 5) : 0;
+      
+      const totalEggs = baseEggs + timeBonus;
+      setPlayerEggs(prev => prev + totalEggs);
+      
+      console.log('🥚 Score:', { baseEggs, timeBonus, totalEggs, timeLeft });
+    }
+
+    // Update answers count for single-player
+    const newAnswersCount = answersCount + 1;
+    setAnswersCount(newAnswersCount);
+    
+    // Check if all players answered (single-player: immediate end)
+    if (newAnswersCount >= expectedPlayers && isHost) {
+      endRound('all_answered');
+    }
+  }, [gameState, selectedAnswer, timeLeft, currentSettings, currentQuestion, answersCount, expectedPlayers, isHost, endRound]);
+
+  // Manual start first round (user gesture)
+  const startFirstRound = useCallback(() => {
+    if (gameState !== 'idle') return;
+    
+    console.log('🎵 Starting first round with user gesture');
+    setAudioUnlocked(true);
+    setGameState('playing');
+    startRoundTimer(currentSettings.time_per_question || 15);
+  }, [gameState, currentSettings, startRoundTimer]);
+
+  // Initialize game
+  useEffect(() => {
+    initializeGame();
+    
+    // Cleanup on unmount
+    return () => {
+      clearTimers();
+      if (realtimeChannelRef.current) {
+        supabase.removeChannel(realtimeChannelRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-advance from reveal to next round (host only)
+  useEffect(() => {
+    if (gameState === 'reveal' && currentRound < 10 && isHost) {
+      timeoutRef.current = setTimeout(() => {
+        setGameState('transition');
+        setTimeout(() => startNextRound(), 100);
+      }, 3000);
+    }
+  }, [gameState, currentRound, isHost, startNextRound]);
+
   return {
+    // Game state
+    gameState,
     currentRound,
     timeLeft,
     selectedAnswer,
-    showResults,
+    showResults: gameState === 'reveal',
     currentQuestion,
     players,
     isLoading,
-    gameStarted,
+    gameStarted: gameState !== 'idle',
+    
+    // Audio control
+    audioUnlocked,
+    
+    // Actions
     handleAnswerSelect,
-    nextRound,
-    setPlayers,
-    setShowResults,
+    startFirstRound,
+    
+    // Player data
     playerEggs,
     answerTime,
-    currentSettings
+    currentSettings,
+    
+    // Multi-player (future)
+    answersCount,
+    expectedPlayers,
+    isHost
   };
 };

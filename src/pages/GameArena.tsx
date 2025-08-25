@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 export default function GameArena() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const {
+    gameState,
     currentRound,
     timeLeft,
     selectedAnswer,
@@ -18,10 +19,9 @@ export default function GameArena() {
     players,
     isLoading,
     gameStarted,
+    audioUnlocked,
     handleAnswerSelect,
-    nextRound,
-    setPlayers,
-    setShowResults,
+    startFirstRound,
     playerEggs,
     answerTime,
     currentSettings
@@ -120,14 +120,14 @@ export default function GameArena() {
             artist={currentQuestion.song.artist}
             audioUrl={(currentQuestion.song as any).audioUrl}
             duration={currentQuestion.song.duration_seconds || 15}
-            autoPlay={!showResults}
+            autoPlay={gameState === 'playing' && audioUnlocked}
+            gameState={gameState}
+            roundKey={`${currentRound}-${currentQuestion.song.id}`}
             onTimeUpdate={(time) => {
-              // Lógica do timer pode ser atualizada aqui
+              // Time update handled by game logic
             }}
             onEnded={() => {
-              if (!showResults) {
-                setShowResults(true);
-              }
+              // Audio end handled by game timer
             }}
           />
         </BarnCard>
@@ -207,6 +207,30 @@ export default function GameArena() {
           </div>
         </BarnCard>
 
+        {/* Start Game Button (Idle State) */}
+        {gameState === 'idle' && (
+          <div className="mb-6">
+            <BarnCard variant="golden" className="text-center">
+              <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
+              <h3 className="text-2xl font-bold text-white mb-4">
+                Pronto para começar?
+              </h3>
+              <p className="text-white/80 mb-6">
+                Clique para liberar o áudio e começar o jogo!
+              </p>
+              <ChickenButton 
+                variant="feather" 
+                size="lg" 
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                chickenStyle="bounce"
+                onClick={startFirstRound}
+              >
+                🎵 Iniciar Jogo 🎵
+              </ChickenButton>
+            </BarnCard>
+          </div>
+        )}
+
         {/* Results/Next Round Section */}
         {showResults && (
           <div className="mt-6">
@@ -224,17 +248,13 @@ export default function GameArena() {
                     : "💔 Que pena! A resposta correta era: " + currentQuestion.options[currentQuestion.correctAnswer]
                   }
                 </h3>
+                <p className="text-white/80 text-lg">
+                  {currentRound < 10 
+                    ? "Próxima música em instantes..." 
+                    : "Fim do jogo! Parabéns!"
+                  }
+                </p>
               </div>
-              
-              <ChickenButton 
-                variant="feather" 
-                size="lg" 
-                className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-                chickenStyle="bounce"
-                onClick={nextRound}
-              >
-                🎵 Próxima Música 🎵
-              </ChickenButton>
             </BarnCard>
           </div>
         )}
