@@ -50,7 +50,7 @@ export const useGameLogic = (roomCode: string) => {
 
       if (error) throw error;
       
-      if (!songs || songs.length < 4) {
+      if (!songs || songs.length === 0) {
         throw new Error('Não há músicas suficientes no banco de dados');
       }
 
@@ -117,7 +117,21 @@ export const useGameLogic = (roomCode: string) => {
       duration_seconds: gameSettings.song_duration || correctSong.duration_seconds || 15
     };
     
-    const options = shuffled.slice(0, 4).map(song => song.title);
+    // Gerar 4 opções, repetindo músicas se necessário
+    const availableOptions = shuffled.map(song => song.title);
+    const options = [];
+    
+    // Adicionar opções únicas primeiro
+    for (let i = 0; i < Math.min(4, availableOptions.length); i++) {
+      options.push(availableOptions[i]);
+    }
+    
+    // Se temos menos de 4 opções, completar com opções repetidas modificadas
+    while (options.length < 4) {
+      const randomSong = shuffled[Math.floor(Math.random() * shuffled.length)];
+      const modifiedTitle = `${randomSong.title} (Versão ${options.length - availableOptions.length + 1})`;
+      options.push(modifiedTitle);
+    }
     
     // Embaralhar as opções
     const shuffledOptions = options.sort(() => Math.random() - 0.5);
