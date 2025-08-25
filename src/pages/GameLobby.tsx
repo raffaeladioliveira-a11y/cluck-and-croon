@@ -45,8 +45,8 @@ export default function GameLobby() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  // Support both URL parameter and query string formats
-  const roomCode = roomCodeParam || searchParams.get("roomCode") || "";
+  // Support both URL parameter and query string formats - always UPPERCASE
+  const roomCode = (roomCodeParam || searchParams.get("roomCode") || "").toUpperCase();
   
   // Redirect to home if no room code
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function GameLobby() {
         profile: userProfile
       });
 
-      // Use RPC to join room with preserved identity
+      // Use RPC to join room with preserved identity (roomCode already uppercase)
       const { error: joinError } = await supabase.rpc('join_room_with_identity', {
         p_room_code: roomCode,
         p_display_name: userProfile.displayName,
@@ -266,7 +266,7 @@ export default function GameLobby() {
 
   const handleStartGame = async () => {
     try {
-      // Use RPC function to start game atomically (host-only)
+      // Use RPC function to start game atomically (host-only) - roomCode already uppercase
       const { data: sessionId, error } = await supabase.rpc('start_game', {
         p_room: roomCode,
         p_client_id: clientId

@@ -7,6 +7,8 @@ import { EggCounter } from "@/components/EggCounter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { getOrCreateClientId, saveProfile } from "@/utils/clientId";
 import heroImage from "@/assets/galinheiro-hero.jpg";
 
 export default function Home() {
@@ -28,7 +30,7 @@ export default function Home() {
   };
 
   // Função para criar novo galinheiro
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
     if (!playerName.trim()) {
       toast({
         title: "🐔 Ops!",
@@ -38,24 +40,49 @@ export default function Home() {
       return;
     }
 
-    const newRoomCode = generateRoomCode();
-    
-    // Salvar dados do jogador no localStorage (temporariamente)
-    localStorage.setItem('playerData', JSON.stringify({
-      name: playerName,
-      avatar: selectedAvatar,
-      isHost: true
-    }));
+    try {
+      const clientId = getOrCreateClientId();
+      
+      // Salvar perfil antes de criar sala
+      saveProfile({
+        displayName: playerName,
+        avatar: selectedAvatar
+      });
 
-    toast({
-      title: "🏠 Galinheiro Criado!",
-      description: `Código: ${newRoomCode}. Redirecionando...`,
-    });
+      // Criar sala via RPC
+      const { data: roomCode, error } = await supabase.rpc('create_room_with_host', {
+        p_display_name: playerName,
+        p_avatar: selectedAvatar,
+        p_client_id: clientId
+      });
 
-    // Navegar para o lobby
-    setTimeout(() => {
-      navigate(`/lobby/${newRoomCode}`);
-    }, 1000);
+      if (error) {
+        console.error('Error creating room:', error);
+        toast({
+          title: "❌ Erro!",
+          description: "Não foi possível criar o galinheiro. Tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({
+        title: "🏠 Galinheiro Criado!",
+        description: `Código: ${roomCode}. Redirecionando...`,
+      });
+
+      // Navegar para o lobby (roomCode já vem em UPPERCASE do RPC)
+      setTimeout(() => {
+        navigate(`/lobby/${roomCode}`);
+      }, 1000);
+    } catch (error) {
+      console.error('Error creating room:', error);
+      toast({
+        title: "❌ Erro!",
+        description: "Não foi possível criar o galinheiro. Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   // Função para entrar em galinheiro existente
@@ -78,21 +105,20 @@ export default function Home() {
       return;
     }
 
-    // Salvar dados do jogador no localStorage (temporariamente)
-    localStorage.setItem('playerData', JSON.stringify({
-      name: playerName,
-      avatar: selectedAvatar,
-      isHost: false
-    }));
+    // Salvar perfil antes de entrar na sala
+    saveProfile({
+      displayName: playerName,
+      avatar: selectedAvatar
+    });
 
     toast({
       title: "🚪 Entrando no Galinheiro!",
-      description: `Conectando ao galinheiro ${roomCode}...`,
+      description: `Conectando ao galinheiro ${roomCode.toUpperCase()}...`,
     });
 
-    // Navegar para o lobby
+    // Navegar para o lobby - roomCode será normalizado para UPPERCASE no GameLobby
     setTimeout(() => {
-      navigate(`/lobby/${roomCode}`);
+      navigate(`/lobby/${roomCode.toUpperCase()}`);
     }, 1000);
   };
 
