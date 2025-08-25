@@ -113,7 +113,7 @@ export default function GameArena() {
           <MusicPlayer
             songTitle={currentQuestion.song.title}
             artist={currentQuestion.song.artist}
-            audioUrl={currentQuestion.song.preview_url || currentQuestion.song.audio_file_url}
+            audioUrl={(currentQuestion.song as any).audioUrl}
             duration={currentQuestion.song.duration_seconds || 15}
             autoPlay={!showResults}
             onTimeUpdate={(time) => {
