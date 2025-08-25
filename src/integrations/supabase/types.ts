@@ -38,6 +38,7 @@ export type Database = {
           current_song_id: string | null
           eggs_per_correct: number | null
           finished_at: string | null
+          game_session_id: string | null
           host_id: string
           host_user_id: string | null
           id: string
@@ -60,6 +61,7 @@ export type Database = {
           current_song_id?: string | null
           eggs_per_correct?: number | null
           finished_at?: string | null
+          game_session_id?: string | null
           host_id: string
           host_user_id?: string | null
           id?: string
@@ -82,6 +84,7 @@ export type Database = {
           current_song_id?: string | null
           eggs_per_correct?: number | null
           finished_at?: string | null
+          game_session_id?: string | null
           host_id?: string
           host_user_id?: string | null
           id?: string
@@ -172,6 +175,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      game_sessions: {
+        Row: {
+          ended_at: string | null
+          id: string
+          room_code: string
+          seed: number
+          started_at: string
+          status: string
+          tracks: string[]
+        }
+        Insert: {
+          ended_at?: string | null
+          id?: string
+          room_code: string
+          seed?: number
+          started_at?: string
+          status?: string
+          tracks?: string[]
+        }
+        Update: {
+          ended_at?: string | null
+          id?: string
+          room_code?: string
+          seed?: number
+          started_at?: string
+          status?: string
+          tracks?: string[]
+        }
+        Relationships: []
       }
       game_settings: {
         Row: {
@@ -301,6 +334,7 @@ export type Database = {
       room_participants: {
         Row: {
           avatar_emoji: string | null
+          client_id: string | null
           current_eggs: number | null
           display_name: string
           id: string
@@ -312,6 +346,7 @@ export type Database = {
         }
         Insert: {
           avatar_emoji?: string | null
+          client_id?: string | null
           current_eggs?: number | null
           display_name: string
           id?: string
@@ -323,6 +358,7 @@ export type Database = {
         }
         Update: {
           avatar_emoji?: string | null
+          client_id?: string | null
           current_eggs?: number | null
           display_name?: string
           id?: string
@@ -414,6 +450,10 @@ export type Database = {
     Functions: {
       generate_unique_room_code: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      start_game: {
+        Args: { p_client_id: string; p_room: string }
         Returns: string
       }
     }
