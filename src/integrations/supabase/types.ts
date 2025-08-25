@@ -334,9 +334,11 @@ export type Database = {
       room_participants: {
         Row: {
           avatar_emoji: string | null
+          avatar_user: string | null
           client_id: string | null
           current_eggs: number | null
           display_name: string
+          display_name_user: string | null
           id: string
           is_host: boolean | null
           is_ready: boolean | null
@@ -346,9 +348,11 @@ export type Database = {
         }
         Insert: {
           avatar_emoji?: string | null
+          avatar_user?: string | null
           client_id?: string | null
           current_eggs?: number | null
           display_name: string
+          display_name_user?: string | null
           id?: string
           is_host?: boolean | null
           is_ready?: boolean | null
@@ -358,9 +362,11 @@ export type Database = {
         }
         Update: {
           avatar_emoji?: string | null
+          avatar_user?: string | null
           client_id?: string | null
           current_eggs?: number | null
           display_name?: string
+          display_name_user?: string | null
           id?: string
           is_host?: boolean | null
           is_ready?: boolean | null
@@ -448,8 +454,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_room_with_host: {
+        Args: { p_avatar: string; p_client_id: string; p_display_name: string }
+        Returns: string
+      }
       generate_unique_room_code: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      join_room_with_identity: {
+        Args: {
+          p_avatar: string
+          p_client_id: string
+          p_display_name: string
+          p_room_code: string
+        }
         Returns: string
       }
       start_game: {

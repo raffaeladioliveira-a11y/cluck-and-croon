@@ -8,7 +8,7 @@ import { EggCounter } from "@/components/EggCounter";
 import { Copy, Users, Music, Trophy, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-import { getOrCreateClientId } from "@/utils/clientId";
+import { getOrCreateClientId, loadProfile, saveProfile, Profile, getDisplayNameOrDefault, getAvatarOrDefault } from "@/utils/clientId";
 
 interface Room {
   code: string;
@@ -63,28 +63,31 @@ export default function GameLobby() {
   const [mvpPlayer, setMvpPlayer] = useState<SetResult | null>(null);
   const [isPickerMode, setIsPickerMode] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState<string>('');
-  const [currentUserId, setCurrentUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [player, setPlayer] = useState<any>(null);
-  const [room, setRoom] = useState<{code: string; status: string; game_session_id: string | null} | null>(null);
-
-  // Generate unique client and user IDs for session
+  const [room, setRoom] = useState<Room | null>(null);
+  
   const clientId = useMemo(getOrCreateClientId, []);
-  const mockUserId = useMemo(() => {
-    let storedId = localStorage.getItem('sessionUserId');
-    if (!storedId) {
-      storedId = crypto.randomUUID();
-      localStorage.setItem('sessionUserId', storedId);
-    }
-    return storedId;
-  }, []);
-
   const navigatedRef = useRef(false);
 
-  // Determine if current user is host
+  // Load user profile (preserva identidade escolhida)
+  const userProfile = useMemo(() => {
+    const profile = loadProfile();
+    // Se ainda não tem perfil salvo, gera um padrão e salva
+    if (!profile.displayName && !profile.avatar) {
+      const defaultProfile: Profile = {
+        displayName: getDisplayNameOrDefault(profile),
+        avatar: getAvatarOrDefault(profile)
+      };
+      saveProfile(defaultProfile);
+      return defaultProfile;
+    }
+    return profile;
+  }, []);
+
+  // Check if current user is host
   const isHost = useMemo(() => {
-    return room?.status === 'lobby' && players.find(p => p.id === mockUserId)?.isHost === true;
-  }, [room, players, mockUserId]);
+    return players.some(p => p.client_id === clientId && p.isHost);
+  }, [players, clientId]);
 
   // Load genres from database
   const loadGenres = async () => {
@@ -102,8 +105,6 @@ export default function GameLobby() {
   };
 
   useEffect(() => {
-    setCurrentUserId(mockUserId);
-    
     // Check if we're coming from a completed set
     const wasSetComplete = searchParams.get('setComplete') === 'true';
     const setEggs = parseInt(searchParams.get('eggs') || '0');
@@ -126,7 +127,7 @@ export default function GameLobby() {
       setIsPickerMode(true);
     }
     
-    // Auto-join room
+    // Auto-join room with preserved identity
     joinRoom();
     
     // Load genres for picker mode
@@ -137,77 +138,53 @@ export default function GameLobby() {
     try {
       setIsLoading(true);
       
-      // Load or generate player data
-      let playerData = localStorage.getItem(`player_${roomCode}`);
-      if (!playerData) {
-        const defaultPlayer = {
-          id: mockUserId,
-          name: `Galinha ${Math.floor(Math.random() * 1000)}`,
-          avatar: '🐔',
-          isHost: false,
-          eggs: 0
-        };
-        localStorage.setItem(`player_${roomCode}`, JSON.stringify(defaultPlayer));
-        setPlayer(defaultPlayer);
-        playerData = JSON.stringify(defaultPlayer);
-      } else {
-        setPlayer(JSON.parse(playerData));
+      console.log('🎯 Joining room with identity:', {
+        roomCode,
+        clientId,
+        profile: userProfile
+      });
+
+      // Use RPC to join room with preserved identity
+      const { error: joinError } = await supabase.rpc('join_room_with_identity', {
+        p_room_code: roomCode,
+        p_display_name: userProfile.displayName,
+        p_avatar: userProfile.avatar,
+        p_client_id: clientId
+      });
+
+      if (joinError) {
+        console.error('Erro completo ao entrar na sala:', joinError);
+        
+        if (joinError.message === 'ROOM_NOT_IN_LOBBY') {
+          toast({
+            title: "Sala não disponível",
+            description: "Esta sala não está disponível ou já começou.",
+            variant: "destructive",
+          });
+          navigate('/');
+          return;
+        }
+        
+        throw joinError;
       }
 
-      const player = JSON.parse(playerData);
-
-      // Check if room exists, create if not
-      let { data: existingRoom } = await supabase
+      // Get room info
+      const { data: roomData, error: roomError } = await supabase
         .from('game_rooms')
-        .select('*')
+        .select('room_code, status, game_session_id, id')
         .eq('room_code', roomCode)
         .single();
 
-      let room = existingRoom;
-      if (!room) {
-        // Create room with host_user_id (server-controlled host)
-        const { data: newRoom, error: roomError } = await supabase
-          .from('game_rooms')
-          .insert({
-            room_code: roomCode,
-            name: `Sala ${roomCode}`,
-            host_id: mockUserId,
-            host_user_id: mockUserId, // Server-controlled host
-            status: 'waiting',
-            max_players: 10,
-            rounds_total: 10,
-            time_per_question: 15,
-            eggs_per_correct: 10,
-            speed_bonus: 5
-          })
-          .select()
-          .single();
-
-        if (roomError) {
-          console.error('Erro completo ao criar sala:', roomError);
-          throw roomError;
-        }
-        room = newRoom;
+      if (roomError) {
+        console.error('Error loading room:', roomError);
+        throw roomError;
       }
 
-      // Join as participant with client_id for host validation
-      const { error: participantError } = await supabase
-        .from('room_participants')
-        .upsert({
-          room_id: room.id,
-          user_id: mockUserId,
-          display_name: player.name,
-          avatar_emoji: player.avatar,
-          client_id: clientId,
-          is_host: false // Always false, host is derived from room.host_user_id
-        }, {
-          onConflict: 'room_id,user_id'
-        });
-
-      if (participantError) {
-        console.error('Erro completo ao participar da sala:', participantError);
-        throw participantError;
-      }
+      setRoom({
+        code: roomData.room_code,
+        status: roomData.status || 'lobby',
+        game_session_id: roomData.game_session_id
+      });
 
       // Subscribe to room changes
       const channel = supabase.channel(`room:${roomCode}`)
@@ -215,30 +192,34 @@ export default function GameLobby() {
           event: '*',
           schema: 'public',
           table: 'room_participants',
-          filter: `room_id=eq.${room.id}`
+          filter: `room_id=eq.${roomData.id}`
         }, () => {
-          loadParticipants(room.id);
+          loadParticipants(roomData.id);
         })
         .on('postgres_changes', {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'game_rooms',
           filter: `room_code=eq.${roomCode}`
-        }, (payload) => {
+        }, (payload: any) => {
           console.log('Room status changed:', payload.new);
-          const roomData = payload.new as any;
-          setRoom(roomData);
+          const updatedRoom = payload.new;
+          setRoom({
+            code: updatedRoom.room_code,
+            status: updatedRoom.status,
+            game_session_id: updatedRoom.game_session_id
+          });
           
-          // Navigate to game when host starts (with session ID)
-          if (!navigatedRef.current && roomData.status === 'in_progress' && roomData.game_session_id) {
+          // Navigate all players when host starts game
+          if (!navigatedRef.current && updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
             navigatedRef.current = true;
-            navigate(`/game/${roomCode}?sid=${roomData.game_session_id}`);
+            navigate(`/game/${roomCode}?sid=${updatedRoom.game_session_id}`);
           }
         })
         .subscribe();
 
       // Load initial participants
-      loadParticipants(room.id);
+      loadParticipants(roomData.id);
 
       return () => {
         supabase.removeChannel(channel);
@@ -257,24 +238,6 @@ export default function GameLobby() {
   };
 
   const loadParticipants = async (roomId: string) => {
-    const { data: roomData, error: roomError } = await supabase
-      .from('game_rooms')
-      .select('host_user_id, status, game_session_id, room_code')
-      .eq('id', roomId)
-      .single();
-
-    if (roomError) {
-      console.error('Error loading room:', roomError);
-      return;
-    }
-
-    // Update room state
-    setRoom({
-      code: roomData.room_code,
-      status: roomData.status || 'lobby',
-      game_session_id: roomData.game_session_id
-    });
-
     const { data, error } = await supabase
       .from('room_participants')
       .select('*')
@@ -285,23 +248,25 @@ export default function GameLobby() {
       return;
     }
 
-    // Host is always derived from room.host_user_id (server-controlled)
+    console.log('📝 Loaded participants:', data);
+
+    // Map participants preserving their chosen identity
     const mappedPlayers = data.map(participant => ({
       id: participant.user_id,
-      name: participant.display_name,
-      avatar: participant.avatar_emoji,
-      isHost: participant.user_id === roomData.host_user_id, // Derived from server
-      eggs: participant.current_eggs || 0
+      name: participant.display_name_user || participant.display_name || 'Guest',
+      avatar: participant.avatar_user || participant.avatar_emoji || '🐔',
+      isHost: participant.is_host || false,
+      eggs: participant.current_eggs || 0,
+      client_id: participant.client_id
     }));
 
+    console.log('🎭 Mapped players with identity:', mappedPlayers);
     setPlayers(mappedPlayers);
   };
 
   const handleStartGame = async () => {
     try {
-      console.log('Starting game with clientId:', clientId, 'roomCode:', roomCode);
-      
-      // Call RPC to start game atomically (host-only)
+      // Use RPC function to start game atomically (host-only)
       const { data: sessionId, error } = await supabase.rpc('start_game', {
         p_room: roomCode,
         p_client_id: clientId
@@ -318,21 +283,17 @@ export default function GameLobby() {
           });
         } else if (error.message === 'ROOM_NOT_IN_LOBBY') {
           toast({
-            title: "Jogo em andamento",
-            description: "Esta sala já está com um jogo em progresso.",
+            title: "Sala não disponível",
+            description: "A sala não está disponível para início.",
             variant: "destructive",
           });
         } else {
-          toast({
-            title: "Erro ao iniciar jogo",
-            description: error.message || "Não foi possível iniciar o jogo.",
-            variant: "destructive",
-          });
+          throw error;
         }
         return;
       }
 
-      console.log('Game started successfully, session ID:', sessionId);
+      console.log('Game started with session ID:', sessionId);
       // Navigation will be handled by realtime subscription automatically
     } catch (error: any) {
       console.error('Error starting game:', error);
@@ -536,144 +497,142 @@ export default function GameLobby() {
               
               <div className="grid md:grid-cols-2 gap-4">
                 <ChickenButton variant="feather" size="lg" onClick={copyRoomCode}>
-                  <Copy className="w-4 h-4 mr-2" />
+                  <Copy className="w-5 h-5 mr-2" />
                   Copiar Código
                 </ChickenButton>
+                
                 <ChickenButton variant="feather" size="lg" onClick={shareRoomLink}>
-                  🔗 Compartilhar Link
+                  <Users className="w-5 h-5 mr-2" />
+                  Compartilhar Link
                 </ChickenButton>
               </div>
             </div>
           </BarnCard>
         )}
 
-        {/* Players Section */}
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          {/* Player List */}
-          <div className="lg:col-span-2">
-            <BarnCard variant="coop" className="h-full">
-              <div className="flex items-center gap-2 mb-6">
-                <Users className="w-5 h-5 text-barn-brown" />
-                <h3 className="text-xl font-bold text-barn-brown">
-                  Galinhas no Poleiro ({players.length}/10)
-                </h3>
-              </div>
-              
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {players.map((player) => (
-                  <div
-                    key={player.id}
-                    className="bg-white/50 rounded-lg p-4 text-center border-2 border-primary/20 hover:border-primary/40 transition-all duration-300"
-                  >
-                    <ChickenAvatar 
-                      emoji={player.avatar} 
-                      size="lg" 
-                      animated 
-                      className="mb-2" 
+        {/* Player List */}
+        {!setComplete && (
+          <BarnCard variant="coop" className="mb-8">
+            <div className="flex items-center gap-2 mb-6">
+              <Users className="w-6 h-6 text-barn-brown" />
+              <h2 className="text-2xl font-bold text-barn-brown">
+                Galinhas no Galinheiro ({players.length}/10)
+              </h2>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              {players.map((player) => (
+                <div
+                  key={player.id}
+                  className="flex items-center gap-4 p-4 bg-white/10 rounded-lg border-2 border-barn-brown/20"
+                >
+                  <ChickenAvatar 
+                    emoji={player.avatar} 
+                    size="md" 
+                    animated 
+                    className={player.isHost ? "ring-2 ring-yellow-400" : ""}
+                  />
+                  
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-barn-brown">
+                        {player.name}
+                        {player.client_id === clientId && " (Você)"}
+                      </span>
+                      {player.isHost && (
+                        <Crown className="w-4 h-4 text-yellow-600" />
+                      )}
+                    </div>
+                    
+                    <EggCounter 
+                      count={player.eggs || 0} 
+                      size="sm"
+                      variant="default"
                     />
-                    <p className="font-semibold text-sm text-foreground truncate">
-                      {player.name}
-                    </p>
-                    {player.isHost && (
-                      <div className="inline-flex items-center gap-1 mt-1 px-2 py-1 bg-primary rounded-full">
-                        <span className="text-xs text-primary-foreground">👑 Fazendeiro</span>
-                      </div>
-                    )}
-                    <EggCounter count={0} size="sm" className="mt-2" />
                   </div>
-                ))}
-                
-                {/* Empty slots */}
-                {Array.from({ length: Math.max(0, 10 - players.length) }).map((_, index) => (
-                  <div
-                    key={`empty-${index}`}
-                    className="bg-muted/30 rounded-lg p-4 text-center border-2 border-dashed border-muted flex flex-col items-center justify-center min-h-[120px]"
-                  >
-                    <div className="text-2xl text-muted-foreground mb-2">🥚</div>
-                    <p className="text-xs text-muted-foreground">Aguardando...</p>
-                  </div>
-                ))}
-              </div>
-            </BarnCard>
-          </div>
+                </div>
+              ))}
+            </div>
 
-          {/* Game Settings */}
-          <div className="space-y-4">
-            <BarnCard variant="nest">
-              <div className="flex items-center gap-2 mb-4">
-                <Music className="w-5 h-5 text-primary" />
-                <h3 className="text-lg font-bold text-primary">Configurações</h3>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Rodadas</span>
-                  <span className="font-semibold">10 🎵</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Tempo por pergunta</span>
-                  <span className="font-semibold">15s ⏱️</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Ovos por acerto</span>
-                  <span className="font-semibold">10 🥚</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Bônus velocidade</span>
-                  <span className="font-semibold">5 🌽</span>
-                </div>
-              </div>
-            </BarnCard>
-
-            <BarnCard variant="default">
-              <h3 className="text-lg font-bold mb-4 text-center">🏆 Premiação</h3>
+            {/* Start Game Button - Only visible to host */}
+            {room?.status === 'lobby' && isHost && (
               <div className="text-center">
-                <div className="text-4xl mb-2 animate-egg-bounce">🐓✨</div>
-                <p className="text-sm font-semibold text-corn-golden">Galinha de Ouro</p>
-                <p className="text-xs text-muted-foreground">Para o grande campeão!</p>
-              </div>
-            </BarnCard>
-          </div>
-        </div>
-
-        {/* Start Game Section */}
-        {!setComplete && !isPickerMode && (
-          <div className="text-center">
-            <BarnCard variant="golden">
-              <div className="text-center">
-                <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
-                <h3 className="text-2xl font-bold text-white mb-4">
-                  Pronto para começar a cantoria?
-                </h3>
-                <p className="text-white/90 mb-6">
-                  Mínimo de 1 galinha necessária para iniciar o jogo
+                <ChickenButton 
+                  variant="corn" 
+                  size="lg"
+                  onClick={handleStartGame}
+                  className="w-full md:w-auto min-w-[200px]"
+                  chickenStyle="bounce"
+                >
+                  <Music className="w-5 h-5 mr-2" />
+                  🎵 Iniciar Cantoria Musical! 🎵
+                </ChickenButton>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Você é o host - clique para começar!
                 </p>
-                {isHost ? (
-                  <ChickenButton 
-                    variant="feather" 
-                    size="xl" 
-                    disabled={players.length < 1}
-                    chickenStyle="bounce"
-                    className="bg-white/20 hover:bg-white/30 text-white border-white/30 text-2xl px-8"
-                    onClick={handleStartGame}
-                  >
-                    🎵 Começar a Cantoria! 🎵
-                  </ChickenButton>
-                ) : (
-                  <div className="text-white/80 text-lg">
-                    ⏳ Aguardando o fazendeiro iniciar o jogo...
-                  </div>
+              </div>
+            )}
+
+            {/* Waiting message for non-hosts */}
+            {room?.status === 'lobby' && !isHost && players.length > 0 && (
+              <div className="text-center">
+                <p className="text-barn-brown/70 text-lg">
+                  🎵 Aguardando o host iniciar a cantoria...
+                </p>
+                {players.find(p => p.isHost) && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Host: {players.find(p => p.isHost)?.name}
+                  </p>
                 )}
               </div>
-            </BarnCard>
-          </div>
+            )}
+
+            {/* Game in progress message */}
+            {room?.status !== 'lobby' && (
+              <div className="text-center">
+                <p className="text-barn-brown/70 text-lg">
+                  🎵 Partida em andamento...
+                </p>
+              </div>
+            )}
+          </BarnCard>
         )}
 
-        {/* Animated Background Elements */}
+        {/* Game Stats */}
+        {!setComplete && (
+          <BarnCard variant="nest" className="mb-8">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <Trophy className="w-6 h-6 text-primary" />
+                <h3 className="text-xl font-bold text-primary">Configurações do Jogo</h3>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">Rodadas</p>
+                  <p className="font-bold">10 rodadas</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">Tempo</p>
+                  <p className="font-bold">15 segundos</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">Ovos por acerto</p>
+                  <p className="font-bold">10 🥚</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground">Bônus velocidade</p>
+                  <p className="font-bold">+5 🥚</p>
+                </div>
+              </div>
+            </div>
+          </BarnCard>
+        )}
+
+        {/* Floating Animation Elements */}
         <div className="fixed inset-0 pointer-events-none z-0">
-          <div className="absolute top-1/4 left-10 animate-chicken-walk text-2xl opacity-20">🐔</div>
-          <div className="absolute top-3/4 right-10 animate-egg-bounce text-2xl opacity-20">🥚</div>
-          <div className="absolute bottom-1/3 left-1/4 animate-feather-float text-xl opacity-10" style={{animationDelay: '3s'}}>🪶</div>
+          <div className="absolute top-20 right-10 animate-feather-float text-xl opacity-20">🪶</div>
+          <div className="absolute bottom-40 left-10 animate-egg-bounce text-2xl opacity-10">🌽</div>
         </div>
       </div>
     </div>
