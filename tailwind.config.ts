@@ -61,7 +61,26 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
-				}
+				},
+				// Galinheiro Musical custom colors
+				'chicken-orange': 'hsl(var(--chicken-orange))',
+				'egg-shell': 'hsl(var(--egg-shell))',
+				'barn-brown': 'hsl(var(--barn-brown))',
+				'feather-white': 'hsl(var(--feather-white))',
+				'corn-golden': 'hsl(var(--corn-golden))'
+			},
+			backgroundImage: {
+				'gradient-sunrise': 'var(--gradient-sunrise)',
+				'gradient-barn': 'var(--gradient-barn)',
+				'gradient-grass': 'var(--gradient-grass)',
+				'gradient-sky': 'var(--gradient-sky)'
+			},
+			boxShadow: {
+				'soft': 'var(--shadow-soft)',
+				'barn': 'var(--shadow-barn)'
+			},
+			transitionTimingFunction: {
+				'bounce': 'var(--transition-bounce)'
 			},
 			borderRadius: {
 				lg: 'var(--radius)',
@@ -84,11 +103,40 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'chicken-walk': {
+					'0%': { transform: 'translateX(-10px) rotate(-2deg)' },
+					'25%': { transform: 'translateX(-5px) rotate(0deg)' },
+					'50%': { transform: 'translateX(0px) rotate(2deg)' },
+					'75%': { transform: 'translateX(5px) rotate(0deg)' },
+					'100%': { transform: 'translateX(10px) rotate(-2deg)' }
+				},
+				'egg-bounce': {
+					'0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+					'50%': { transform: 'translateY(-10px) rotate(5deg)' }
+				},
+				'feather-float': {
+					'0%': { transform: 'translateY(0px) rotate(0deg)', opacity: '1' },
+					'50%': { transform: 'translateY(-20px) rotate(180deg)', opacity: '0.7' },
+					'100%': { transform: 'translateY(-40px) rotate(360deg)', opacity: '0' }
+				},
+				'barn-door-open': {
+					'0%': { transform: 'rotateY(0deg)' },
+					'100%': { transform: 'rotateY(-45deg)' }
+				},
+				'peck': {
+					'0%, 100%': { transform: 'translateY(0px)' },
+					'50%': { transform: 'translateY(5px)' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'chicken-walk': 'chicken-walk 2s ease-in-out infinite',
+				'egg-bounce': 'egg-bounce 1.5s ease-in-out infinite',
+				'feather-float': 'feather-float 3s ease-out forwards',
+				'barn-door-open': 'barn-door-open 0.8s ease-out forwards',
+				'peck': 'peck 0.3s ease-in-out'
 			}
 		}
 	},
