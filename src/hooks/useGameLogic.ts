@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getOrCreateClientId, loadProfile } from '@/utils/clientId';
 
 export interface Song {
   id: string;
@@ -12,386 +13,358 @@ export interface Song {
 }
 
 export interface GameQuestion {
-  song: Song;
-  options: string[]; // Títulos das músicas
+  song: Song & { audioUrl?: string };
+  options: string[];
   correctAnswer: number;
 }
 
-export interface Player {
+export interface PlayerFace {
   id: string;
   name: string;
   avatar: string;
-  eggs: number;
-  selectedAnswer?: number;
 }
 
 export type GameState = 'idle' | 'playing' | 'reveal' | 'transition' | 'finished';
+type AnswersByOption = Record<number, PlayerFace[]>;
 
-export interface GameRound {
-  id: string;
-  question: GameQuestion;
-  answersCount: number;
-  timeLeft: number;
-  state: GameState;
+function getAudioUrl(song: Song): string {
+  if (song.audio_file_url && song.audio_file_url.trim() !== '') return song.audio_file_url;
+  if (song.preview_url && song.preview_url.trim() !== '') return song.preview_url;
+  return 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
 }
 
-export const useGameLogic = (roomCode: string) => {
-  // State machine
+export const useGameLogic = (roomCode: string, sessionId?: string) => {
+  const { toast } = useToast();
+
+  // identidade local
+  const clientId = useRef(getOrCreateClientId());
+  const profile  = useRef(loadProfile()); // { displayName, avatar }
+
+  // estado principal
+  const [isLoading, setIsLoading] = useState(true);
   const [gameState, setGameState] = useState<GameState>('idle');
   const [currentRound, setCurrentRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(15);
-  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<GameQuestion | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentSettings, setCurrentSettings] = useState<any>({});
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [playerEggs, setPlayerEggs] = useState(0);
   const [answerTime, setAnswerTime] = useState<number | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
-  const [answersCount, setAnswersCount] = useState(0);
-  const [expectedPlayers, setExpectedPlayers] = useState(1); // Single-player default
-  const [isHost, setIsHost] = useState(true); // Single-player default
-  const [previousSongId, setPreviousSongId] = useState<string | null>(null);
-  
-  // Refs for cleanup
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isHost, setIsHost] = useState(false);
+
+  const [currentSettings, setCurrentSettings] = useState({
+    eggs_per_correct: 10,
+    speed_bonus: 5,
+    time_per_question: 15,
+    song_duration: 15,
+  });
+
+  // avatares por alternativa
+  const [answersByOption, setAnswersByOption] = useState<AnswersByOption>({});
+
+  // timers
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const realtimeChannelRef = useRef<any>(null);
-  
-  const { toast } = useToast();
+  const timeoutRef  = useRef<NodeJS.Timeout | null>(null);
 
-  // Buscar músicas do banco
-  const fetchRandomSongs = async (): Promise<Song[]> => {
-    try {
-      const { data: songs, error } = await supabase
-        .from('songs')
-        .select('id, title, artist, preview_url, audio_file_url, duration_seconds')
-        .eq('is_active', true)
-        .limit(20);
+  // canal realtime
+  const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-      if (error) throw error;
-      
-      if (!songs || songs.length === 0) {
-        throw new Error('Não há músicas suficientes no banco de dados');
-      }
-
-      return songs;
-    } catch (error) {
-      console.error('Erro ao buscar músicas:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar músicas do jogo",
-        variant: "destructive"
-      });
-      return [];
-    }
-  };
-
-  // Carregar configurações do jogo
-  const loadGameSettings = async () => {
-    try {
-      console.log('⚙️ Carregando configurações do jogo...');
-      const { data, error } = await supabase
-        .from('game_settings')
-        .select('key, value');
-
-      if (error) throw error;
-
-      const settings: any = {};
-      data?.forEach(setting => {
-        settings[setting.key] = parseInt(setting.value as string);
-      });
-
-      console.log('✅ Configurações carregadas:', settings);
-      return {
-        eggs_per_correct: 10,
-        speed_bonus: 5,
-        time_per_question: 15,
-        song_duration: 15,
-        ...settings
-      };
-    } catch (error) {
-      console.error('❌ Erro ao carregar configurações:', error);
-      return {
-        eggs_per_correct: 10,
-        speed_bonus: 5,
-        time_per_question: 15,
-        song_duration: 15
-      };
-    }
-  };
-
-  // URLs de áudio com prioridade para Storage
-  const getAudioUrl = (song: Song): string => {
-    // Prioridade: audio_file_url (Storage) → preview_url → outros
-    if (song.audio_file_url && song.audio_file_url.trim() !== '') {
-      return song.audio_file_url;
-    }
-    if (song.preview_url && song.preview_url.trim() !== '') {
-      return song.preview_url;
-    }
-    
-    // URL de teste confiável como fallback
-    return "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav";
-  };
-
-  // Gerar pergunta com títulos como opções (anti-repetição)
-  const generateQuestion = async (songs: Song[], gameSettings: any, previousSongId?: string): Promise<GameQuestion> => {
-    // Filter out previous song to avoid immediate repetition
-    let filteredSongs = previousSongId 
-      ? songs.filter(song => song.id !== previousSongId)
-      : songs;
-    
-    // If we have less than 4 songs after filtering, use all available
-    if (filteredSongs.length < 4) {
-      filteredSongs = songs;
-    }
-    
-    const shuffled = [...filteredSongs].sort(() => Math.random() - 0.5);
-    const correctSong = shuffled[0];
-    
-    // Adicionar URL de áudio à música
-    const songWithAudio = {
-      ...correctSong,
-      audioUrl: getAudioUrl(correctSong),
-      duration_seconds: gameSettings.song_duration || correctSong.duration_seconds || 15
-    };
-
-    console.log('🎵 Música selecionada:', songWithAudio.title, 'Duração:', songWithAudio.duration_seconds, 's');
-    
-    // Gerar 4 opções, repetindo músicas se necessário
-    const availableOptions = shuffled.map(song => song.title);
-    const options = [];
-    
-    // Adicionar opções únicas primeiro
-    for (let i = 0; i < Math.min(4, availableOptions.length); i++) {
-      options.push(availableOptions[i]);
-    }
-    
-    // Se temos menos de 4 opções, completar com opções repetidas modificadas
-    while (options.length < 4) {
-      const randomSong = shuffled[Math.floor(Math.random() * shuffled.length)];
-      const modifiedTitle = `${randomSong.title} (Versão ${options.length - availableOptions.length + 1})`;
-      options.push(modifiedTitle);
-    }
-    
-    // Embaralhar as opções
-    const shuffledOptions = options.sort(() => Math.random() - 0.5);
-    const correctAnswer = shuffledOptions.indexOf(correctSong.title);
-
-    return {
-      song: songWithAudio,
-      options: shuffledOptions,
-      correctAnswer
-    };
-  };
-
-  // Inicializar jogo
-  const initializeGame = async () => {
-    setIsLoading(true);
-    try {
-      const [songs, gameSettings] = await Promise.all([
-        fetchRandomSongs(),
-        loadGameSettings()
-      ]);
-      
-      setCurrentSettings(gameSettings);
-      
-      if (songs.length > 0) {
-        const question = await generateQuestion(songs, gameSettings);
-        setCurrentQuestion(question);
-        setTimeLeft(gameSettings.time_per_question || 15);
-      }
-    } catch (error) {
-      console.error('Erro ao inicializar jogo:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Clear all timers
   const clearTimers = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    if (timeoutRef.current)  { clearTimeout(timeoutRef.current);   timeoutRef.current  = null; }
   }, []);
 
-  // Start round timer
   const startRoundTimer = useCallback((duration: number) => {
     clearTimers();
     setTimeLeft(duration);
-    
     intervalRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          if (isHost) endRound('timeout');
+          clearTimers();
+          setGameState('reveal');
+          if (isHost) {
+            timeoutRef.current = setTimeout(() => {
+              setGameState('transition'); // host dispara próxima
+            }, 3000);
+          }
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }, [isHost]);
+  }, [clearTimers, isHost]);
 
-  // End round (host only)
-  const endRound = useCallback((reason: 'timeout' | 'all_answered') => {
-    if (!isHost) return;
-    
-    console.log('🏁 Ending round:', reason);
-    clearTimers();
-    setGameState('reveal');
-    
-    // Show results for 3 seconds, then transition
-    timeoutRef.current = setTimeout(() => {
-      if (currentRound >= 10) {
-        // End of set - redirect to lobby
-        setGameState('finished');
-        
-        // Navigate to lobby with set completion data
-        setTimeout(() => {
-          // Properly dispatch navigation event
-          console.log('🚀 Redirecting to lobby with', playerEggs, 'eggs');
-          window.dispatchEvent(new CustomEvent('navigateToLobby', { 
-            detail: { 
-              roomCode, 
-              setComplete: true, 
-              eggs: playerEggs 
-            } 
-          }));
-        }, 1000);
-        
-        toast({
-          title: "🎉 Set completo!",
-          description: `Você coletou ${playerEggs} ovos! Voltando ao lobby...`
-        });
-      } else {
-        setGameState('transition');
-        setTimeout(() => startNextRound(), 100);
-      }
-    }, 3000);
-  }, [isHost, currentRound, playerEggs, roomCode]);
+  // ---- dados
+  const fetchRandomSongs = async (): Promise<Song[]> => {
+    const { data, error } = await supabase
+        .from('songs')
+        .select('id,title,artist,preview_url,audio_file_url,duration_seconds')
+        .eq('is_active', true)
+        .limit(20);
+    if (error) throw error;
+    if (!data || data.length === 0) throw new Error('Sem músicas ativas.');
+    return data;
+  };
 
-  // Start next round
-  const startNextRound = useCallback(async () => {
-    if (!isHost) return;
-    
-    console.log('🚀 Starting next round');
-    setCurrentRound(prev => prev + 1);
-    setSelectedAnswer(null);
-    setAnswerTime(null);
-    setAnswersCount(0);
-    
-    // Generate new question
-    const [songs, gameSettings] = await Promise.all([
-      fetchRandomSongs(),
-      loadGameSettings()
-    ]);
-    
-    setCurrentSettings(gameSettings);
-    
-    if (songs.length > 0) {
-      const question = await generateQuestion(songs, gameSettings, previousSongId || undefined);
-      setCurrentQuestion(question);
-      setPreviousSongId(question.song.id);
-      setGameState('playing');
-      startRoundTimer(gameSettings.time_per_question || 15);
+  const buildQuestion = async (): Promise<GameQuestion> => {
+    const songs = await fetchRandomSongs();
+    const shuffled = [...songs].sort(() => Math.random() - 0.5);
+    const correct = shuffled[0];
+    const titles = shuffled.map(s => s.title);
+
+    const opts: string[] = [];
+    for (let i = 0; i < Math.min(4, titles.length); i++) opts.push(titles[i]);
+    while (opts.length < 4) {
+      const r = shuffled[Math.floor(Math.random() * shuffled.length)];
+      opts.push(`${r.title} (Alt ${opts.length})`);
     }
-  }, [isHost, startRoundTimer]);
+    const shuffledOptions = opts.sort(() => Math.random() - 0.5);
+    const correctIndex = shuffledOptions.indexOf(correct.title);
 
-  // Handle answer selection
-  const handleAnswerSelect = useCallback((answerIndex: number) => {
-    if (gameState !== 'playing' || selectedAnswer !== null) return;
-    
-    setSelectedAnswer(answerIndex);
-    setAnswerTime((currentSettings.time_per_question || 15) - timeLeft);
-
-    // Calculate score
-    const isCorrect = answerIndex === currentQuestion?.correctAnswer;
-    if (isCorrect) {
-      const baseEggs = currentSettings.eggs_per_correct || 10;
-      const timeBonus = timeLeft > ((currentSettings.time_per_question || 15) * 0.8) ? 
-        (currentSettings.speed_bonus || 5) : 0;
-      
-      const totalEggs = baseEggs + timeBonus;
-      setPlayerEggs(prev => prev + totalEggs);
-      
-      console.log('🥚 Score:', { baseEggs, timeBonus, totalEggs, timeLeft });
-    }
-
-    // Update answers count for single-player
-    const newAnswersCount = answersCount + 1;
-    setAnswersCount(newAnswersCount);
-    
-    // Check if all players answered (single-player: immediate end)
-    if (newAnswersCount >= expectedPlayers && isHost) {
-      endRound('all_answered');
-    }
-  }, [gameState, selectedAnswer, timeLeft, currentSettings, currentQuestion, answersCount, expectedPlayers, isHost, endRound]);
-
-  // Manual start first round (user gesture)
-  const startFirstRound = useCallback(() => {
-    if (gameState !== 'idle') return;
-    
-    console.log('🎵 Starting first round with user gesture');
-    setAudioUnlocked(true);
-    setGameState('playing');
-    startRoundTimer(currentSettings.time_per_question || 15);
-  }, [gameState, currentSettings, startRoundTimer]);
-
-  // Initialize game
-  useEffect(() => {
-    initializeGame();
-    
-    // Cleanup on unmount
-    return () => {
-      clearTimers();
-      if (realtimeChannelRef.current) {
-        supabase.removeChannel(realtimeChannelRef.current);
-      }
+    return {
+      song: { ...correct, audioUrl: getAudioUrl(correct), duration_seconds: currentSettings.song_duration },
+      options: shuffledOptions,
+      correctAnswer: correctIndex,
     };
-  }, []);
+  };
 
-  // Auto-advance from reveal to next round (host only)
-  useEffect(() => {
-    if (gameState === 'reveal' && currentRound < 10 && isHost) {
-      timeoutRef.current = setTimeout(() => {
-        setGameState('transition');
-        setTimeout(() => startNextRound(), 100);
-      }, 3000);
+  // ---- broadcast helpers
+  const broadcastRoundStart = useCallback(async (q: GameQuestion, round: number) => {
+    if (!sessionId || !gameChannelRef.current) return;
+
+    const payload = {
+      question: q,
+      round,
+      settings: currentSettings,
+      startedAt: Date.now(),
+    };
+
+    await gameChannelRef.current.send({
+      type: 'broadcast',
+      event: 'ROUND_START',
+      payload,
+    });
+
+    // aplica no host também
+    setCurrentQuestion(q);
+    setCurrentRound(round);
+    setSelectedAnswer(null);
+    setAnswersByOption({});
+    setGameState('playing');
+    startRoundTimer(currentSettings.time_per_question);
+  }, [currentSettings, sessionId, startRoundTimer]);
+
+  const broadcastAnswer = useCallback(async (answerIndex: number) => {
+    if (!sessionId || !gameChannelRef.current) return;
+    await gameChannelRef.current.send({
+      type: 'broadcast',
+      event: 'ANSWER',
+      payload: {
+        answerIndex,
+        participantId: clientId.current,
+        name: profile.current.displayName || 'Jogador',
+        avatar: profile.current.avatar || '🐔',
+      },
+    });
+  }, [sessionId]);
+
+  // ---- ações públicas
+  const startFirstRound = useCallback(async () => {
+    setAudioUnlocked(true);
+
+    if (sessionId && isHost) {
+      try {
+        const q = await buildQuestion();
+        await broadcastRoundStart(q, 1);
+      } catch (e) {
+        console.error('[host] erro ao iniciar 1ª rodada:', e);
+        toast({ title: 'Erro', description: 'Não foi possível iniciar a rodada.', variant: 'destructive' });
+      }
+      return;
     }
-  }, [gameState, currentRound, isHost, startNextRound]);
+
+    // fallback single-player (sem sid)
+    setGameState('playing');
+    startRoundTimer(currentSettings.time_per_question);
+  }, [sessionId, isHost, startRoundTimer, currentSettings.time_per_question, broadcastRoundStart, toast]);
+
+  const handleAnswerSelect = useCallback((idx: number) => {
+    if (gameState !== 'playing' || selectedAnswer !== null) return;
+
+    setSelectedAnswer(idx);
+    setAnswerTime(currentSettings.time_per_question - timeLeft);
+
+    if (currentQuestion && idx === currentQuestion.correctAnswer) {
+      const base  = currentSettings.eggs_per_correct;
+      const bonus = timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0;
+      setPlayerEggs(e => e + base + bonus);
+    }
+
+    // avatar local
+    setAnswersByOption(prev => {
+      const next = { ...prev };
+      const list = next[idx] ? [...next[idx]] : [];
+      if (!list.find(p => p.id === clientId.current)) {
+        list.push({ id: clientId.current, name: profile.current.displayName || 'Jogador', avatar: profile.current.avatar || '🐔' });
+      }
+      next[idx] = list;
+      return next;
+    });
+
+    broadcastAnswer(idx);
+  }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer]);
+
+  // ---- inicialização (carrega config + liga Realtime + descobre host)
+  useEffect(() => {
+    let cancelled = false;
+
+    const init = async () => {
+      try {
+        // carrega configurações (opcional)
+        const { data, error } = await supabase.from('game_settings').select('key,value');
+        if (!error && data) {
+          const s: any = {};
+          data.forEach(row => { s[row.key] = parseInt(String(row.value), 10); });
+          if (!cancelled) {
+            setCurrentSettings(prev => ({ ...prev, ...s }));
+          }
+        }
+      } catch {
+          // usa defaults silenciosamente
+      }
+
+      // se houver sessão, conecta no canal e descobre se sou host
+      if (sessionId) {
+        try {
+          const ch = supabase.channel(`game:${sessionId}`, {
+            config: { broadcast: { ack: true }, presence: { key: clientId.current } }
+          });
+
+          ch.on('broadcast', { event: 'ROUND_START' }, (msg) => {
+            const { question, round, settings, startedAt } = msg.payload as {
+              question: GameQuestion; round: number; settings: typeof currentSettings; startedAt: number;
+            };
+
+            setCurrentQuestion(question);
+            setCurrentRound(round);
+            setCurrentSettings(settings);
+            setSelectedAnswer(null);
+            setAnswersByOption({});
+            setGameState('playing');
+
+            const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+            const duration = settings.time_per_question;
+            const remaining = Math.max(1, duration - elapsed);
+            startRoundTimer(remaining);
+          });
+
+          ch.on('broadcast', { event: 'ANSWER' }, (msg) => {
+            const { answerIndex, participantId, name, avatar } = msg.payload as {
+              answerIndex: number; participantId: string; name: string; avatar: string;
+            };
+            setAnswersByOption(prev => {
+              const next = { ...prev };
+              const list = next[answerIndex] ? [...next[answerIndex]] : [];
+              if (!list.find(p => p.id === participantId)) {
+                list.push({ id: participantId, name, avatar });
+              }
+              next[answerIndex] = list;
+              return next;
+            });
+          });
+
+          ch.subscribe((status) => {
+            console.log('[realtime] game channel status:', status);
+          });
+
+          gameChannelRef.current = ch;
+
+          // tenta descobrir se sou host
+          try {
+            const { data: room } = await supabase
+                .from('game_rooms')
+                .select('id')
+                .eq('room_code', roomCode)
+                .maybeSingle();
+
+            if (room?.id) {
+              const { data: me } = await supabase
+                  .from('room_participants')
+                  .select('is_host,client_id')
+                  .eq('room_id', room.id)
+                  .eq('client_id', clientId.current)
+                  .maybeSingle();
+
+              if (!cancelled) setIsHost(!!me?.is_host);
+            }
+          } catch {
+              /* ok */
+          }
+        } catch (e) {
+          console.error('[realtime] erro ao iniciar canal:', e);
+        }
+      }
+
+      if (!cancelled) setIsLoading(false);
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+      clearTimers();
+      if (gameChannelRef.current) supabase.removeChannel(gameChannelRef.current);
+    };
+  }, [sessionId, roomCode, clearTimers, startRoundTimer]);
+
+  // próxima rodada (host)
+  useEffect(() => {
+    if (!sessionId || !isHost) return;
+    if (gameState !== 'transition') return;
+
+    (async () => {
+      try {
+        const nextRound = currentRound + 1;
+        if (nextRound > 10) {
+          setGameState('finished');
+          toast({ title: '🎉 Set completo!', description: `Você coletou ${playerEggs} ovos!` });
+          return;
+        }
+        const q = await buildQuestion();
+        await broadcastRoundStart(q, nextRound);
+      } catch (err) {
+        console.error('[host] erro ao iniciar próxima rodada:', err);
+        toast({ title: 'Erro', description: 'Falha ao iniciar a próxima rodada.', variant: 'destructive' });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState]);
 
   return {
-    // Game state
+    // estado
+    isLoading,
     gameState,
     currentRound,
     timeLeft,
     selectedAnswer,
     showResults: gameState === 'reveal',
     currentQuestion,
-    players,
-    isLoading,
     gameStarted: gameState !== 'idle',
-    
-    // Audio control
+
+    // áudio
     audioUnlocked,
-    
-    // Actions
+
+    // ações
     handleAnswerSelect,
     startFirstRound,
-    
-    // Player data
+
+    // placar próprio
     playerEggs,
     answerTime,
     currentSettings,
-    
-    // Multi-player (future)
-    answersCount,
-    expectedPlayers,
-    isHost
+
+    // sync
+    isHost,
+    answersByOption,
   };
 };

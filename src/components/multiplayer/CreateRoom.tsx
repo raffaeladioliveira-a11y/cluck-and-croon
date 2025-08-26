@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
+import { ChickenButton } from "@/components/ChickenButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
@@ -15,11 +15,9 @@ interface CreateRoomProps {
   onAvatarChange: (avatar: string) => void;
 }
 
-export function CreateRoom({ 
-  playerName, 
-  selectedAvatar, 
-  onPlayerNameChange, 
-  onAvatarChange 
+export function CreateRoom({
+  playerName,
+  selectedAvatar,
 }: CreateRoomProps) {
   const navigate = useNavigate();
   const [isCreating, setIsCreating] = useState(false);
@@ -37,25 +35,44 @@ export function CreateRoom({
     setIsCreating(true);
     try {
       const clientId = getOrCreateClientId();
-      
-      // Salvar perfil antes de criar sala
-      saveProfile({
-        displayName: playerName,
-        avatar: selectedAvatar
-      });
 
-      // Criar sala via RPC
-      const { data: roomCode, error } = await supabase.rpc('create_room_with_host', {
+      // Salva a identidade escolhida antes de criar a sala
+      saveProfile({ displayName: playerName, avatar: selectedAvatar });
+
+      // ✅ Use a RPC (não faça insert direto em game_rooms)
+      const { data, error } = await supabase.rpc("create_room_with_host", {
         p_display_name: playerName,
         p_avatar: selectedAvatar,
-        p_client_id: clientId
+        p_client_id: clientId,
       });
 
+      // Log técnico pra depurar na Network/Console
+      console.log("[create_room_with_host] data:", data, "error:", error);
+
       if (error) {
-        console.error('Error creating room:', error);
+        const e: any = error;
+        const tech =
+          [e.code && `code: ${e.code}`, e.message && `msg: ${e.message}`, e.hint && `hint: ${e.hint}`, e.details && `details: ${e.details}`]
+            .filter(Boolean)
+            .join(" | ");
+
+        console.error("[create_room_with_host] ERROR:", { code: e.code, message: e.message, hint: e.hint, details: e.details });
+
         toast({
-          title: "❌ Erro!",
-          description: "Não foi possível criar o galinheiro. Tente novamente.",
+          title: "❌ Erro ao criar o galinheiro",
+          description: tech || "Não foi possível criar o galinheiro. Veja o console/Network para detalhes.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const newRoomCode = typeof data === "string" ? data.trim().toUpperCase() : "";
+
+      if (!/^[A-Z0-9]{6}$/.test(newRoomCode)) {
+        console.error("[create_room_with_host] retorno inválido:", data);
+        toast({
+          title: "❌ Erro",
+          description: "A RPC não retornou um código de 6 caracteres (A-Z/0-9).",
           variant: "destructive",
         });
         return;
@@ -63,18 +80,16 @@ export function CreateRoom({
 
       toast({
         title: "🏠 Galinheiro Criado!",
-        description: `Código: ${roomCode}. Redirecionando...`,
+        description: `Código: ${newRoomCode}. Redirecionando...`,
       });
 
-      // Navegar para o lobby
-      setTimeout(() => {
-        navigate(`/lobby/${roomCode}`);
-      }, 1000);
-    } catch (error) {
-      console.error('Error creating room:', error);
+      // ✅ navega somente com code válido
+      navigate(`/lobby/${newRoomCode}`);
+    } catch (err: any) {
+      console.error("[create_room_with_host] EXCEPTION:", err);
       toast({
-        title: "❌ Erro!",
-        description: "Não foi possível criar o galinheiro. Tente novamente.",
+        title: "❌ Erro inesperado",
+        description: err?.message || String(err),
         variant: "destructive",
       });
     } finally {
@@ -90,9 +105,14 @@ export function CreateRoom({
         <p className="text-muted-foreground mb-6">
           Seja o fazendeiro e crie um novo galinheiro para seus amigos se juntarem!
         </p>
-        <ChickenButton 
-          variant="barn" 
-          size="lg" 
+
+        {/* (Opcional) Campos extras aqui se quiser editar nome/avatar neste card */}
+        {/* <Label className="block mb-2">Nome</Label>
+        <Input value={playerName} onChange={(e)=>onPlayerNameChange(e.target.value)} /> */}
+
+        <ChickenButton
+          variant="barn"
+          size="lg"
           className="w-full group"
           chickenStyle="bounce"
           onClick={handleCreateRoom}
