@@ -109,14 +109,15 @@ export function RoomLobby() {
         game_session_id: roomData.game_session_id
       });
 
-      // Subscribe to real-time changes
-      const channel = supabase.channel(`room:${roomCode}`)
+      // Subscribe to real-time changes with better error handling
+      const channel = supabase.channel(`room:${roomCode}:${clientId}`)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
           table: 'room_participants',
           filter: `room_id=eq.${roomData.id}`
-        }, () => {
+        }, (payload) => {
+          console.log('🔄 Room participants changed:', payload);
           loadParticipants(roomData.id);
         })
         .on('postgres_changes', {
@@ -125,7 +126,7 @@ export function RoomLobby() {
           table: 'game_rooms',
           filter: `code=eq.${roomCode.trim()}`
         }, (payload: any) => {
-          console.log('Room status changed:', payload.new);
+          console.log('🏠 Room status changed:', payload.new);
           const updatedRoom = payload.new;
           setRoom({
             code: updatedRoom.code || updatedRoom.room_code,
@@ -139,7 +140,14 @@ export function RoomLobby() {
             navigate(`/game/${roomCode}?sid=${updatedRoom.game_session_id}`);
           }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('📡 Realtime subscription status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Successfully subscribed to room updates');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Error subscribing to room updates');
+          }
+        });
 
       // Load initial participants
       loadParticipants(roomData.id);
@@ -162,28 +170,35 @@ export function RoomLobby() {
   };
 
   const loadParticipants = async (roomId: string) => {
-    const { data, error } = await supabase
-      .from('room_participants')
-      .select('*')
-      .eq('room_id', roomId);
+    try {
+      const { data, error } = await supabase
+        .from('room_participants')
+        .select('*')
+        .eq('room_id', roomId);
 
-    if (error) {
-      console.error('Error loading participants:', error);
-      return;
+      if (error) {
+        console.error('Error loading participants:', error);
+        return;
+      }
+
+      console.log('👥 Loaded participants:', data);
+
+      // Map participants
+      const mappedPlayers = data.map(participant => ({
+        id: participant.id,
+        name: participant.display_name || 'Guest',
+        avatar: participant.avatar_emoji || '🐔',
+        isHost: participant.is_host || false,
+        isReady: participant.is_ready || false,
+        eggs: participant.current_eggs || 0,
+        client_id: participant.client_id
+      }));
+
+      console.log('🗂️ Mapped players:', mappedPlayers);
+      setPlayers(mappedPlayers);
+    } catch (error) {
+      console.error('Unexpected error loading participants:', error);
     }
-
-    // Map participants
-    const mappedPlayers = data.map(participant => ({
-      id: participant.id,
-      name: participant.display_name || 'Guest',
-      avatar: participant.avatar_emoji || '🐔',
-      isHost: participant.is_host || false,
-      isReady: participant.is_ready || false,
-      eggs: participant.current_eggs || 0,
-      client_id: participant.client_id
-    }));
-
-    setPlayers(mappedPlayers);
   };
 
   const handleStartGame = async () => {
