@@ -1,6 +1,7 @@
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
 import { BarnCard } from "@/components/BarnCard";
+import { ChickenButton } from "@/components/ChickenButton";
 import { Crown, Users } from "lucide-react";
 
 interface Player {
@@ -8,6 +9,7 @@ interface Player {
   name: string;
   avatar: string;
   isHost: boolean;
+  isReady: boolean;
   eggs?: number;
   client_id?: string;
 }
@@ -15,9 +17,14 @@ interface Player {
 interface PlayerListProps {
   players: Player[];
   currentClientId: string;
+  onToggleReady?: () => void;
 }
 
-export function PlayerList({ players, currentClientId }: PlayerListProps) {
+export function PlayerList({ players, currentClientId, onToggleReady }: PlayerListProps) {
+  const currentPlayer = players.find(p => p.client_id === currentClientId);
+  const isCurrentPlayerHost = currentPlayer?.isHost || false;
+  const isCurrentPlayerReady = currentPlayer?.isReady || false;
+
   if (players.length === 0) {
     return (
       <BarnCard variant="nest" className="text-center">
@@ -45,48 +52,63 @@ export function PlayerList({ players, currentClientId }: PlayerListProps) {
             const isCurrentPlayer = player.client_id === currentClientId;
             
             return (
-              <div
-                key={player.id}
-                className={`flex items-center gap-4 p-4 rounded-lg transition-all ${
-                  isCurrentPlayer
-                    ? "bg-primary/20 border-2 border-primary/40 shadow-lg"
-                    : "bg-white/50 hover:bg-white/70"
-                }`}
-              >
-                <div className="relative">
-                  <ChickenAvatar 
-                    emoji={player.avatar} 
-                    size="lg" 
-                    animated 
-                    className={isCurrentPlayer ? "ring-2 ring-primary" : ""}
-                  />
-                  {player.isHost && (
-                    <Crown className="absolute -top-2 -right-2 w-5 h-5 text-yellow-500" />
-                  )}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-bold text-lg truncate">
-                      {player.name}
-                      {isCurrentPlayer && <span className="text-primary ml-1">(Você)</span>}
-                    </h4>
-                    {player.isHost && (
-                      <span className="text-xs bg-yellow-500 text-yellow-900 px-2 py-1 rounded-full font-semibold">
-                        HOST
-                      </span>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center gap-2 mt-1">
-                    <EggCounter count={player.eggs || 0} variant="default" size="sm" />
-                    <span className="text-sm text-muted-foreground">ovos</span>
+              <div key={player.id}>
+                <div className={`p-4 rounded-lg transition-all ${
+                  player.isHost ? 'bg-gradient-sunrise border-2 border-yellow-400' : 'bg-barn-wood/20'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <ChickenAvatar 
+                      size="md" 
+                      emoji={player.avatar} 
+                      className="flex-shrink-0"
+                    />
+                    <div className="flex-grow">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-lg">
+                          {player.name}
+                        </span>
+                        {player.isHost && (
+                          <span className="text-sm px-2 py-1 bg-yellow-400 text-yellow-900 rounded-full font-bold">
+                            👑 HOST
+                          </span>
+                        )}
+                        {!player.isHost && (
+                          <span className={`text-sm px-2 py-1 rounded-full font-bold ${
+                            player.isReady 
+                              ? 'bg-green-400 text-green-900' 
+                              : 'bg-orange-400 text-orange-900'
+                          }`}>
+                            {player.isReady ? '✅ PRONTA' : '⏳ AGUARDANDO'}
+                          </span>
+                        )}
+                        {player.client_id === currentClientId && (
+                          <span className="text-primary font-bold text-sm">VOCÊ</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {player.eggs || 0} 🥚 ovos coletados
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
             );
           })}
         </div>
+
+        {/* Ready Button for Non-Host Players */}
+        {!isCurrentPlayerHost && onToggleReady && (
+          <div className="mt-6 text-center">
+            <ChickenButton
+              variant={isCurrentPlayerReady ? "feather" : "corn"}
+              size="md"
+              onClick={onToggleReady}
+              className="min-w-[200px]"
+            >
+              {isCurrentPlayerReady ? '⏳ Marcar como Não Pronta' : '✅ Marcar como Pronta'}
+            </ChickenButton>
+          </div>
+        )}
 
         {players.length < 10 && (
           <div className="mt-6 text-center p-4 bg-white/30 rounded-lg">

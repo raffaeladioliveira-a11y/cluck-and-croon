@@ -18,6 +18,7 @@ interface Player {
   name: string;
   avatar: string;
   isHost: boolean;
+  isReady: boolean;
   eggs?: number;
   client_id?: string;
 }
@@ -177,6 +178,7 @@ export function RoomLobby() {
       name: participant.display_name || 'Guest',
       avatar: participant.avatar_emoji || '🐔',
       isHost: participant.is_host || false,
+      isReady: participant.is_ready || false,
       eggs: participant.current_eggs || 0,
       client_id: participant.client_id
     }));
@@ -189,6 +191,19 @@ export function RoomLobby() {
       toast({
         title: "Aguarde mais jogadores",
         description: "É necessário pelo menos 2 jogadores para começar o jogo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Check if all non-host players are ready
+    const nonHostPlayers = players.filter(p => !p.isHost);
+    const allNonHostReady = nonHostPlayers.every(p => p.isReady);
+    
+    if (nonHostPlayers.length > 0 && !allNonHostReady) {
+      toast({
+        title: "Aguarde as galinhas se prepararem",
+        description: "Todas as galinhas precisam estar prontas antes de iniciar!",
         variant: "destructive",
       });
       return;
@@ -231,6 +246,31 @@ export function RoomLobby() {
     }
   };
 
+  const handleToggleReady = async () => {
+    try {
+      const currentPlayer = players.find(p => p.client_id === clientId);
+      if (!currentPlayer) return;
+
+      const newReadyStatus = !currentPlayer.isReady;
+
+      const { error } = await supabase
+        .from('room_participants')
+        .update({ is_ready: newReadyStatus })
+        .eq('id', currentPlayer.id);
+
+      if (error) {
+        console.error('Error updating ready status:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível atualizar seu status.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling ready:', error);
+    }
+  };
+
   const handleLeaveRoom = () => {
     navigate('/');
   };
@@ -263,19 +303,52 @@ export function RoomLobby() {
         <RoomCode roomCode={roomCode} />
 
         {/* Players List */}
-        <PlayerList players={players} currentClientId={clientId} />
+        <PlayerList 
+          players={players} 
+          currentClientId={clientId} 
+          onToggleReady={handleToggleReady}
+        />
 
         {/* Action Buttons */}
-        <div className="flex gap-4 justify-center">
+        <div className="flex flex-col gap-4 items-center">
           {isHost && (
-            <ChickenButton 
-              variant="corn" 
-              size="lg" 
-              onClick={handleStartGame}
-              disabled={players.length < 2}
-            >
-              🎵 Iniciar Jogo ({players.length}/10)
-            </ChickenButton>
+            <>
+              {/* Ready Status Display */}
+              {players.length > 1 && (
+                <div className="text-center p-4 bg-white/20 rounded-lg">
+                  <p className="text-sm font-medium mb-2">Status das Galinhas:</p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {players.filter(p => !p.isHost).map(player => (
+                      <span
+                        key={player.id}
+                        className={`text-xs px-2 py-1 rounded-full font-bold ${
+                          player.isReady
+                            ? 'bg-green-400 text-green-900'
+                            : 'bg-orange-400 text-orange-900'
+                        }`}
+                      >
+                        {player.name}: {player.isReady ? '✅' : '⏳'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <ChickenButton 
+                variant="corn" 
+                size="lg" 
+                onClick={handleStartGame}
+                disabled={players.length < 2 || (players.filter(p => !p.isHost).length > 0 && !players.filter(p => !p.isHost).every(p => p.isReady))}
+                className="min-w-[250px]"
+              >
+                {players.length < 2 
+                  ? '🔄 Aguardando Jogadores...' 
+                  : players.filter(p => !p.isHost).length > 0 && !players.filter(p => !p.isHost).every(p => p.isReady)
+                    ? '⏳ Aguardando Galinhas...'
+                    : `🎵 Iniciar Jogo (${players.length}/10)`
+                }
+              </ChickenButton>
+            </>
           )}
           
           <ChickenButton 
