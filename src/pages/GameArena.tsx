@@ -150,7 +150,8 @@ function GameArenaContent() {
                     artist={currentQuestion.song.artist}
                     audioUrl={currentQuestion.song.audioUrl}
                     duration={currentQuestion.song.duration_seconds || 15}
-                    autoPlay={gameState === "playing" && audioUnlocked}
+                    autoPlay={gameState === 'playing'}
+                    muted={!audioUnlocked}
                     gameState={gameState}
                     roundKey={`${currentRound}-${currentQuestion.song.id}`}
                     onTimeUpdate={() => {}}
