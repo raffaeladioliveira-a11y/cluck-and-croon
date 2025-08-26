@@ -40,6 +40,7 @@ export type Database = {
           finished_at: string | null
           game_session_id: string | null
           host_id: string
+          host_participant_id: string | null
           host_user_id: string | null
           id: string
           max_players: number | null
@@ -63,6 +64,7 @@ export type Database = {
           finished_at?: string | null
           game_session_id?: string | null
           host_id: string
+          host_participant_id?: string | null
           host_user_id?: string | null
           id?: string
           max_players?: number | null
@@ -86,6 +88,7 @@ export type Database = {
           finished_at?: string | null
           game_session_id?: string | null
           host_id?: string
+          host_participant_id?: string | null
           host_user_id?: string | null
           id?: string
           max_players?: number | null
@@ -344,7 +347,7 @@ export type Database = {
           is_ready: boolean | null
           joined_at: string
           room_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           avatar_emoji?: string | null
@@ -358,7 +361,7 @@ export type Database = {
           is_ready?: boolean | null
           joined_at?: string
           room_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           avatar_emoji?: string | null
@@ -372,7 +375,7 @@ export type Database = {
           is_ready?: boolean | null
           joined_at?: string
           room_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -462,6 +465,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      join_room: {
+        Args: {
+          p_avatar: string
+          p_client_id: string
+          p_display_name: string
+          p_room_code: string
+        }
+        Returns: string
+      }
       join_room_with_identity: {
         Args: {
           p_avatar: string
@@ -472,7 +484,7 @@ export type Database = {
         Returns: string
       }
       start_game: {
-        Args: { p_client_id: string; p_room: string }
+        Args: { p_client_id: string; p_room_code: string }
         Returns: string
       }
     }

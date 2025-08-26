@@ -145,7 +145,7 @@ export default function GameLobby() {
       });
 
       // Use RPC to join room with preserved identity (roomCode already uppercase)
-      const { error: joinError } = await supabase.rpc('join_room_with_identity', {
+      const { error: joinError } = await supabase.rpc('join_room', {
         p_room_code: roomCode,
         p_display_name: userProfile.displayName,
         p_avatar: userProfile.avatar,
@@ -250,11 +250,11 @@ export default function GameLobby() {
 
     console.log('📝 Loaded participants:', data);
 
-    // Map participants preserving their chosen identity
+    // Map participants preserving their chosen identity (use participant.id instead of user_id)
     const mappedPlayers = data.map(participant => ({
-      id: participant.user_id,
-      name: participant.display_name_user || participant.display_name || 'Guest',
-      avatar: participant.avatar_user || participant.avatar_emoji || '🐔',
+      id: participant.id,
+      name: participant.display_name || 'Guest',
+      avatar: participant.avatar_emoji || '🐔',
       isHost: participant.is_host || false,
       eggs: participant.current_eggs || 0,
       client_id: participant.client_id
@@ -268,7 +268,7 @@ export default function GameLobby() {
     try {
       // Use RPC function to start game atomically (host-only) - roomCode already uppercase
       const { data: sessionId, error } = await supabase.rpc('start_game', {
-        p_room: roomCode,
+        p_room_code: roomCode,
         p_client_id: clientId
       });
 
