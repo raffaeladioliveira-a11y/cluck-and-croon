@@ -7,6 +7,7 @@ import { AppHeader } from "@/components/AppHeader";
 import Index from "./pages/Index";
 import Home from "./pages/Home";
 import GameLobby from "./pages/GameLobby";
+import { RoomLobby } from "@/components/multiplayer/RoomLobby";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import GameArena from "./pages/GameArena";
@@ -28,7 +29,7 @@ const App = () => (
             <Route path="/" element={<Home />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/lobby/:roomCode" element={<GameLobby />} />
+            <Route path="/lobby/:roomCode" element={<RoomLobby />} />
             <Route path="/game/lobby/:roomCode" element={<GameLobby />} />
             <Route path="/game/lobby" element={<GameLobby />} />
             <Route path="/game/:roomCode" element={<GameArena />} />

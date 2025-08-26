@@ -6,121 +6,16 @@ import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { getOrCreateClientId, saveProfile } from "@/utils/clientId";
+import { CreateRoom } from "@/components/multiplayer/CreateRoom";
+import { JoinRoom } from "@/components/multiplayer/JoinRoom";
 import heroImage from "@/assets/galinheiro-hero.jpg";
 
 export default function Home() {
   const navigate = useNavigate();
-  const [roomCode, setRoomCode] = useState("");
   const [playerName, setPlayerName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("🐔");
 
   const chickenAvatars = ["🐔", "🐓", "🐣", "🐤", "🐥", "🏵️🐔", "👑🐓", "🌟🐥", "💎🐤", "🎵🐣"];
-
-  // Função para gerar código de sala aleatório
-  const generateRoomCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let result = '';
-    for (let i = 0; i < 6; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return result;
-  };
-
-  // Função para criar novo galinheiro
-  const handleCreateRoom = async () => {
-    if (!playerName.trim()) {
-      toast({
-        title: "🐔 Ops!",
-        description: "Você precisa dar um nome para sua galinha primeiro!",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const clientId = getOrCreateClientId();
-      
-      // Salvar perfil antes de criar sala
-      saveProfile({
-        displayName: playerName,
-        avatar: selectedAvatar
-      });
-
-      // Criar sala via RPC
-      const { data: roomCode, error } = await supabase.rpc('create_room_with_host', {
-        p_display_name: playerName,
-        p_avatar: selectedAvatar,
-        p_client_id: clientId
-      });
-
-      if (error) {
-        console.error('Error creating room:', error);
-        toast({
-          title: "❌ Erro!",
-          description: "Não foi possível criar o galinheiro. Tente novamente.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      toast({
-        title: "🏠 Galinheiro Criado!",
-        description: `Código: ${roomCode}. Redirecionando...`,
-      });
-
-      // Navegar para o lobby (roomCode já vem em UPPERCASE do RPC)
-      setTimeout(() => {
-        navigate(`/lobby/${roomCode}`);
-      }, 1000);
-    } catch (error) {
-      console.error('Error creating room:', error);
-      toast({
-        title: "❌ Erro!",
-        description: "Não foi possível criar o galinheiro. Tente novamente.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Função para entrar em galinheiro existente
-  const handleJoinRoom = () => {
-    if (!playerName.trim()) {
-      toast({
-        title: "🐔 Ops!",
-        description: "Você precisa dar um nome para sua galinha primeiro!",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (roomCode.length !== 6) {
-      toast({
-        title: "🚪 Código Inválido!",
-        description: "O código do galinheiro deve ter 6 caracteres.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Salvar perfil antes de entrar na sala
-    saveProfile({
-      displayName: playerName,
-      avatar: selectedAvatar
-    });
-
-    toast({
-      title: "🚪 Entrando no Galinheiro!",
-      description: `Conectando ao galinheiro ${roomCode.toUpperCase()}...`,
-    });
-
-    // Navegar para o lobby - roomCode será normalizado para UPPERCASE no GameLobby
-    setTimeout(() => {
-      navigate(`/lobby/${roomCode.toUpperCase()}`);
-    }, 1000);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-sky">
@@ -158,55 +53,20 @@ export default function Home() {
           {/* Action Cards */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             {/* Create Room Card */}
-            <BarnCard variant="coop" animated className="group">
-              <div className="text-center">
-                <div className="text-6xl mb-4 group-hover:animate-chicken-walk">🏠</div>
-                <h3 className="text-2xl font-bold mb-4 text-barn-brown">Criar Galinheiro</h3>
-                <p className="text-muted-foreground mb-6">
-                  Seja o fazendeiro e crie um novo galinheiro para seus amigos se juntarem!
-                </p>
-                <ChickenButton 
-                  variant="barn" 
-                  size="lg" 
-                  className="w-full group"
-                  chickenStyle="bounce"
-                  onClick={handleCreateRoom}
-                >
-                  🏠 Criar Novo Galinheiro
-                </ChickenButton>
-              </div>
-            </BarnCard>
+            <CreateRoom 
+              playerName={playerName}
+              selectedAvatar={selectedAvatar}
+              onPlayerNameChange={setPlayerName}
+              onAvatarChange={setSelectedAvatar}
+            />
 
             {/* Join Room Card */}
-            <BarnCard variant="nest" animated className="group">
-              <div className="text-center">
-                <div className="text-6xl mb-4 group-hover:animate-egg-bounce">🚪</div>
-                <h3 className="text-2xl font-bold mb-4 text-primary">Entrar no Galinheiro</h3>
-                <div className="space-y-4 mb-6">
-                  <div>
-                    <Label htmlFor="room-code" className="text-sm font-medium">Código do Galinheiro</Label>
-                    <Input 
-                      id="room-code"
-                      placeholder="Digite o código (ex: ABC123)"
-                      value={roomCode}
-                      onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                      className="mt-1 text-center font-bold text-lg tracking-widest"
-                      maxLength={6}
-                    />
-                  </div>
-                </div>
-                <ChickenButton 
-                  variant="corn" 
-                  size="lg" 
-                  className="w-full"
-                  chickenStyle="walk"
-                  disabled={roomCode.length < 6}
-                  onClick={handleJoinRoom}
-                >
-                  🚪 Entrar no Galinheiro
-                </ChickenButton>
-              </div>
-            </BarnCard>
+            <JoinRoom 
+              playerName={playerName}
+              selectedAvatar={selectedAvatar}
+              onPlayerNameChange={setPlayerName}
+              onAvatarChange={setSelectedAvatar}
+            />
           </div>
 
           {/* Player Setup */}
