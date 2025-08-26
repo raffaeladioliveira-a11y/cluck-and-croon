@@ -31,6 +31,7 @@ export type Database = {
       }
       game_rooms: {
         Row: {
+          code: string | null
           created_at: string
           current_players: number | null
           current_round: number | null
@@ -55,6 +56,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          code?: string | null
           created_at?: string
           current_players?: number | null
           current_round?: number | null
@@ -79,6 +81,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          code?: string | null
           created_at?: string
           current_players?: number | null
           current_round?: number | null

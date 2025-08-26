@@ -3,10 +3,11 @@
 ## ✅ Funcionalidades Implementadas
 
 ### Banco de Dados
-- [x] Removida dependência obrigatória de `user_id` (agora nullable)
+- [x] Convertido `user_id` para `text` para eliminar erros de tipo
 - [x] Criado índice único para `room_id + client_id`
 - [x] RPCs atualizadas para usar apenas `client_id`
 - [x] RLS desabilitado para MVP público
+- [x] Adicionada coluna `code` para compatibilidade
 
 ### RPCs Funcionais
 - [x] `create_room_with_host(display_name, avatar, client_id)` - Cria sala e define host
@@ -19,6 +20,7 @@
 - [x] Identificação por `participant.id` em vez de `user_id`
 - [x] Detecção de host via `client_id` + `is_host`
 - [x] Navegação sincronizada via realtime no `game_rooms.status`
+- [x] Uso da coluna `code` para consultas de sala
 
 ## Testes Sugeridos
 
@@ -65,3 +67,9 @@
 
 ## Status: ✅ COMPLETO
 Todas as mudanças necessárias foram implementadas. O sistema agora funciona completamente sem autenticação, usando apenas `client_id` para identificação.
+
+### Mudanças Implementadas:
+1. **Banco de Dados**: user_id convertido para text, criado índice único client_id+room_id
+2. **RPCs**: Todas as funções agora usam apenas client_id, sem tocar em user_id
+3. **Frontend**: GameLobby.tsx atualizado para usar nova estrutura
+4. **RLS**: Desabilitado para permitir acesso público no MVP

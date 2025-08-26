@@ -146,7 +146,7 @@ export default function GameLobby() {
 
       // Use RPC to join room with preserved identity (roomCode already uppercase)
       const { error: joinError } = await supabase.rpc('join_room', {
-        p_room_code: roomCode,
+        p_room_code: roomCode.trim(),
         p_display_name: userProfile.displayName,
         p_avatar: userProfile.avatar,
         p_client_id: clientId
@@ -168,11 +168,11 @@ export default function GameLobby() {
         throw joinError;
       }
 
-      // Get room info
+      // Get room info using 'code' column (new)
       const { data: roomData, error: roomError } = await supabase
         .from('game_rooms')
-        .select('room_code, status, game_session_id, id')
-        .eq('room_code', roomCode)
+        .select('code, room_code, status, game_session_id, id')
+        .eq('code', roomCode.trim())
         .single();
 
       if (roomError) {
@@ -181,7 +181,7 @@ export default function GameLobby() {
       }
 
       setRoom({
-        code: roomData.room_code,
+        code: roomData.code || roomData.room_code,
         status: roomData.status || 'lobby',
         game_session_id: roomData.game_session_id
       });
@@ -200,12 +200,12 @@ export default function GameLobby() {
           event: 'UPDATE',
           schema: 'public',
           table: 'game_rooms',
-          filter: `room_code=eq.${roomCode}`
+          filter: `code=eq.${roomCode.trim()}`
         }, (payload: any) => {
           console.log('Room status changed:', payload.new);
           const updatedRoom = payload.new;
           setRoom({
-            code: updatedRoom.room_code,
+            code: updatedRoom.code || updatedRoom.room_code,
             status: updatedRoom.status,
             game_session_id: updatedRoom.game_session_id
           });
@@ -268,7 +268,7 @@ export default function GameLobby() {
     try {
       // Use RPC function to start game atomically (host-only) - roomCode already uppercase
       const { data: sessionId, error } = await supabase.rpc('start_game', {
-        p_room_code: roomCode,
+        p_room_code: roomCode.trim(),
         p_client_id: clientId
       });
 
