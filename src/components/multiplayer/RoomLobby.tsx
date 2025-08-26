@@ -94,7 +94,7 @@ export function RoomLobby() {
       // Get room info
       const { data: roomData, error: roomError } = await supabase
         .from('game_rooms')
-        .select('code, room_code, status, game_session_id, id')
+        .select('code, room_code, status, game_session_id, id, host_id')
         .eq('code', roomCode.trim())
         .single();
 
@@ -109,8 +109,8 @@ export function RoomLobby() {
         game_session_id: roomData.game_session_id
       });
 
-      // Subscribe to real-time changes with better error handling
-      const channel = supabase.channel(`room:${roomCode}:${clientId}`)
+      // Subscribe to real-time changes with unique channel per user
+      const channel = supabase.channel(`room_${roomCode}_${clientId}_${Date.now()}`)
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
@@ -118,21 +118,22 @@ export function RoomLobby() {
           filter: `room_id=eq.${roomData.id}`
         }, (payload) => {
           console.log('🔄 Room participants changed:', payload);
-          loadParticipants(roomData.id);
+          // Small delay to ensure DB consistency
+          setTimeout(() => loadParticipants(roomData.id), 100);
         })
         .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'game_rooms',
-          filter: `code=eq.${roomCode.trim()}`
+          filter: `id=eq.${roomData.id}`
         }, (payload: any) => {
           console.log('🏠 Room status changed:', payload.new);
           const updatedRoom = payload.new;
-          setRoom({
-            code: updatedRoom.code || updatedRoom.room_code,
+          setRoom(prev => ({
+            ...prev,
             status: updatedRoom.status,
             game_session_id: updatedRoom.game_session_id
-          });
+          }));
           
           // Navigate to game when it starts
           if (!navigatedRef.current && updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
@@ -174,16 +175,17 @@ export function RoomLobby() {
       const { data, error } = await supabase
         .from('room_participants')
         .select('*')
-        .eq('room_id', roomId);
+        .eq('room_id', roomId)
+        .order('joined_at', { ascending: true }); // Host will be first (joined first)
 
       if (error) {
         console.error('Error loading participants:', error);
         return;
       }
 
-      console.log('👥 Loaded participants:', data);
+      console.log('👥 Loaded participants (ordered by join time):', data);
 
-      // Map participants
+      // Map participants and ensure correct host identification
       const mappedPlayers = data.map(participant => ({
         id: participant.id,
         name: participant.display_name || 'Guest',
@@ -194,7 +196,7 @@ export function RoomLobby() {
         client_id: participant.client_id
       }));
 
-      console.log('🗂️ Mapped players:', mappedPlayers);
+      console.log('🗂️ Mapped players with host info:', mappedPlayers);
       setPlayers(mappedPlayers);
     } catch (error) {
       console.error('Unexpected error loading participants:', error);
