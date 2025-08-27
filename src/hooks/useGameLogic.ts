@@ -154,6 +154,21 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     startRoundTimer(currentSettings.time_per_question);
   }, [currentSettings, sessionId, startRoundTimer]);
 
+  const broadcastEndOfRound = useCallback(async (roomCode: string, playerEggs: number, sessionId: string) => {
+    if (!sessionId || !gameChannelRef.current) return;
+
+    await gameChannelRef.current.send({
+      type: 'broadcast',
+      event: 'ROUND_COMPLETE',
+      payload: {
+        roomCode,
+        playerEggs,
+        sessionId,
+        completed: true
+      }
+    });
+  }, []);
+
   const broadcastAnswer = useCallback(async (answerIndex: number) => {
     if (!sessionId || !gameChannelRef.current) return;
     await gameChannelRef.current.send({
@@ -273,6 +288,17 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             });
           });
 
+          ch.on('broadcast', { event: 'ROUND_COMPLETE' }, (msg) => {
+            const { roomCode, sessionId } = msg.payload as {
+              roomCode: string; sessionId: string;
+            };
+            console.log('[realtime] Round complete, redirecting to lobby...');
+            const navigateEvent = new CustomEvent("navigateToRoundLobby", {
+              detail: { roomCode, playerEggs, sessionId }
+            });
+            window.dispatchEvent(navigateEvent);
+          });
+
           ch.subscribe((status) => {
             console.log('[realtime] game channel status:', status);
           });
@@ -326,8 +352,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       try {
         const nextRound = currentRound + 1;
         if (nextRound > 10) {
-          setGameState('finished');
-          toast({ title: '🎉 Set completo!', description: `Você coletou ${playerEggs} ovos!` });
+          // Ao final da 10ª pergunta, host dispara evento para todos redirecionarem
+          console.log('[host] Fim das 10 perguntas, enviando broadcast para redirecionar todos');
+          await broadcastEndOfRound(roomCode, playerEggs, sessionId);
           return;
         }
         const q = await buildQuestion();
@@ -338,7 +365,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gameState]);
+  }, [gameState, roomCode, playerEggs, sessionId, broadcastEndOfRound]);
 
 
 

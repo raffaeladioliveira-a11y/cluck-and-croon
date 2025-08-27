@@ -11,6 +11,7 @@ import { RoomLobby } from "@/components/multiplayer/RoomLobby";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import GameArena from "./pages/GameArena";
+import RoundLobby from "./pages/RoundLobby";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/lobby/:roomCode" element={<RoomLobby />} />
             <Route path="/game/lobby/:roomCode" element={<GameLobby />} />
             <Route path="/game/lobby" element={<GameLobby />} />
+            <Route path="/round-lobby/:roomCode" element={<RoundLobby />} />
             <Route path="/game/:roomCode" element={<GameArena />} />
             <Route path="/admin" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />

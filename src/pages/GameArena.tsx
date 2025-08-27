@@ -21,8 +21,19 @@ function GameArenaContent() {
       const { roomCode: navRoomCode, setComplete, eggs } = event.detail;
       navigate(`/game/lobby/${navRoomCode}?setComplete=${setComplete}&eggs=${eggs}`);
     };
+    
+    const handleNavigateToRoundLobby = (event: CustomEvent) => {
+      const { roomCode: navRoomCode, playerEggs, sessionId } = event.detail;
+      navigate(`/round-lobby/${navRoomCode}?sid=${sessionId}&eggs=${playerEggs}`);
+    };
+    
     window.addEventListener("navigateToLobby", handleNavigateToLobby as EventListener);
-    return () => window.removeEventListener("navigateToLobby", handleNavigateToLobby as EventListener);
+    window.addEventListener("navigateToRoundLobby", handleNavigateToRoundLobby as EventListener);
+    
+    return () => {
+      window.removeEventListener("navigateToLobby", handleNavigateToLobby as EventListener);
+      window.removeEventListener("navigateToRoundLobby", handleNavigateToRoundLobby as EventListener);
+    };
   }, [navigate]);
 
   const {

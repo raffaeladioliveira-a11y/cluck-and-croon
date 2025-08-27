@@ -13,6 +13,7 @@ interface MusicPlayerProps {
   onTimeUpdate?: (currentTime: number) => void;
   onEnded?: () => void;
   autoPlay?: boolean;
+  muted?: boolean;
   gameState?: GameState;
   roundKey?: string;
   className?: string;
@@ -26,6 +27,7 @@ export const MusicPlayer = ({
   onTimeUpdate,
   onEnded,
   autoPlay = false,
+  muted = false,
   gameState = 'idle',
   roundKey = '',
   className
