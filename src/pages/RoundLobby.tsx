@@ -331,7 +331,7 @@ export default function RoundLobby() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <EggCounter 
+                  <EggCounter
                     count={player.eggs} 
                     size="lg" 
                     variant={player.position === 1 ? "golden" : "default"}
