@@ -126,13 +126,13 @@ export default function AdminLogin() {
         </form>
 
         {/* Login hint */}
-        <div className="mt-6 p-3 bg-primary/10 rounded-lg border border-primary/20">
-          <p className="text-xs text-muted-foreground text-center">
-            <strong>Demonstração:</strong><br />
-            Usuário: fazendeiro<br />
-            Senha: galinha123
-          </p>
-        </div>
+        {/*<div className="mt-6 p-3 bg-primary/10 rounded-lg border border-primary/20">*/}
+          {/*<p className="text-xs text-muted-foreground text-center">*/}
+            {/*<strong>Demonstração:</strong><br />*/}
+            {/*Usuário: fazendeiro<br />*/}
+            {/*Senha: galinha123*/}
+          {/*</p>*/}
+        {/*</div>*/}
 
         {/* Back to game */}
         <div className="mt-4 text-center">
