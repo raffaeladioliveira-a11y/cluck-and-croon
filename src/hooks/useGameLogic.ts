@@ -61,6 +61,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
   // avatares por alternativa
   const [answersByOption, setAnswersByOption] = useState<AnswersByOption>({});
+  const [activeGenre, setActiveGenre] = useState<{ id: string; name: string; emoji: string; description?: string } | null>(null);
 
   // timers
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -95,19 +96,50 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   }, [clearTimers, isHost]);
 
   // ---- dados
-  const fetchRandomSongs = async (): Promise<Song[]> => {
-    const { data, error } = await supabase
-        .from('songs')
-        .select('id,title,artist,preview_url,audio_file_url,duration_seconds')
-        .eq('is_active', true)
-        .limit(20);
-    if (error) throw error;
-    if (!data || data.length === 0) throw new Error('Sem músicas ativas.');
-    return data;
+  const fetchSongsWithGenre = async (): Promise<Song[]> => {
+    try {
+      // Buscar músicas usando o edge function para respeitar gênero ativo
+      const { data: response, error } = await supabase.functions.invoke('game-manager', {
+        body: {
+          action: 'getSongsForGenre',
+          roomCode,
+          roundNumber: currentRound
+        }
+      });
+
+      if (error) {
+        console.error('Erro ao buscar músicas:', error);
+        throw error;
+      }
+
+      const { songs, activeGenreId, usedFallback, totalAvailable } = response;
+      
+      if (!songs || songs.length === 0) {
+        throw new Error('Nenhuma música encontrada na base de dados');
+      }
+
+      // Log para debug e UX
+      if (activeGenreId) {
+        console.log(`🎵 Usando ${usedFallback ? 'fallback' : 'gênero específico'} | ${totalAvailable} músicas disponíveis`);
+        
+        if (usedFallback) {
+          toast({
+            title: '⚠️ Fallback Ativado',
+            description: 'Poucas músicas do gênero selecionado. Usando catálogo completo.',
+            variant: 'default'
+          });
+        }
+      }
+
+      return songs;
+    } catch (error) {
+      console.error('Erro ao buscar músicas:', error);
+      throw error;
+    }
   };
 
   const buildQuestion = async (): Promise<GameQuestion> => {
-    const songs = await fetchRandomSongs();
+    const songs = await fetchSongsWithGenre();
     const shuffled = [...songs].sort(() => Math.random() - 0.5);
     const correct = shuffled[0];
     const titles = shuffled.map(s => s.title);
@@ -290,12 +322,28 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             setCurrentSettings(prev => ({ ...prev, ...s }));
           }
         }
-      } catch {
-          // usa defaults silenciosamente
-      }
+        } catch {
+            // usa defaults silenciosamente
+        }
 
-      // se houver sessão, conecta no canal e descobre se sou host
-      if (sessionId) {
+        // Carregar gênero ativo da sala
+        try {
+          const { data: genreResponse } = await supabase.functions.invoke('game-manager', {
+            body: {
+              action: 'getActiveGenre',
+              roomCode
+            }
+          });
+
+          if (!cancelled && genreResponse?.activeGenre) {
+            setActiveGenre(genreResponse.activeGenre);
+          }
+        } catch (error) {
+          console.error('Erro ao carregar gênero ativo:', error);
+        }
+
+        // se houver sessão, conecta no canal e descobre se sou host
+        if (sessionId) {
         try {
           const ch = supabase.channel(`game:${sessionId}`, {
             config: { broadcast: { ack: true }, presence: { key: clientId.current } }
@@ -449,5 +497,6 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     // sync
     isHost,
     answersByOption,
+    activeGenre,
   };
 };

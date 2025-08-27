@@ -14,7 +14,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, roomCode, genreId, userId } = await req.json();
+    const { action, roomCode, genreId, userId, roundNumber } = await req.json();
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -39,22 +39,82 @@ serve(async (req) => {
         );
 
       case 'getSongsForGenre':
-        // Get songs filtered by genre (with anti-repetition)
+        // Get room info to check active genre
+        const { data: roomData } = await supabase
+          .from('game_rooms')
+          .select('next_genre_id, current_set')
+          .eq('room_code', roomCode)
+          .single();
+
+        const activeGenreId = roomData?.next_genre_id || genreId;
+        console.log(`[${roomCode}] Getting songs for genre: ${activeGenreId || 'ALL'} | Round: ${roundNumber || 'N/A'}`);
+
+        // Get songs filtered by active genre
         let query = supabase
           .from('songs')
           .select('*')
-          .eq('is_active', true)
-          .limit(20);
+          .eq('is_active', true);
 
-        if (genreId) {
-          query = query.eq('genre_id', genreId);
+        if (activeGenreId) {
+          query = query.eq('genre_id', activeGenreId);
         }
 
         const { data: songs, error: songsError } = await query;
         if (songsError) throw songsError;
 
+        console.log(`[${roomCode}] Found ${songs?.length || 0} songs for genre ${activeGenreId || 'ALL'}`);
+
+        // Fallback if not enough songs
+        let finalSongs = songs || [];
+        let usedFallback = false;
+
+        if (finalSongs.length < 10 && activeGenreId) {
+          console.log(`[${roomCode}] Not enough songs (${finalSongs.length}) for genre ${activeGenreId}, using fallback`);
+          
+          // Get all songs as fallback
+          const { data: fallbackSongs } = await supabase
+            .from('songs')
+            .select('*')
+            .eq('is_active', true);
+          
+          finalSongs = fallbackSongs || [];
+          usedFallback = true;
+        }
+
+        // Shuffle songs for variety
+        const shuffled = finalSongs.sort(() => Math.random() - 0.5);
+
         return new Response(
-          JSON.stringify({ songs }),
+          JSON.stringify({ 
+            songs: shuffled.slice(0, 20),
+            activeGenreId,
+            usedFallback,
+            totalAvailable: finalSongs.length
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+
+      case 'getActiveGenre':
+        // Get current active genre for display
+        const { data: genreData } = await supabase
+          .from('game_rooms')
+          .select(`
+            next_genre_id,
+            genres:next_genre_id (
+              id,
+              name,
+              emoji,
+              description
+            )
+          `)
+          .eq('room_code', roomCode)
+          .single();
+
+        return new Response(
+          JSON.stringify({ 
+            activeGenre: genreData?.genres || null,
+            activeGenreId: genreData?.next_genre_id || null
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
 

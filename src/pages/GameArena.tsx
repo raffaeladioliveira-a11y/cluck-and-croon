@@ -53,6 +53,7 @@ function GameArenaContent() {
       currentSettings,
       answersByOption,
       isHost,
+      activeGenre,
   } = useGameLogic(roomCode || "", sid);
 
   // loader somente enquanto inicia plugin/rt + conf
@@ -89,8 +90,8 @@ function GameArenaContent() {
       <div className="min-h-screen bg-gradient-sky p-4">
         <div className="max-w-6xl mx-auto">
 
-          {/* Header com rodada/tempo/valor (mostramos mesmo no idle) */}
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
+          {/* Header com rodada/tempo/valor + gênero ativo */}
+          <div className="grid md:grid-cols-4 gap-4 mb-6">
             <BarnCard variant="nest" className="text-center">
               <div className="flex items-center justify-center gap-2">
                 <span className="text-2xl">🔢</span>
@@ -119,6 +120,17 @@ function GameArenaContent() {
                 </div>
               </div>
             </BarnCard>
+            {activeGenre && (
+              <BarnCard variant="nest" className="text-center">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-2xl">{activeGenre.emoji}</span>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Estilo</p>
+                    <p className="text-lg font-bold text-primary">{activeGenre.name}</p>
+                  </div>
+                </div>
+              </BarnCard>
+            )}
           </div>
 
           {/* Estado IDLE: NÃO depende de currentQuestion */}
