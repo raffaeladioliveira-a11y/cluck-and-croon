@@ -51,7 +51,7 @@ export type Database = {
           rounds_total: number | null
           speed_bonus: number | null
           started_at: string | null
-          status: string | null
+          status: string
           time_per_question: number | null
           updated_at: string
         }
@@ -76,7 +76,7 @@ export type Database = {
           rounds_total?: number | null
           speed_bonus?: number | null
           started_at?: string | null
-          status?: string | null
+          status?: string
           time_per_question?: number | null
           updated_at?: string
         }
@@ -101,7 +101,7 @@ export type Database = {
           rounds_total?: number | null
           speed_bonus?: number | null
           started_at?: string | null
-          status?: string | null
+          status?: string
           time_per_question?: number | null
           updated_at?: string
         }
@@ -341,7 +341,9 @@ export type Database = {
         Row: {
           avatar_emoji: string | null
           avatar_user: string | null
+          avg_response_time: number | null
           client_id: string | null
+          correct_answers: number | null
           current_eggs: number | null
           display_name: string
           display_name_user: string | null
@@ -350,12 +352,16 @@ export type Database = {
           is_ready: boolean | null
           joined_at: string
           room_id: string
+          total_answers: number | null
+          total_response_time: number | null
           user_id: string | null
         }
         Insert: {
           avatar_emoji?: string | null
           avatar_user?: string | null
+          avg_response_time?: number | null
           client_id?: string | null
+          correct_answers?: number | null
           current_eggs?: number | null
           display_name: string
           display_name_user?: string | null
@@ -364,12 +370,16 @@ export type Database = {
           is_ready?: boolean | null
           joined_at?: string
           room_id: string
+          total_answers?: number | null
+          total_response_time?: number | null
           user_id?: string | null
         }
         Update: {
           avatar_emoji?: string | null
           avatar_user?: string | null
+          avg_response_time?: number | null
           client_id?: string | null
+          correct_answers?: number | null
           current_eggs?: number | null
           display_name?: string
           display_name_user?: string | null
@@ -378,6 +388,8 @@ export type Database = {
           is_ready?: boolean | null
           joined_at?: string
           room_id?: string
+          total_answers?: number | null
+          total_response_time?: number | null
           user_id?: string | null
         }
         Relationships: [

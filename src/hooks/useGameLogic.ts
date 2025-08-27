@@ -207,12 +207,58 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     if (gameState !== 'playing' || selectedAnswer !== null) return;
 
     setSelectedAnswer(idx);
-    setAnswerTime(currentSettings.time_per_question - timeLeft);
+    const responseTime = currentSettings.time_per_question - timeLeft;
+    setAnswerTime(responseTime);
 
-    if (currentQuestion && idx === currentQuestion.correctAnswer) {
+    const isCorrect = currentQuestion && idx === currentQuestion.correctAnswer;
+    if (isCorrect) {
       const base  = currentSettings.eggs_per_correct;
       const bonus = timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0;
       setPlayerEggs(e => e + base + bonus);
+    }
+
+    // Salvar estatísticas do jogador no Supabase (modo multiplayer)
+    if (sessionId) {
+      (async () => {
+        try {
+          const { data: room } = await supabase
+            .from('game_rooms')
+            .select('id')
+            .eq('room_code', roomCode)
+            .maybeSingle();
+
+          if (room?.id) {
+            // Buscar dados atuais do participante
+            const { data: participant } = await supabase
+              .from('room_participants')
+              .select('current_eggs, correct_answers, total_answers, total_response_time')
+              .eq('room_id', room.id)
+              .eq('client_id', clientId.current)
+              .maybeSingle();
+
+            if (participant) {
+              const newEggs = participant.current_eggs + (isCorrect ? currentSettings.eggs_per_correct + (timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0) : 0);
+              const newCorrectAnswers = participant.correct_answers + (isCorrect ? 1 : 0);
+              const newTotalAnswers = participant.total_answers + 1;
+              const newTotalResponseTime = participant.total_response_time + responseTime;
+
+              // Atualizar estatísticas do participante
+              await supabase
+                .from('room_participants')
+                .update({
+                  current_eggs: newEggs,
+                  correct_answers: newCorrectAnswers,
+                  total_answers: newTotalAnswers,
+                  total_response_time: newTotalResponseTime
+                })
+                .eq('room_id', room.id)
+                .eq('client_id', clientId.current);
+            }
+          }
+        } catch (error) {
+          console.error('[stats] Erro ao salvar estatísticas:', error);
+        }
+      })();
     }
 
     // avatar local
@@ -227,7 +273,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     });
 
     broadcastAnswer(idx);
-  }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer]);
+  }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode]);
 
   // ---- inicialização (carrega config + liga Realtime + descobre host)
   useEffect(() => {
