@@ -355,6 +355,14 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           // Ao final da 10ª pergunta, host dispara evento para todos redirecionarem
           console.log('[host] Fim das 10 perguntas, enviando broadcast para redirecionar todos');
           await broadcastEndOfRound(roomCode, playerEggs, sessionId);
+          
+          // Host também precisa ser redirecionado
+          setTimeout(() => {
+            const navigateEvent = new CustomEvent("navigateToRoundLobby", {
+              detail: { roomCode, playerEggs, sessionId }
+            });
+            window.dispatchEvent(navigateEvent);
+          }, 1000);
           return;
         }
         const q = await buildQuestion();

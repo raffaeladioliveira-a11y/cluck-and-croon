@@ -47,21 +47,20 @@ export default function RoundLobby() {
 
   const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Calcular ranking baseado em critérios específicos
+  // Calcular ranking baseado nos dados reais dos participantes
   const calculateRanking = useCallback((participants: any[]): PlayerRanking[] => {
-    // Simular dados de ranking (em implementação real, viria do banco)
-    const mockRankingData = participants.map((p, index) => ({
+    const rankingData = participants.map((p) => ({
       id: p.client_id || p.id,
-      name: p.display_name || `Jogador ${index + 1}`,
+      name: p.display_name || 'Jogador Anônimo',
       avatar: p.avatar_emoji || '🐔',
-      eggs: Math.floor(Math.random() * 100) + 10, // Mock data
-      correct_answers: Math.floor(Math.random() * 8) + 1,
-      avg_response_time: Math.random() * 10 + 2, // 2-12 segundos
+      eggs: p.current_eggs || 0, // Dados reais dos ovos acumulados
+      correct_answers: p.correct_answers || 0, // Dados reais de acertos
+      avg_response_time: p.avg_response_time || 0, // Tempo médio real de resposta
       position: 0
     }));
 
     // Ordenar por critérios: eggs > correct_answers > menor avg_response_time > nome
-    const sorted = mockRankingData.sort((a, b) => {
+    const sorted = rankingData.sort((a, b) => {
       if (a.eggs !== b.eggs) return b.eggs - a.eggs;
       if (a.correct_answers !== b.correct_answers) return b.correct_answers - a.correct_answers;
       if (a.avg_response_time !== b.avg_response_time) return a.avg_response_time - b.avg_response_time;
