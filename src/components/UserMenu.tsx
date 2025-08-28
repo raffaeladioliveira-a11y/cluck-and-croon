@@ -20,6 +20,7 @@ export function UserMenu() {
   const avatarEmoji = (meta.avatar_emoji as string) || loadProfile().avatar || getAvatarOrDefault(loadProfile());
   const avatarUrl = (meta.avatar_url as string) || "";
 
+
   const initials = useMemo(() => {
     const n = (displayName || email || "U").trim();
     return n.slice(0,1).toUpperCase();
@@ -30,7 +31,7 @@ export function UserMenu() {
   if (!user) {
     return (
       <Button variant="outline" onClick={() => navigate("/auth")} aria-label="Entrar">
-        Entrar
+        Entrar / Cadastrar
       </Button>
     );
   }

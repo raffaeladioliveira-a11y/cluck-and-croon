@@ -15,18 +15,31 @@ export default function Home() {
   const [playerName, setPlayerName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("🐔");
 
-  const chickenAvatars = ["🐔", "🐓", "🐣", "🐤", "🐥", "🏵️🐔", "👑🐓", "🌟🐥", "💎🐤", "🎵🐣"];
+  // const chickenAvatars = ["🐔", "🐓", "🐣", "🐤", "🐥", "🏵️🐔", "👑🐓", "🌟🐥", "💎🐤", "🎵🐣"];
+
+    const chickenAvatars = [
+        "/avatars/avatar1.jpg",
+        "/avatars/avatar2.webp",
+        "/avatars/avatar3.webp",
+        "/avatars/avatar4.jpg",
+        "/avatars/avatar5.webp",
+        "/avatars/avatar6.webp",
+        "/avatars/avatar7.webp",
+        "/avatars/avatar8.jpg",
+        "/avatars/avatar9.jpg",
+        "/avatars/avatar10.jpg",
+    ];
 
   return (
     <div className="min-h-screen bg-gradient-sky">
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background Hero Image */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
           style={{ backgroundImage: `url(${heroImage})` }}
         />
-        
+
         {/* Animated Background Elements */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-20 left-10 animate-chicken-walk text-4xl">🐔</div>
@@ -53,7 +66,7 @@ export default function Home() {
           {/* Action Cards */}
           <div className="grid md:grid-cols-2 gap-6 mb-8">
             {/* Create Room Card */}
-            <CreateRoom 
+            <CreateRoom
               playerName={playerName}
               selectedAvatar={selectedAvatar}
               onPlayerNameChange={setPlayerName}
@@ -61,7 +74,7 @@ export default function Home() {
             />
 
             {/* Join Room Card */}
-            <JoinRoom 
+            <JoinRoom
               playerName={playerName}
               selectedAvatar={selectedAvatar}
               onPlayerNameChange={setPlayerName}
@@ -73,11 +86,11 @@ export default function Home() {
           <BarnCard variant="golden" className="max-w-2xl mx-auto">
             <div className="text-center">
               <h3 className="text-2xl font-bold mb-6">Escolha sua Galinha</h3>
-              
+
               {/* Name Input */}
               <div className="mb-6">
                 <Label htmlFor="player-name" className="text-white/90">Nome da sua galinha</Label>
-                <Input 
+                <Input
                   id="player-name"
                   placeholder="Ex: Galinha Pititica"
                   value={playerName}
@@ -98,8 +111,8 @@ export default function Home() {
                       size="lg"
                       animated
                       className={`cursor-pointer transition-all duration-200 ${
-                        selectedAvatar === emoji 
-                          ? 'transform scale-125 ring-2 ring-white/50 ring-offset-2 ring-offset-transparent' 
+                        selectedAvatar === emoji
+                          ? 'transform scale-125 ring-2 ring-white/50 ring-offset-2 ring-offset-transparent'
                           : 'hover:scale-110 opacity-70'
                       }`}
                       onClick={() => setSelectedAvatar(emoji)}
@@ -151,8 +164,8 @@ export default function Home() {
           {/* Auth Access */}
           <div className="mt-8 text-center space-y-2">
             <div>
-              <ChickenButton 
-                variant="feather" 
+              <ChickenButton
+                variant="feather"
                 size="md"
                 onClick={() => navigate('/auth')}
                 className="opacity-90 hover:opacity-100"
@@ -161,8 +174,8 @@ export default function Home() {
               </ChickenButton>
             </div>
             <div>
-              <ChickenButton 
-                variant="barn" 
+              <ChickenButton
+                variant="barn"
                 size="sm"
                 onClick={() => navigate('/admin')}
                 className="opacity-75 hover:opacity-100"

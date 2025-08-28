@@ -73,7 +73,7 @@ export function GameNavigation({
             onClick={handleLeaveRoom}
           >
             <LogOut className="w-4 h-4 mr-2" />
-            Sair da Sala
+            Sair do Galinheiro
           </ChickenButton>
         )}
       </div>

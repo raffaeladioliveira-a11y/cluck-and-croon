@@ -9,6 +9,8 @@ import { GameNavigation } from "@/components/GameNavigation";
 import { useToast } from "@/hooks/use-toast";
 import { getOrCreateClientId, loadProfile } from "@/utils/clientId";
 import { Loader2, Crown, Trophy, Music } from "lucide-react";
+import { useAuthSession } from "@/hooks/useAuthSession";
+// import { getDisplayNameOrDefault, getAvatarOrDefault, loadProfile } from "@/utils/clientId";
 
 interface PlayerRanking {
   id: string;
@@ -46,6 +48,12 @@ export default function RoundLobby() {
   const [isStartingNewRound, setIsStartingNewRound] = useState(false);
   const [topPlayer, setTopPlayer] = useState<PlayerRanking | null>(null);
 
+  const { user, loading } = useAuthSession();
+  const email = user?.email ?? "";
+  const meta = (user?.user_metadata ?? {}) as Record<string, any>;
+  const avatarUrl = (meta.avatar_url as string) || "";
+
+
   const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Calcular ranking baseado nos dados reais dos participantes
@@ -54,11 +62,14 @@ export default function RoundLobby() {
       id: p.client_id || p.id,
       name: p.display_name || 'Jogador Anônimo',
       avatar: p.avatar_emoji || '🐔',
+      // avatar_url: p.avatar_url || null,
       eggs: p.current_eggs || 0, // Dados reais dos ovos acumulados
       correct_answers: p.correct_answers || 0, // Dados reais de acertos
       avg_response_time: p.avg_response_time || 0, // Tempo médio real de resposta
       position: 0
     }));
+
+
 
     // Ordenar por critérios: eggs > correct_answers > menor avg_response_time > nome
     const sorted = rankingData.sort((a, b) => {
@@ -67,6 +78,8 @@ export default function RoundLobby() {
       if (a.avg_response_time !== b.avg_response_time) return a.avg_response_time - b.avg_response_time;
       return a.name.localeCompare(b.name);
     });
+
+
 
     // Definir posições
     return sorted.map((player, index) => ({
@@ -303,7 +316,7 @@ export default function RoundLobby() {
               Ranking da Rodada - Sala {roomCode}
             </h1>
             <p className="text-white/80 text-lg">
-              Parabéns a todos os jogadores! 🎉
+              Parabéns a todas as cocós! 🎉Muito milho pra vocês!!!
             </p>
           </BarnCard>
         </div>
@@ -321,11 +334,25 @@ export default function RoundLobby() {
                   <div className="flex items-center justify-center w-12 h-12">
                     {getPositionIcon(player.position)}
                   </div>
-                  <ChickenAvatar 
-                    emoji={player.avatar} 
-                    size="lg" 
-                    animated={player.position <= 3}
-                  />
+                  {user && player.id === clientId.current ? (
+                      avatarUrl ? (
+                          <img
+                              src={avatarUrl}
+                              alt="Seu Avatar"
+                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                          />
+                      ) : (
+                      <img
+                          src={player.avatar}
+                          alt="Seu Avatar"
+                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                      />
+                      )
+                  ) : (
+                      // Usuário não logado ou outros jogadores - usar avatar emoji
+                      <ChickenAvatar emoji="🐔" size="lg" animated={player.position <= 3} />
+                  )}
+
                   <div>
                     <h3 className="text-xl font-bold">{player.name}</h3>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">

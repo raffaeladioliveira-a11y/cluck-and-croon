@@ -9,12 +9,20 @@ import { GameNavigation } from "@/components/GameNavigation";
 import { useGameLogic } from "@/hooks/useGameLogic";
 import { Loader2 } from "lucide-react";
 import GameArenaGuard from "./GameArenaGuard";
+import { useAuthSession } from "@/hooks/useAuthSession";
+import { getOrCreateClientId } from "@/utils/clientId";
+import { useRef } from "react"; // se não estiver importado
 
 function GameArenaContent() {
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sid = (searchParams.get("sid") || "").trim();
+
+    // Adicionar após as outras declarações de hooks
+    const { user } = useAuthSession();
+    const clientId = useRef(getOrCreateClientId());
+    const avatarUrl = user?.user_metadata?.avatar_url || "";
 
   // volta ao lobby ao finalizar set
   useEffect(() => {
@@ -204,7 +212,28 @@ function GameArenaContent() {
                         <div className="flex -space-x-1">
                           {playersOnOption(index).map(p => (
                               <div key={p.id} className="relative">
-                                <ChickenAvatar emoji={p.avatar} size="sm" className="border-2 border-background" />
+                                  {user && p.id === clientId.current ? (
+                                      // Usuário logado - usar avatar do perfil
+                                      avatarUrl ? (
+                                          <img
+                                              src={avatarUrl}
+                                              alt="Seu Avatar"
+                                              className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                                          />
+                                      ) : (
+                                      <img
+                                          src={p.avatar}
+                                          alt="Seu Avatar"
+                                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                                      />
+
+                                      )
+                                  ) : (
+                                      // Outros jogadores - usar avatar emoji
+                                      <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />
+
+                                  )}
+                                {/*<ChickenAvatar emoji={p.avatar} size="sm" className="border-2 border-background" />*/}
                               </div>
                           ))}
                         </div>
@@ -219,8 +248,22 @@ function GameArenaContent() {
                   <h3 className="text-xl font-bold text-barn-brown">Sua Pontuação - Rodada {currentRound}</h3>
                 </div>
                 <div className="text-center">
-                  <ChickenAvatar emoji={currentPlayer.avatar} size="lg" animated className="mb-2" />
-                  <p className="font-semibold text-lg mb-2">{currentPlayer.name}</p>
+                    {user && avatarUrl ? (
+                        <img
+                            src={avatarUrl}
+                            alt="Seu Avatar"
+                            className="w-24 h-24 rounded-full object-cover border-2 border-white mx-auto mb-2"
+                        />
+                    ) : (
+                        <img
+                            src={currentPlayer.avatar ||  <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />}
+                            alt="Seu Avatar"
+                            className="w-24 h-24 rounded-full object-cover border-2 border-white mx-auto mb-2"
+                        />
+                    )}
+                    <p className="font-semibold text-lg mb-2">
+                        {user?.user_metadata?.display_name || "Você"}
+                    </p>
                   <EggCounter count={currentPlayer.eggs} size="lg" variant="golden" />
                   {selectedAnswer !== null && (
                       <div className="mt-4 p-3 bg-muted/50 rounded-lg">

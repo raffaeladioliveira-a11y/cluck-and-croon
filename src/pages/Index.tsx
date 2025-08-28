@@ -17,13 +17,24 @@ const Index = () => {
   const navigate = useNavigate();
   const { roomCode } = useParams<{ roomCode: string }>();
   const { user, loading } = useAuthSession();
-  
+
   const [playerName, setPlayerName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState("🐔");
   const [isRedirectMode, setIsRedirectMode] = useState(false);
 
-  const chickenAvatars = ["🐔", "🐓", "🐣", "🐤", "🐥", "🏵️🐔", "👑🐓", "🌟🐥", "💎🐤", "🎵🐣"];
-
+  // const chickenAvatars = ["🐔", "🐓", "🐣", "🐤", "🐥", "🏵️🐔", "👑🐓", "🌟🐥", "💎🐤", "🎵🐣"];
+  const chickenAvatars = [
+    "/avatars/avatar1.jpg",
+    "/avatars/avatar2.webp",
+    "/avatars/avatar3.webp",
+    "/avatars/avatar4.jpg",
+    "/avatars/avatar5.webp",
+    "/avatars/avatar6.webp",
+    "/avatars/avatar7.webp",
+    "/avatars/avatar8.jpg",
+    "/avatars/avatar9.jpg",
+    "/avatars/avatar10.jpg",
+  ];
   // Verifica se chegou via link compartilhado
   useEffect(() => {
     if (roomCode) {
@@ -52,10 +63,10 @@ const Index = () => {
 
   const handleJoinRoomWithCode = () => {
     if (!playerName.trim()) return;
-    
+
     // Salva perfil
     saveProfile({ displayName: playerName, avatar: selectedAvatar });
-    
+
     if (roomCode) {
       navigate(`/lobby/${roomCode}`);
     }
@@ -89,11 +100,11 @@ const Index = () => {
           <BarnCard variant="golden" className="max-w-md mx-auto">
             <div className="text-center">
               <h3 className="text-2xl font-bold mb-6 text-white">Configure sua Galinha</h3>
-              
+
               {/* Name Input */}
               <div className="mb-6">
                 <Label htmlFor="player-name" className="text-white/90">Nome da sua galinha</Label>
-                <Input 
+                <Input
                   id="player-name"
                   placeholder="Ex: Galinha Pititica"
                   value={playerName}
@@ -114,8 +125,8 @@ const Index = () => {
                       size="md"
                       animated
                       className={`cursor-pointer transition-all duration-200 ${
-                        selectedAvatar === emoji 
-                          ? 'transform scale-110 ring-2 ring-white/50' 
+                        selectedAvatar === emoji
+                          ? 'transform scale-110 ring-2 ring-white/50'
                           : 'hover:scale-105 opacity-70'
                       }`}
                       onClick={() => setSelectedAvatar(emoji)}
@@ -124,7 +135,7 @@ const Index = () => {
                 </div>
               </div>
 
-              <ChickenButton 
+              <ChickenButton
                 onClick={handleJoinRoomWithCode}
                 disabled={!playerName.trim()}
                 className="w-full mb-4"
@@ -135,8 +146,8 @@ const Index = () => {
               </ChickenButton>
 
               <div className="text-center">
-                <ChickenButton 
-                  variant="feather" 
+                <ChickenButton
+                  variant="feather"
                   size="sm"
                   onClick={() => navigate('/auth')}
                 >
@@ -155,7 +166,7 @@ const Index = () => {
       {/* Header com UserMenu */}
       <header className="w-full sticky top-0 z-20 bg-background/70 backdrop-blur border-b">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="font-bold text-lg">🐔 Cluck & Croon</div>
+          <div className="font-bold text-lg">®️ Cocoli</div>
           <UserMenu />
         </div>
       </header>
@@ -163,11 +174,11 @@ const Index = () => {
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Background Hero Image */}
-        <div 
+        <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
           style={{ backgroundImage: `url(${heroImage})` }}
         />
-        
+
         {/* Animated Background Elements */}
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute top-20 left-10 animate-chicken-walk text-4xl">🐔</div>
@@ -184,56 +195,24 @@ const Index = () => {
               🐔 Galinheiro Musical 🎵
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground font-medium mb-2">
-              Onde as galinhas mais musicais se encontram!
+              Onde o carro da rua passa no seu ovo e as galinha choram!
             </p>
             <p className="text-lg text-muted-foreground">
               Teste seus conhecimentos musicais em um quiz multiplayer cheio de diversão
             </p>
           </div>
 
-          {/* Action Cards - Para usuários logados */}
-          {user && (
-            <div className="grid md:grid-cols-2 gap-6 mb-8">
-              {/* Create Room Card - Só aparece para logados */}
-              <CreateRoom 
-                playerName={user.user_metadata?.display_name || user.email || "Galinha"}
-                selectedAvatar="🐔"
-                onPlayerNameChange={() => {}}
-                onAvatarChange={() => {}}
-              />
-
-              {/* Join Room Card */}
-              <JoinRoom 
-                playerName={user.user_metadata?.display_name || user.email || "Galinha"}
-                selectedAvatar="🐔"
-                onPlayerNameChange={() => {}}
-                onAvatarChange={() => {}}
-              />
-            </div>
-          )}
-
-          {/* Join Room - Para usuários NÃO logados */}
-          {!user && (
-            <div className="max-w-md mx-auto mb-8">
-              <JoinRoom 
-                playerName={playerName}
-                selectedAvatar={selectedAvatar}
-                onPlayerNameChange={setPlayerName}
-                onAvatarChange={setSelectedAvatar}
-              />
-            </div>
-          )}
 
           {/* Player Setup - Só para não logados */}
           {!user && (
             <BarnCard variant="golden" className="max-w-2xl mx-auto">
               <div className="text-center">
                 <h3 className="text-2xl font-bold mb-6">Escolha sua Galinha</h3>
-                
+
                 {/* Name Input */}
                 <div className="mb-6">
                   <Label htmlFor="player-name" className="text-white/90">Nome da sua galinha</Label>
-                  <Input 
+                  <Input
                     id="player-name"
                     placeholder="Ex: Galinha Pititica"
                     value={playerName}
@@ -247,19 +226,18 @@ const Index = () => {
                 <div className="mb-6">
                   <Label className="text-white/90 block mb-4">Escolha seu avatar</Label>
                   <div className="grid grid-cols-5 md:grid-cols-10 gap-2 justify-center">
-                    {chickenAvatars.map((emoji) => (
-                      <ChickenAvatar
-                        key={emoji}
-                        emoji={emoji}
-                        size="lg"
-                        animated
-                        className={`cursor-pointer transition-all duration-200 ${
-                          selectedAvatar === emoji 
-                            ? 'transform scale-125 ring-2 ring-white/50 ring-offset-2 ring-offset-transparent' 
-                            : 'hover:scale-110 opacity-70'
-                        }`}
-                        onClick={() => setSelectedAvatar(emoji)}
-                      />
+                    {chickenAvatars.map((gifUrl) => (
+                        <img
+                            key={gifUrl}
+                            src={gifUrl}
+                            alt="Avatar"
+                            className={`w-16 h-16 rounded-full object-cover cursor-pointer transition-all duration-200 ${
+          selectedAvatar === gifUrl
+            ? "transform scale-125 ring-2 ring-white/50 ring-offset-2 ring-offset-transparent"
+            : "hover:scale-110 opacity-70"
+        }`}
+                            onClick={() => setSelectedAvatar(gifUrl)}
+                        />
                     ))}
                   </div>
                 </div>
@@ -269,7 +247,11 @@ const Index = () => {
                   <div className="bg-white/10 rounded-lg p-4 border border-white/20">
                     <p className="text-white/90 mb-2">Sua galinha:</p>
                     <div className="flex items-center justify-center gap-4">
-                      <ChickenAvatar emoji={selectedAvatar} size="xl" animated />
+                      <img
+                          src={selectedAvatar}
+                          alt="Avatar selecionado"
+                          className="w-20 h-20 rounded-full object-cover"
+                      />
                       <div>
                         <p className="text-xl font-bold text-white">{playerName}</p>
                         <EggCounter count={0} variant="golden" size="sm" />
@@ -281,7 +263,42 @@ const Index = () => {
             </BarnCard>
           )}
 
-          {/* Quick Stats */}
+
+            {/* Action Cards - Para usuários logados */}
+            {user && (
+                <div className="grid md:grid-cols-2 gap-6 mb-8">
+                    {/* Create Room Card - Só aparece para logados */}
+                    <CreateRoom
+                        playerName={user.user_metadata?.display_name || user.email || "Galinha"}
+                selectedAvatar="🐔"
+                onPlayerNameChange={() => {}}
+                        onAvatarChange={() => {}}
+                        />
+
+                        {/* Join Room Card */}
+                    <JoinRoom
+                        playerName={user.user_metadata?.display_name || user.email || "Galinha"}
+                selectedAvatar="🐔"
+                onPlayerNameChange={() => {}}
+                        onAvatarChange={() => {}}
+                        />
+                </div>
+            )}
+
+            {/* Join Room - Para usuários NÃO logados */}
+            {!user && (
+                <div className="max-w-md mx-auto mb-8">
+                    <JoinRoom
+                        playerName={playerName}
+                        selectedAvatar={selectedAvatar}
+                        onPlayerNameChange={setPlayerName}
+                        onAvatarChange={setSelectedAvatar}
+                    />
+                </div>
+            )}
+
+
+            {/* Quick Stats */}
           <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
             <div className="text-center">
               <div className="text-3xl mb-2">🐔</div>
@@ -306,18 +323,7 @@ const Index = () => {
           </div>
 
           {/* Auth Access - Só para não logados */}
-          {!user && (
-            <div className="mt-8 text-center">
-              <ChickenButton 
-                variant="feather" 
-                size="md"
-                onClick={() => navigate('/auth')}
-                className="opacity-90 hover:opacity-100"
-              >
-                🐔 Entrar/Cadastrar
-              </ChickenButton>
-            </div>
-          )}
+
         </div>
       </section>
     </div>
