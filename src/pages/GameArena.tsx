@@ -5,6 +5,7 @@ import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
 import { MusicPlayer } from "@/components/MusicPlayer";
 import { ChickenButton } from "@/components/ChickenButton";
+import { GameNavigation } from "@/components/GameNavigation";
 import { useGameLogic } from "@/hooks/useGameLogic";
 import { Loader2 } from "lucide-react";
 import GameArenaGuard from "./GameArenaGuard";
@@ -88,6 +89,9 @@ function GameArenaContent() {
 
   return (
       <div className="min-h-screen bg-gradient-sky p-4">
+        {/* Navigation */}
+        <GameNavigation showLeaveRoom={true} />
+        
         <div className="max-w-6xl mx-auto">
 
           {/* Header com rodada/tempo/valor + gênero ativo */}

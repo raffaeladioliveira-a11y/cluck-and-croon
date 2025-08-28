@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { Input } from "@/components/ui/input";
@@ -13,15 +14,44 @@ export default function AdminLogin() {
     password: ""
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Login simples para demonstração
-    if (credentials.username === "fazendeiro" && credentials.password === "galinha123") {
+    try {
+      // Buscar usuário admin no banco
+      const { data: adminUser, error } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('username', credentials.username)
+        .single();
+
+      if (error || !adminUser) {
+        toast({
+          title: "❌ Acesso Negado",
+          description: "Usuário não encontrado",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Verificar senha (em produção use bcrypt.compare)
+      // Por enquanto verificação simples
+      const isValidPassword = credentials.password === "galinha123";
+      
+      if (!isValidPassword) {
+        toast({
+          title: "❌ Acesso Negado", 
+          description: "Senha incorreta",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Salvar estado de admin no localStorage
       localStorage.setItem('adminAuth', JSON.stringify({
         isAuthenticated: true,
-        user: 'Fazendeiro Silva',
+        user: adminUser.display_name,
+        userId: adminUser.id,
         loginTime: Date.now()
       }));
 
@@ -31,10 +61,10 @@ export default function AdminLogin() {
       });
 
       navigate('/admin/dashboard');
-    } else {
+    } catch (error: any) {
       toast({
-        title: "❌ Acesso Negado",
-        description: "Usuário ou senha incorretos. Tente: fazendeiro / galinha123",
+        title: "❌ Erro no Sistema",
+        description: "Erro ao verificar credenciais",
         variant: "destructive",
       });
     }

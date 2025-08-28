@@ -5,6 +5,7 @@ import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
 import { ChickenButton } from "@/components/ChickenButton";
+import { GameNavigation } from "@/components/GameNavigation";
 import { useToast } from "@/hooks/use-toast";
 import { getOrCreateClientId, loadProfile } from "@/utils/clientId";
 import { Loader2, Crown, Trophy, Music } from "lucide-react";
@@ -289,6 +290,9 @@ export default function RoundLobby() {
 
   return (
     <div className="min-h-screen bg-gradient-sky p-4">
+      {/* Navigation */}
+      <GameNavigation showLeaveRoom={true} />
+      
       <div className="max-w-6xl mx-auto">
         
         {/* Header */}

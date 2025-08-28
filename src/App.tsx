@@ -5,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppHeader } from "@/components/AppHeader";
 import Index from "./pages/Index";
-import Home from "./pages/Home";
 import GameLobby from "./pages/GameLobby";
 import { RoomLobby } from "@/components/multiplayer/RoomLobby";
 import AdminLogin from "./pages/AdminLogin";
@@ -25,9 +24,8 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <div className="min-h-screen">
-          <AppHeader />
           <Routes>
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/lobby/:roomCode" element={<RoomLobby />} />

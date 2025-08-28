@@ -61,9 +61,6 @@ export function UserMenu() {
         <DropdownMenuItem onClick={() => navigate("/profile")}>
           <UserIcon className="h-4 w-4 mr-2" /> Meu perfil
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => navigate("/settings")}>
-          <Settings className="h-4 w-4 mr-2" /> Configurações
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={async () => {

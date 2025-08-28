@@ -5,6 +5,7 @@ import { ChickenButton } from "@/components/ChickenButton";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
 import { EggCounter } from "@/components/EggCounter";
+import { GameNavigation } from "@/components/GameNavigation";
 import { Copy, Users, Music, Trophy, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
@@ -376,6 +377,9 @@ export default function GameLobby() {
 
     return (
         <div className="min-h-screen bg-gradient-sky p-4">
+            {/* Navigation */}
+            <GameNavigation showLeaveRoom={true} />
+            
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="text-center mb-8">

@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          avatar_emoji: string | null
+          avatar_url: string | null
+          created_at: string
+          display_name: string
+          id: string
+          password_hash: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          avatar_emoji?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          display_name: string
+          id?: string
+          password_hash: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          avatar_emoji?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          password_hash?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: []
+      }
       "cluck-and-croon": {
         Row: {
           created_at: string
