@@ -26,10 +26,10 @@ interface Player {
 export function RoomLobby() {
   const { roomCode: roomCodeParam } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
-  
+
   // Always use uppercase room code
   const roomCode = (roomCodeParam || "").toUpperCase();
-  
+
   // Redirect to home if no room code
   useEffect(() => {
     if (!roomCode) {
@@ -41,7 +41,7 @@ export function RoomLobby() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [room, setRoom] = useState<Room | null>(null);
-  
+
   const clientId = useMemo(getOrCreateClientId, []);
   const navigatedRef = useRef(false);
 
@@ -60,7 +60,7 @@ export function RoomLobby() {
   const joinRoom = async () => {
     try {
       setIsLoading(true);
-      
+
       console.log('🎯 Joining room with identity:', {
         roomCode,
         clientId,
@@ -77,7 +77,7 @@ export function RoomLobby() {
 
       if (joinError) {
         console.error('Error joining room:', joinError);
-        
+
         if (joinError.message === 'ROOM_NOT_IN_LOBBY') {
           toast({
             title: "Sala não disponível",
@@ -87,7 +87,7 @@ export function RoomLobby() {
           navigate('/');
           return;
         }
-        
+
         throw joinError;
       }
 
@@ -134,7 +134,7 @@ export function RoomLobby() {
             status: updatedRoom.status,
             game_session_id: updatedRoom.game_session_id
           }));
-          
+
           // Navigate to game when it starts
           if (!navigatedRef.current && updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
             navigatedRef.current = true;
@@ -185,6 +185,7 @@ export function RoomLobby() {
 
       console.log('👥 Loaded participants (ordered by join time):', data);
 
+
       // Map participants and ensure correct host identification
       const mappedPlayers = data.map(participant => ({
         id: participant.id,
@@ -216,7 +217,7 @@ export function RoomLobby() {
     // Check if all non-host players are ready
     const nonHostPlayers = players.filter(p => !p.isHost);
     const allNonHostReady = nonHostPlayers.every(p => p.isReady);
-    
+
     if (nonHostPlayers.length > 0 && !allNonHostReady) {
       toast({
         title: "Aguarde as galinhas se prepararem",
@@ -235,7 +236,7 @@ export function RoomLobby() {
 
       if (error) {
         console.error('Error starting game:', error);
-        
+
         if (error.message === 'NOT_HOST') {
           toast({
             title: "Acesso negado",
@@ -320,9 +321,9 @@ export function RoomLobby() {
         <RoomCode roomCode={roomCode} />
 
         {/* Players List */}
-        <PlayerList 
-          players={players} 
-          currentClientId={clientId} 
+        <PlayerList
+          players={players}
+          currentClientId={clientId}
           onToggleReady={handleToggleReady}
         />
 
@@ -350,16 +351,16 @@ export function RoomLobby() {
                   </div>
                 </div>
               )}
-              
-              <ChickenButton 
-                variant="corn" 
-                size="lg" 
+
+              <ChickenButton
+                variant="corn"
+                size="lg"
                 onClick={handleStartGame}
                 disabled={players.length < 2 || (players.filter(p => !p.isHost).length > 0 && !players.filter(p => !p.isHost).every(p => p.isReady))}
                 className="min-w-[250px]"
               >
-                {players.length < 2 
-                  ? '🔄 Aguardando Jogadores...' 
+                {players.length < 2
+                  ? '🔄 Aguardando Jogadores...'
                   : players.filter(p => !p.isHost).length > 0 && !players.filter(p => !p.isHost).every(p => p.isReady)
                     ? '⏳ Aguardando Galinhas...'
                     : `🎵 Iniciar Jogo (${players.length}/10)`
@@ -367,10 +368,10 @@ export function RoomLobby() {
               </ChickenButton>
             </>
           )}
-          
-          <ChickenButton 
-            variant="feather" 
-            size="lg" 
+
+          <ChickenButton
+            variant="feather"
+            size="lg"
             onClick={handleLeaveRoom}
           >
             🚪 Sair do Galinheiro

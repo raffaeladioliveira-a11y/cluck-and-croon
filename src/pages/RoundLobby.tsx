@@ -61,7 +61,7 @@ export default function RoundLobby() {
     const rankingData = participants.map((p) => ({
       id: p.client_id || p.id,
       name: p.display_name || 'Jogador Anônimo',
-      avatar: p.avatar_emoji || '🐔',
+      avatar: p.avatar_emoji || p.avatar || '🐔',
       // avatar_url: p.avatar_url || null,
       eggs: p.current_eggs || 0, // Dados reais dos ovos acumulados
       correct_answers: p.correct_answers || 0, // Dados reais de acertos
@@ -79,7 +79,12 @@ export default function RoundLobby() {
       return a.name.localeCompare(b.name);
     });
 
-
+    if (participants) {
+      console.log('Dados dos participantes:', participants);
+      participants.forEach(p => {
+        console.log(`Jogador ${p.display_name}: avatar = "${p.avatar_emoji}", client_id = "${p.client_id}"`);
+      });
+    }
 
     // Definir posições
     return sorted.map((player, index) => ({
@@ -190,7 +195,7 @@ export default function RoundLobby() {
     if (!gameChannelRef.current) return;
 
     setSelectedGenre(genreId);
-    
+
     // Atualizar sala com próximo gênero
     try {
       await supabase
@@ -238,9 +243,9 @@ export default function RoundLobby() {
       // Atualizar status da sala
       await supabase
         .from('game_rooms')
-        .update({ 
+        .update({
           status: 'in_progress',
-          current_round: 1 
+          current_round: 1
         })
         .eq('room_code', roomCode);
 
@@ -248,9 +253,9 @@ export default function RoundLobby() {
       await gameChannelRef.current.send({
         type: 'broadcast',
         event: 'NEW_ROUND_STARTING',
-        payload: { 
+        payload: {
           roomCode,
-          selectedGenre: selectedGenre 
+          selectedGenre: selectedGenre
         }
       });
 
@@ -305,9 +310,9 @@ export default function RoundLobby() {
     <div className="min-h-screen bg-gradient-sky p-4">
       {/* Navigation */}
       <GameNavigation showLeaveRoom={true} />
-      
+
       <div className="max-w-6xl mx-auto">
-        
+
         {/* Header */}
         <div className="text-center mb-6">
           <BarnCard variant="golden" className="p-6">
@@ -334,24 +339,52 @@ export default function RoundLobby() {
                   <div className="flex items-center justify-center w-12 h-12">
                     {getPositionIcon(player.position)}
                   </div>
-                  {user && player.id === clientId.current ? (
-                      avatarUrl ? (
+                  {(() => {
+                    const isCurrentUser = player.id === clientId.current;
+
+                    if (user && isCurrentUser && avatarUrl) {
+                      // Usuário logado com avatar do perfil
+                      return (
                           <img
                               src={avatarUrl}
                               alt="Seu Avatar"
                               className="w-12 h-12 rounded-full object-cover border-2 border-white"
                           />
+                      );
+                    }
+
+                    if (isCurrentUser) {
+                      // Usuário atual (logado sem avatarUrl ou não logado) - usar avatar escolhido
+                      return player.avatar && player.avatar.startsWith('/') ? (
+                          <img
+                              src={player.avatar}
+                              alt="Seu Avatar"
+                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                          />
                       ) : (
-                      <img
-                          src={player.avatar}
-                          alt="Seu Avatar"
-                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                      />
-                      )
-                  ) : (
-                      // Usuário não logado ou outros jogadores - usar avatar emoji
-                      <ChickenAvatar emoji="🐔" size="lg" animated={player.position <= 3} />
-                  )}
+                          <ChickenAvatar
+                              emoji={player.avatar || profile.current.avatar || "🐔"}
+                              size="lg"
+                              animated={player.position <= 3}
+                          />
+                      );
+                    }
+
+                    // Outros jogadores
+                    return player.avatar && player.avatar.startsWith('/') ? (
+                        <img
+                            src={player.avatar}
+                            alt="Avatar do jogador"
+                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                        />
+                    ) : (
+                        <ChickenAvatar
+                            emoji={player.avatar || "🐔"}
+                            size="lg"
+                            animated={player.position <= 3}
+                        />
+                    );
+                  })()}
 
                   <div>
                     <h3 className="text-xl font-bold">{player.name}</h3>
@@ -363,8 +396,8 @@ export default function RoundLobby() {
                 </div>
                 <div className="text-right">
                   <EggCounter
-                    count={player.eggs} 
-                    size="lg" 
+                    count={player.eggs}
+                    size="lg"
                     variant={player.position === 1 ? "golden" : "default"}
                   />
                 </div>
@@ -386,7 +419,7 @@ export default function RoundLobby() {
                   Como campeão desta rodada, você tem o privilégio de escolher o estilo musical
                 </p>
               </div>
-              
+
               <div className="grid md:grid-cols-3 gap-3">
                 {genres.map((genre) => (
                   <ChickenButton
@@ -442,7 +475,7 @@ export default function RoundLobby() {
               <p className="text-muted-foreground mb-6">
                 Quando estiver pronto, inicie a próxima rodada. Os pontos serão zerados e uma nova rodada começará.
               </p>
-              
+
               <ChickenButton
                 variant="feather"
                 size="lg"
@@ -461,7 +494,7 @@ export default function RoundLobby() {
                   </>
                 )}
               </ChickenButton>
-              
+
               {!selectedGenre && (
                 <p className="text-sm text-destructive/80 mt-2">
                   ⚠️ Aguardando o campeão escolher o estilo musical

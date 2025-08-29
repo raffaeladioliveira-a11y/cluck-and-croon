@@ -70,26 +70,42 @@ export function PlayerList({ players, currentClientId, onToggleReady }: PlayerLi
                   <div className="flex items-center gap-3">
 
                     {user && player.client_id === clientId.current ? (
-                        // Usuário logado - usar avatar do perfil
+                        // Jogador atual logado (você)
                         avatarUrl ? (
                             <img
                                 src={avatarUrl}
                                 alt="Seu Avatar"
-                                className="w-8 h-8 rounded-full object-cover border-2 border-white"
-                            />
-                        ) : (
-                            <img
-                                src={player.avatar}
-                                alt="Seu Avatar"
                                 className="w-12 h-12 rounded-full object-cover border-2 border-white"
                             />
-
-                        )
+                        ) : player.avatar?.startsWith("/") ? (
+                        <img
+                            src={player.avatar}
+                            alt="Seu Avatar"
+                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                        />
                     ) : (
-                        // Outros jogadores - usar avatar emoji
-                        <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />
-
+                        <ChickenAvatar
+                            emoji={player.avatar}
+                            size="sm"
+                            className="border-2 border-white"
+                        />
+                    )
+                    ) : player.avatar?.startsWith("/") ? (
+                    // Outros jogadores - avatar é uma imagem
+                    <img
+                        src={player.avatar}
+                        alt={player.name}
+                        className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                    />
+                    ) : (
+                    // Outros jogadores - avatar é emoji
+                    <ChickenAvatar
+                        emoji={player.avatar}
+                        size="sm"
+                        className="border-2 border-white"
+                    />
                     )}
+
                     {/*<ChickenAvatar*/}
                       {/*size="md"*/}
                       {/*emoji={player.avatar}*/}
