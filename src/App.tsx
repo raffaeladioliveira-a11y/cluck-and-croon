@@ -12,6 +12,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import GameArena from "./pages/GameArena";
 import RoundLobby from "./pages/RoundLobby";
 import Auth from "./pages/Auth";
+import AdminSpotify from "./pages/AdminSpotify";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/admin/spotify" element={<AdminSpotify />} />
             <Route path="/lobby/:roomCode" element={<RoomLobby />} />
             <Route path="/game/lobby/:roomCode" element={<GameLobby />} />
             <Route path="/game/lobby" element={<GameLobby />} />
