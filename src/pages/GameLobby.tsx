@@ -228,5 +228,194 @@ export default function GameLobby() {
         setPlayers(mappedPlayers);
     };
 
-    // Resto da renderização permanece igual...
+    const copyRoomCode = () => {
+        navigator.clipboard.writeText(roomCode);
+        toast({ title: "Código copiado!", description: "Código da sala copiado para a área de transferência" });
+    };
+
+    const startGame = async () => {
+        if (!isHost) return;
+        
+        setIsLoading(true);
+        try {
+            const { data: sessionId, error } = await supabase.rpc("start_game", {
+                p_room_code: roomCode,
+                p_client_id: clientId,
+            });
+
+            if (error) throw error;
+            navigate(`/game/${roomCode}?sid=${sessionId}`);
+        } catch (error: any) {
+            console.error("Error starting game:", error);
+            toast({ title: "Erro ao iniciar jogo", description: error.message, variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const selectGenre = async () => {
+        if (!isHost || !selectedGenre) return;
+        
+        setIsLoading(true);
+        try {
+            // Call game manager to set active genre
+            const { error } = await supabase.functions.invoke("game-manager", {
+                body: {
+                    action: "setActiveGenre",
+                    roomCode,
+                    genreId: selectedGenre,
+                },
+            });
+
+            if (error) throw error;
+            
+            toast({ title: "Gênero selecionado!", description: "Próximo set será deste gênero." });
+            startGame();
+        } catch (error: any) {
+            console.error("Error setting genre:", error);
+            toast({ title: "Erro ao selecionar gênero", description: error.message, variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary to-secondary">
+                <div className="text-center text-primary-foreground">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                    <p>Carregando...</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-primary to-secondary p-4">
+            <GameNavigation />
+            
+            <div className="max-w-4xl mx-auto">
+                <BarnCard>
+                    <div className="text-center mb-6">
+                        <h1 className="text-3xl font-bold text-primary mb-2 flex items-center justify-center gap-2">
+                            <Music className="w-8 h-8" />
+                            Galinheiro {roomCode}
+                        </h1>
+                        
+                        <div className="flex items-center justify-center gap-2 mb-4">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={copyRoomCode}
+                                className="gap-2"
+                            >
+                                <Copy className="w-4 h-4" />
+                                Copiar Código
+                            </Button>
+                            
+                            <div className="flex items-center gap-1 text-muted-foreground">
+                                <Users className="w-4 h-4" />
+                                <span>{players.length}/10 Galinhas</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {setComplete && (
+                        <div className="mb-6 p-4 bg-accent/20 rounded-lg border-2 border-accent">
+                            <h2 className="text-xl font-bold text-center mb-4 flex items-center justify-center gap-2">
+                                <Trophy className="w-6 h-6 text-yellow-500" />
+                                Set Completo!
+                            </h2>
+                            
+                            {mvpPlayer && (
+                                <div className="text-center mb-4">
+                                    <div className="flex items-center justify-center gap-2 mb-2">
+                                        <Crown className="w-6 h-6 text-yellow-500" />
+                                        <span className="text-lg font-semibold">MVP do Set: {mvpPlayer.playerName}</span>
+                                    </div>
+                                    <div className="flex justify-center">
+                                        <EggCounter count={mvpPlayer.setEggs} size="lg" variant="golden" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {isPickerMode && isHost && (
+                        <div className="mb-6 p-4 bg-primary/10 rounded-lg border-2 border-primary">
+                            <h3 className="text-lg font-semibold text-center mb-4">
+                                Escolha o gênero para o próximo set:
+                            </h3>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                                {genres.map((genre) => (
+                                    <Button
+                                        key={genre.id}
+                                        variant={selectedGenre === genre.id ? "default" : "outline"}
+                                        onClick={() => setSelectedGenre(genre.id)}
+                                        className="h-auto p-3 flex flex-col items-center gap-2"
+                                    >
+                                        <span className="text-2xl">{genre.emoji}</span>
+                                        <span className="text-sm font-medium">{genre.name}</span>
+                                    </Button>
+                                ))}
+                            </div>
+                            
+                            <div className="text-center">
+                                <ChickenButton
+                                    onClick={selectGenre}
+                                    disabled={!selectedGenre || isLoading}
+                                    size="lg"
+                                >
+                                    {isLoading ? "Iniciando..." : "Iniciar Próximo Set"}
+                                </ChickenButton>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        {players.map((player) => (
+                            <div
+                                key={player.id}
+                                className={`p-4 rounded-lg border-2 transition-all ${
+                                    player.isHost
+                                        ? "bg-primary/10 border-primary"
+                                        : "bg-card border-border"
+                                }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <ChickenAvatar emoji={player.avatar} size="md" />
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-semibold">{player.name}</h4>
+                                            {player.isHost && <Crown className="w-4 h-4 text-yellow-500" />}
+                                        </div>
+                                        <EggCounter count={player.eggs || 0} size="sm" />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {isHost && !isPickerMode && (
+                        <div className="text-center">
+                            <ChickenButton
+                                onClick={startGame}
+                                disabled={players.length < 1 || isLoading}
+                                size="lg"
+                            >
+                                {isLoading ? "Iniciando..." : "Iniciar Jogo"}
+                            </ChickenButton>
+                        </div>
+                    )}
+
+                    {!isHost && (
+                        <div className="text-center text-muted-foreground">
+                            <p>Aguardando o anfitrião iniciar o jogo...</p>
+                        </div>
+                    )}
+                </BarnCard>
+            </div>
+        </div>
+    );
 }

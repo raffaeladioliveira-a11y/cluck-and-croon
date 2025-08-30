@@ -255,11 +255,7 @@ function GameArenaContent() {
                             className="w-24 h-24 rounded-full object-cover border-2 border-white mx-auto mb-2"
                         />
                     ) : (
-                        <img
-                            src={currentPlayer.avatar ||  <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />}
-                            alt="Seu Avatar"
-                            className="w-24 h-24 rounded-full object-cover border-2 border-white mx-auto mb-2"
-                        />
+                        <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="lg" className="border-2 border-background" />
                     )}
                     <p className="font-semibold text-lg mb-2">
                         {user?.user_metadata?.display_name || "Você"}
