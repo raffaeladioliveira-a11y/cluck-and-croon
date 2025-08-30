@@ -500,6 +500,97 @@ export type Database = {
           },
         ]
       }
+      spotify_albums: {
+        Row: {
+          album_cover_url: string | null
+          album_name: string
+          artist_name: string
+          created_at: string
+          genre_id: string | null
+          id: string
+          release_date: string | null
+          spotify_album_id: string
+          total_tracks: number
+          updated_at: string
+        }
+        Insert: {
+          album_cover_url?: string | null
+          album_name: string
+          artist_name: string
+          created_at?: string
+          genre_id?: string | null
+          id?: string
+          release_date?: string | null
+          spotify_album_id: string
+          total_tracks?: number
+          updated_at?: string
+        }
+        Update: {
+          album_cover_url?: string | null
+          album_name?: string
+          artist_name?: string
+          created_at?: string
+          genre_id?: string | null
+          id?: string
+          release_date?: string | null
+          spotify_album_id?: string
+          total_tracks?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spotify_albums_genre_id_fkey"
+            columns: ["genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spotify_tracks: {
+        Row: {
+          created_at: string
+          duration_ms: number
+          embed_url: string | null
+          id: string
+          preview_url: string | null
+          spotify_album_id: string
+          spotify_track_id: string
+          track_name: string
+          track_number: number
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number
+          embed_url?: string | null
+          id?: string
+          preview_url?: string | null
+          spotify_album_id: string
+          spotify_track_id: string
+          track_name: string
+          track_number: number
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number
+          embed_url?: string | null
+          id?: string
+          preview_url?: string | null
+          spotify_album_id?: string
+          spotify_track_id?: string
+          track_name?: string
+          track_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spotify_tracks_spotify_album_id_fkey"
+            columns: ["spotify_album_id"]
+            isOneToOne: false
+            referencedRelation: "spotify_albums"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
