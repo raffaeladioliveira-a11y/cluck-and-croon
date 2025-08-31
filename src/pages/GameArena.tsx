@@ -304,14 +304,30 @@ function GameArenaContent() {
                   <h3 className="text-xl font-bold text-barn-brown">Sua Pontuação - Rodada {currentRound}</h3>
                 </div>
                 <div className="text-center">
-                  {user && avatarUrl ? (
+                  {user && currentPlayer.client_id === clientId.current ? (
+                      avatarUrl ? (
+                          <img
+                              src={avatarUrl}
+                              alt="Seu Avatar"
+                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                          />
+                      ) : currentPlayer.avatar?.startsWith("/") ? (
                       <img
-                          src={avatarUrl}
+                          src={currentPlayer.avatar}
                           alt="Seu Avatar"
-                          className="w-24 h-24 rounded-full object-cover border-2 border-white mx-auto mb-2"
+                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
                       />
                   ) : (
-                      <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="lg" className="border-2 border-background" />
+                      <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
+                  )
+                  ) : currentPlayer.avatar?.startsWith("/") ? (
+                  <img
+                      src={currentPlayer.avatar}
+                      alt={currentPlayer.name}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                  />
+                  ) : (
+                  <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
                   )}
                   <p className="font-semibold text-lg mb-2">
                     {user?.user_metadata?.display_name || "Você"}

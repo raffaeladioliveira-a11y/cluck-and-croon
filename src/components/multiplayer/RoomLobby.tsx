@@ -6,6 +6,7 @@ import { getOrCreateClientId, loadProfile } from "@/utils/clientId";
 import { PlayerList } from "./PlayerList";
 import { RoomCode } from "./RoomCode";
 import { ChickenButton } from "@/components/ChickenButton";
+import { useAuthSession } from "@/hooks/useAuthSession";
 
 interface Room {
   code: string;
@@ -47,6 +48,15 @@ export function RoomLobby() {
 
   // Load user profile
   const userProfile = useMemo(() => loadProfile(), []);
+  const { user, loading } = useAuthSession(); // MANTENHA APENAS ESTA LINHA
+
+  // DEBUG:
+  console.log('AUTH STATUS:', {
+    user: user,
+    loading: loading,
+    userProfile: userProfile,
+    user_avatar: user?.user_metadata?.avatar_url
+});
 
   // Check if current user is host
   const isHost = useMemo(() => {
@@ -54,8 +64,11 @@ export function RoomLobby() {
   }, [players, clientId]);
 
   useEffect(() => {
+    if (loading) return; // ESPERA O AUTH CARREGAR
     joinRoom();
-  }, [roomCode]);
+  }, [roomCode, loading]); // ADICIONE LOADING COMO DEPENDÊNCIA
+
+  // resto do código continua igual...
 
   const joinRoom = async () => {
     try {
@@ -67,13 +80,16 @@ export function RoomLobby() {
         profile: userProfile
       });
 
+
+
       // Use RPC to join room with preserved identity
       const { error: joinError } = await supabase.rpc('join_room', {
         p_room_code: roomCode.trim(),
         p_display_name: userProfile.displayName || `Galinha ${Math.floor(Math.random() * 1000)}`,
-        p_avatar: userProfile.avatar || '🐔',
+        p_avatar: user?.user_metadata?.avatar_url || userProfile.avatar || '🐔',
         p_client_id: clientId
       });
+
 
       if (joinError) {
         console.error('Error joining room:', joinError);
@@ -185,12 +201,19 @@ export function RoomLobby() {
 
       console.log('👥 Loaded participants (ordered by join time):', data);
 
+      // ADICIONE ESTE DEBUG:
+      console.log('🔍 Avatar debug:', data.map(p => ({
+        name: p.display_name,
+        avatar: p.avatar,
+        avatar_emoji: p.avatar_emoji
+      })));
+
 
       // Map participants and ensure correct host identification
       const mappedPlayers = data.map(participant => ({
         id: participant.id,
         name: participant.display_name || 'Guest',
-        avatar: participant.avatar_emoji || '🐔',
+        avatar: participant.avatar || '🐔',
         isHost: participant.is_host || false,
         isReady: participant.is_ready || false,
         eggs: participant.current_eggs || 0,

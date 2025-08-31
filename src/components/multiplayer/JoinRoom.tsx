@@ -15,8 +15,8 @@ type Props = {
 };
 
 export function JoinRoom({
-  playerName,
-  selectedAvatar,
+    playerName,
+    selectedAvatar,
 }: Props) {
   const navigate = useNavigate();
   const [roomCode, setRoomCode] = useState("");
@@ -53,34 +53,34 @@ export function JoinRoom({
   };
 
   return (
-    <BarnCard variant="nest" animated className="group">
-      <div className="text-center">
-        <div className="text-6xl mb-4 group-hover:animate-egg-bounce">🚪</div>
-        <h3 className="text-2xl font-bold mb-4 text-primary">Entrar no Galinheiro</h3>
-        <div className="space-y-4 mb-6">
-          <div>
-            <Label htmlFor="room-code" className="text-sm font-medium">Código do Galinheiro</Label>
-            <Input
-              id="room-code"
-              placeholder="Digite o código (ex: ABC123)"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-              className="mt-1 text-center font-bold text-lg tracking-widest"
-              maxLength={6}
-            />
+      <BarnCard variant="nest" animated className="group">
+        <div className="text-center">
+          <div className="text-6xl mb-4 group-hover:animate-egg-bounce">🚪</div>
+          <h3 className="text-2xl font-bold mb-4 text-primary">Entrar no Galinheiro</h3>
+          <div className="space-y-4 mb-6">
+            <div>
+              <Label htmlFor="room-code" className="text-sm font-medium">Código do Galinheiro</Label>
+              <Input
+                  id="room-code"
+                  placeholder="Digite o código (ex: ABC123)"
+                  value={roomCode}
+                  onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                  className="mt-1 text-center font-bold text-lg tracking-widest"
+                  maxLength={6}
+              />
+            </div>
           </div>
+          <ChickenButton
+              variant="corn"
+              size="lg"
+              className="w-full"
+              chickenStyle="walk"
+              disabled={roomCode.length < 6}
+              onClick={handleJoinRoom}
+          >
+            🚪 Entrar no Galinheiro
+          </ChickenButton>
         </div>
-        <ChickenButton
-          variant="corn"
-          size="lg"
-          className="w-full"
-          chickenStyle="walk"
-          disabled={roomCode.length < 6}
-          onClick={handleJoinRoom}
-        >
-          🚪 Entrar no Galinheiro
-        </ChickenButton>
-      </div>
-    </BarnCard>
+      </BarnCard>
   );
 }
