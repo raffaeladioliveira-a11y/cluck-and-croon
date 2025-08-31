@@ -99,28 +99,28 @@ export default function RoundLobby() {
       try {
         // Verificar se é host
         const { data: room } = await supabase
-          .from('game_rooms')
-          .select('id, host_id')
-          .eq('room_code', roomCode)
-          .maybeSingle();
+            .from('game_rooms')
+            .select('id, host_id')
+            .eq('room_code', roomCode)
+            .maybeSingle();
 
         if (room) {
           const { data: participant } = await supabase
-            .from('room_participants')
-            .select('is_host')
-            .eq('room_id', room.id)
-            .eq('client_id', clientId.current)
-            .maybeSingle();
+              .from('room_participants')
+              .select('is_host')
+              .eq('room_id', room.id)
+              .eq('client_id', clientId.current)
+              .maybeSingle();
 
           setIsHost(!!participant?.is_host);
         }
 
         // Carregar participantes para ranking
         const { data: participants } = await supabase
-          .from('room_participants')
-          .select('*')
-          .eq('room_id', room?.id || '')
-          .limit(10);
+            .from('room_participants')
+            .select('*')
+            .eq('room_id', room?.id || '')
+      .limit(10);
 
         if (participants) {
           const rankingData = calculateRanking(participants);
@@ -130,9 +130,9 @@ export default function RoundLobby() {
 
         // Carregar gêneros disponíveis
         const { data: genresData } = await supabase
-          .from('genres')
-          .select('*')
-          .order('name');
+            .from('genres')
+            .select('*')
+            .order('name');
 
         setGenres(genresData || []);
 
@@ -199,9 +199,9 @@ export default function RoundLobby() {
     // Atualizar sala com próximo gênero
     try {
       await supabase
-        .from('game_rooms')
-        .update({ next_genre_id: genreId })
-        .eq('room_code', roomCode);
+          .from('game_rooms')
+          .update({ next_genre_id: genreId })
+          .eq('room_code', roomCode);
 
       // Broadcast para todos os jogadores
       await gameChannelRef.current.send({
@@ -232,22 +232,22 @@ export default function RoundLobby() {
     try {
       // Zerar pontos dos participantes
       await supabase
-        .from('room_participants')
-        .update({ current_eggs: 0 })
-        .eq('room_id', (await supabase
-          .from('game_rooms')
-          .select('id')
-          .eq('room_code', roomCode)
-          .single()).data?.id);
+          .from('room_participants')
+          .update({ current_eggs: 0 })
+          .eq('room_id', (await supabase
+              .from('game_rooms')
+              .select('id')
+              .eq('room_code', roomCode)
+              .single()).data?.id);
 
       // Atualizar status da sala
       await supabase
-        .from('game_rooms')
-        .update({
-          status: 'in_progress',
-          current_round: 1
-        })
-        .eq('room_code', roomCode);
+          .from('game_rooms')
+          .update({
+            status: 'in_progress',
+            current_round: 1
+          })
+          .eq('room_code', roomCode);
 
       // Broadcast para iniciar nova rodada
       await gameChannelRef.current.send({
@@ -296,228 +296,228 @@ export default function RoundLobby() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-sky flex items-center justify-center p-4">
-        <BarnCard variant="golden" className="text-center p-8">
-          <div className="text-6xl mb-4 animate-chicken-walk">🏆</div>
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-white" />
-          <p className="text-white text-lg">Calculando o ranking...</p>
-        </BarnCard>
-      </div>
+        <div className="min-h-screen bg-gradient-sky flex items-center justify-center p-4">
+          <BarnCard variant="golden" className="text-center p-8">
+            <div className="text-6xl mb-4 animate-chicken-walk">🏆</div>
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-white" />
+            <p className="text-white text-lg">Calculando o ranking...</p>
+          </BarnCard>
+        </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-sky p-4">
-      {/* Navigation */}
-      <GameNavigation showLeaveRoom={true} />
+      <div className="min-h-screen bg-gradient-sky p-4">
+        {/* Navigation */}
+        <GameNavigation showLeaveRoom={true} />
 
-      <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto">
 
-        {/* Header */}
-        <div className="text-center mb-6">
-          <BarnCard variant="golden" className="p-6">
-            <div className="text-6xl mb-4 animate-chicken-walk">🏆</div>
-            <h1 className="text-3xl font-bold text-white mb-2">
-              Ranking da Rodada - Sala {roomCode}
-            </h1>
-            <p className="text-white/80 text-lg">
-              Parabéns a todas as cocós! 🎉Muito milho pra vocês!!!
-            </p>
-          </BarnCard>
-        </div>
-
-        {/* Ranking */}
-        <div className="grid gap-4 mb-6">
-          {ranking.map((player) => (
-            <BarnCard
-              key={player.id}
-              variant={getPositionVariant(player.position)}
-              className="p-4"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-12 h-12">
-                    {getPositionIcon(player.position)}
-                  </div>
-                  {(() => {
-                    const isCurrentUser = player.id === clientId.current;
-
-                    if (user && isCurrentUser && avatarUrl) {
-                      // Usuário logado com avatar do perfil
-                      return (
-                          <img
-                              src={avatarUrl}
-                              alt="Seu Avatar"
-                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                          />
-                      );
-                    }
-
-                    if (isCurrentUser) {
-                      // Usuário atual (logado sem avatarUrl ou não logado) - usar avatar escolhido
-                      return player.avatar && player.avatar.startsWith('/') ? (
-                          <img
-                              src={player.avatar}
-                              alt="Seu Avatar"
-                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                          />
-                      ) : (
-                          <ChickenAvatar
-                              emoji={player.avatar || profile.current.avatar || "🐔"}
-                              size="lg"
-                              animated={player.position <= 3}
-                          />
-                      );
-                    }
-
-                    // Outros jogadores
-                    return player.avatar && player.avatar.startsWith('/') ? (
-                        <img
-                            src={player.avatar}
-                            alt="Avatar do jogador"
-                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                        />
-                    ) : (
-                        <ChickenAvatar
-                            emoji={player.avatar || "🐔"}
-                            size="lg"
-                            animated={player.position <= 3}
-                        />
-                    );
-                  })()}
-
-                  <div>
-                    <h3 className="text-xl font-bold">{player.name}</h3>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span>✅ {player.correct_answers} acertos</span>
-                      <span>⚡ {player.avg_response_time.toFixed(1)}s médio</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <EggCounter
-                    count={player.eggs}
-                    size="lg"
-                    variant={player.position === 1 ? "golden" : "default"}
-                  />
-                </div>
-              </div>
-            </BarnCard>
-          ))}
-        </div>
-
-        {/* Seleção de Estilo Musical - apenas para o 1º colocado */}
-        {topPlayer && topPlayer.id === clientId.current && (
-          <div className="mb-6">
+          {/* Header */}
+          <div className="text-center mb-6">
             <BarnCard variant="golden" className="p-6">
-              <div className="text-center mb-4">
-                <div className="text-4xl mb-2">👑</div>
-                <h2 className="text-2xl font-bold text-white mb-2">
-                  Você está no topo! Escolha o estilo da próxima rodada
-                </h2>
-                <p className="text-white/80">
-                  Como campeão desta rodada, você tem o privilégio de escolher o estilo musical
-                </p>
-              </div>
+              <div className="text-6xl mb-4 animate-chicken-walk">🏆</div>
+              <h1 className="text-3xl font-bold text-white mb-2">
+                Ranking da Rodada - Sala {roomCode}
+              </h1>
+              <p className="text-white/80 text-lg">
+                Parabéns a todas as cocós! 🎉Muito milho pra vocês!!!
+              </p>
+            </BarnCard>
+          </div>
 
-              <div className="grid md:grid-cols-3 gap-3">
-                {genres.map((genre) => (
-                  <ChickenButton
-                    key={genre.id}
-                    variant={selectedGenre === genre.id ? "feather" : "egg"}
-                    size="lg"
-                    onClick={() => handleGenreSelect(genre.id, genre.name)}
-                    className="flex items-center gap-2 p-4"
-                  >
-                    <span className="text-2xl">{genre.emoji}</span>
-                    <div className="text-left">
-                      <div className="font-bold text-sm">{genre.name}</div>
-                      {genre.description && (
-                        <div className="text-xs opacity-80">{genre.description}</div>
-                      )}
+          {/* Ranking */}
+          <div className="grid gap-4 mb-6">
+            {ranking.map((player) => (
+                <BarnCard
+                    key={player.id}
+                    variant={getPositionVariant(player.position)}
+                    className="p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center justify-center w-12 h-12">
+                        {getPositionIcon(player.position)}
+                      </div>
+                      {(() => {
+                        const isCurrentUser = player.id === clientId.current;
+
+                        if (user && isCurrentUser && avatarUrl) {
+                          // Usuário logado com avatar do perfil
+                          return (
+                              <img
+                                  src={avatarUrl}
+                                  alt="Seu Avatar"
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                              />
+                          );
+                        }
+
+                        if (isCurrentUser) {
+                          // Usuário atual (logado sem avatarUrl ou não logado) - usar avatar escolhido
+                          return player.avatar && player.avatar.startsWith('/') ? (
+                              <img
+                                  src={player.avatar}
+                                  alt="Seu Avatar"
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                              />
+                          ) : (
+                              <ChickenAvatar
+                                  emoji={player.avatar || profile.current.avatar || "🐔"}
+                                  size="lg"
+                                  animated={player.position <= 3}
+                              />
+                          );
+                        }
+
+                        // Outros jogadores
+                        return player.avatar && player.avatar.startsWith('/') ? (
+                            <img
+                                src={player.avatar}
+                                alt="Avatar do jogador"
+                                className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                            />
+                        ) : (
+                            <ChickenAvatar
+                                emoji={player.avatar || "🐔"}
+                                size="lg"
+                                animated={player.position <= 3}
+                            />
+                        );
+                      })()}
+
+                      <div>
+                        <h3 className="text-xl font-bold">{player.name}</h3>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span>✅ {player.correct_answers} acertos</span>
+                          <span>⚡ {player.avg_response_time.toFixed(1)}s médio</span>
+                        </div>
+                      </div>
                     </div>
-                  </ChickenButton>
-                ))}
+                    <div className="text-right">
+                      <EggCounter
+                          count={player.eggs}
+                          size="lg"
+                          variant={player.position === 1 ? "golden" : "default"}
+                      />
+                    </div>
+                  </div>
+                </BarnCard>
+            ))}
+          </div>
+
+          {/* Seleção de Estilo Musical - apenas para o 1º colocado */}
+          {topPlayer && topPlayer.id === clientId.current && (
+              <div className="mb-6">
+                <BarnCard variant="golden" className="p-6">
+                  <div className="text-center mb-4">
+                    <div className="text-4xl mb-2">👑</div>
+                    <h2 className="text-2xl font-bold text-white mb-2">
+                      Você está no topo! Escolha o estilo da próxima rodada
+                    </h2>
+                    <p className="text-white/80">
+                      Como campeão desta rodada, você tem o privilégio de escolher o estilo musical
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-3 gap-3">
+                    {genres.map((genre) => (
+                        <ChickenButton
+                            key={genre.id}
+                            variant={selectedGenre === genre.id ? "feather" : "egg"}
+                            size="lg"
+                            onClick={() => handleGenreSelect(genre.id, genre.name)}
+                            className="flex items-center gap-2 p-4"
+                        >
+                          <span className="text-2xl">{genre.emoji}</span>
+                          <div className="text-left">
+                            <div className="font-bold text-sm">{genre.name}</div>
+                            {genre.description && (
+                                <div className="text-xs opacity-80">{genre.description}</div>
+                            )}
+                          </div>
+                        </ChickenButton>
+                    ))}
+                  </div>
+                </BarnCard>
               </div>
-            </BarnCard>
-          </div>
-        )}
+          )}
 
-        {/* Estilo selecionado (para todos os outros jogadores) */}
-        {topPlayer && topPlayer.id !== clientId.current && selectedGenre && (
-          <div className="mb-6">
-            <BarnCard variant="nest" className="p-6 text-center">
-              <Music className="h-12 w-12 mx-auto mb-4 text-primary" />
-              <h3 className="text-xl font-bold mb-2">Estilo Musical Escolhido</h3>
-              <p className="text-muted-foreground">
-                {topPlayer.name} escolheu o estilo para a próxima rodada
-              </p>
-              {genres.find(g => g.id === selectedGenre) && (
-                <div className="mt-4 p-4 bg-primary/10 rounded-lg">
-                  <div className="text-3xl mb-2">
-                    {genres.find(g => g.id === selectedGenre)?.emoji}
-                  </div>
-                  <div className="font-bold text-lg">
-                    {genres.find(g => g.id === selectedGenre)?.name}
-                  </div>
-                </div>
-              )}
-            </BarnCard>
-          </div>
-        )}
+          {/* Estilo selecionado (para todos os outros jogadores) */}
+          {topPlayer && topPlayer.id !== clientId.current && selectedGenre && (
+              <div className="mb-6">
+                <BarnCard variant="nest" className="p-6 text-center">
+                  <Music className="h-12 w-12 mx-auto mb-4 text-primary" />
+                  <h3 className="text-xl font-bold mb-2">Estilo Musical Escolhido</h3>
+                  <p className="text-muted-foreground">
+                    {topPlayer.name} escolheu o estilo para a próxima rodada
+                  </p>
+                  {genres.find(g => g.id === selectedGenre) && (
+                      <div className="mt-4 p-4 bg-primary/10 rounded-lg">
+                        <div className="text-3xl mb-2">
+                          {genres.find(g => g.id === selectedGenre)?.emoji}
+                        </div>
+                        <div className="font-bold text-lg">
+                          {genres.find(g => g.id === selectedGenre)?.name}
+                        </div>
+                      </div>
+                  )}
+                </BarnCard>
+              </div>
+          )}
 
-        {/* Ações do Host */}
-        {isHost && (
-          <div className="text-center">
-            <BarnCard variant="coop" className="p-6">
-              <div className="text-4xl mb-4">🎮</div>
-              <h3 className="text-2xl font-bold mb-4">Comandos do Host</h3>
-              <p className="text-muted-foreground mb-6">
-                Quando estiver pronto, inicie a próxima rodada. Os pontos serão zerados e uma nova rodada começará.
-              </p>
+          {/* Ações do Host */}
+          {isHost && (
+              <div className="text-center">
+                <BarnCard variant="coop" className="p-6">
+                  <div className="text-4xl mb-4">🎮</div>
+                  <h3 className="text-2xl font-bold mb-4">Comandos do Host</h3>
+                  <p className="text-muted-foreground mb-6">
+                    Quando estiver pronto, inicie a próxima rodada. Os pontos serão zerados e uma nova rodada começará.
+                  </p>
 
-              <ChickenButton
-                variant="feather"
-                size="lg"
-                onClick={handleStartNewRound}
-                disabled={isStartingNewRound || !selectedGenre}
-                className="bg-primary hover:bg-primary/90"
-              >
-                {isStartingNewRound ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                    Iniciando Nova Rodada...
-                  </>
-                ) : (
-                  <>
-                    🚀 Iniciar Próxima Rodada
-                  </>
-                )}
-              </ChickenButton>
+                  <ChickenButton
+                      variant="feather"
+                      size="lg"
+                      onClick={handleStartNewRound}
+                      disabled={isStartingNewRound || !selectedGenre}
+                      className="bg-primary hover:bg-primary/90"
+                  >
+                    {isStartingNewRound ? (
+                        <>
+                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                        Iniciando Nova Rodada...
+                        </>
+                    ) : (
+                        <>
+                        🚀 Iniciar Próxima Rodada
+                        </>
+                    )}
+                  </ChickenButton>
 
-              {!selectedGenre && (
-                <p className="text-sm text-destructive/80 mt-2">
-                  ⚠️ Aguardando o campeão escolher o estilo musical
-                </p>
-              )}
-            </BarnCard>
-          </div>
-        )}
+                  {!selectedGenre && (
+                      <p className="text-sm text-destructive/80 mt-2">
+                        ⚠️ Aguardando o campeão escolher o estilo musical
+                      </p>
+                  )}
+                </BarnCard>
+              </div>
+          )}
 
-        {/* Informação para não-hosts */}
-        {!isHost && (
-          <div className="text-center">
-            <BarnCard variant="default" className="p-6">
-              <div className="text-4xl mb-4">⏳</div>
-              <h3 className="text-xl font-bold mb-2">Aguardando o Host</h3>
-              <p className="text-muted-foreground">
-                O host da sala iniciará a próxima rodada em breve...
-              </p>
-            </BarnCard>
-          </div>
-        )}
+          {/* Informação para não-hosts */}
+          {!isHost && (
+              <div className="text-center">
+                <BarnCard variant="default" className="p-6">
+                  <div className="text-4xl mb-4">⏳</div>
+                  <h3 className="text-xl font-bold mb-2">Aguardando o Host</h3>
+                  <p className="text-muted-foreground">
+                    O host da sala iniciará a próxima rodada em breve...
+                  </p>
+                </BarnCard>
+              </div>
+          )}
 
+        </div>
       </div>
-    </div>
   );
 }

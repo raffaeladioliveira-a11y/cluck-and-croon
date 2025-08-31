@@ -322,10 +322,12 @@ export function RoomLobby() {
 
         {/* Players List */}
         <PlayerList
-          players={players}
-          currentClientId={clientId}
-          onToggleReady={handleToggleReady}
+            players={players}
+            currentClientId={clientId}
+            onToggleReady={handleToggleReady}
+            roomCode={roomCode}
         />
+
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-4 items-center">

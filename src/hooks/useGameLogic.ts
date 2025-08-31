@@ -10,6 +10,10 @@ export interface Song {
   preview_url?: string;
   audio_file_url?: string;
   duration_seconds: number;
+
+  // NOVOS CAMPOS (para Spotify)
+  spotify_track_id?: string;
+  embed_url?: string;
 }
 
 export interface GameQuestion {
@@ -32,6 +36,179 @@ function getAudioUrl(song: Song): string {
   if (song.preview_url && song.preview_url.trim() !== '') return song.preview_url;
   return 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
 }
+
+/* ----------------------------- HELPERS SPOTIFY ----------------------------- */
+
+async function getGameMode(): Promise<'mp3' | 'spotify'> {
+  // tabela key/value: key='game_mode', value='"spotify"' ou '"mp3"'
+  const { data, error } = await supabase
+      .from('game_settings')
+      .select('value')
+      .eq('key', 'game_mode')
+      .maybeSingle();
+
+  if (error) {
+    console.warn('[useGameLogic] game_mode fallback mp3 (erro ao ler game_settings)', error);
+    return 'mp3';
+  }
+
+  const raw = data?.value;
+  // value costuma vir como string JSON com aspas: "\"spotify\"" → normalizar
+  const normalized =
+      typeof raw === 'string' ? raw.replaceAll('"', '') : 'mp3';
+
+  return normalized === 'spotify' ? 'spotify' : 'mp3';
+}
+
+async function getRoomByCode(roomCode: string) {
+  const { data, error } = await supabase
+      .from('game_rooms')
+      .select(
+          'id, room_code, status, selected_spotify_album_id, selected_genre_id, next_genre_id'
+      )
+      .eq('room_code', roomCode)
+      .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+/** Busca outras músicas do mesmo gênero para usar como opções incorretas (Spotify) */
+async function getOtherSpotifyTracksFromGenre(genreId: string, excludeTrackId: string, limit: number = 10): Promise<string[]> {
+  const { data: tracks, error } = await supabase
+      .from('spotify_tracks')
+      .select('track_name, spotify_albums!inner(genre_id)')
+      .eq('spotify_albums.genre_id', genreId)
+      .neq('id', excludeTrackId)
+      .limit(limit);
+
+  if (error || !tracks) return [];
+  return tracks.map(t => t.track_name);
+}
+
+/** Busca outras músicas do mesmo gênero para usar como opções incorretas (MP3) */
+async function getOtherMP3TracksFromGenre(genreId: string, excludeSongId: string, limit: number = 10): Promise<string[]> {
+  const { data: songs, error } = await supabase
+      .from('songs')
+      .select('title')
+      .eq('genre_id', genreId)
+      .neq('id', excludeSongId)
+      .limit(limit);
+
+  if (error || !songs) return [];
+  return songs.map(s => s.title);
+}
+
+/** Sorteia UMA faixa do Spotify, priorizando:
+ * 1) Álbum escolhido (selected_spotify_album_id)
+ * 2) Qualquer álbum do gênero (selected_genre_id ou next_genre_id)
+ * Retorna track + nome do artista via join em spotify_albums
+ */
+async function pickOneSpotifyTrack(room: any): Promise<{
+  id: string; // uuid (id da track)
+  track_name: string;
+  duration_ms: number;
+  embed_url?: string;
+  spotify_track_id?: string;
+  artist_name?: string;
+  genre_id?: string;
+} | null> {
+  // 1) pelo álbum escolhido
+  if (room?.selected_spotify_album_id) {
+    const { data: tracks, error } = await supabase
+        .from('spotify_tracks')
+        .select(
+            'id, spotify_track_id, track_name, duration_ms, embed_url, spotify_album_id, spotify_albums!inner(artist_name, genre_id)'
+        )
+        .eq('spotify_album_id', room.selected_spotify_album_id);
+
+    if (!error && tracks && tracks.length > 0) {
+      const rnd = Math.floor(Math.random() * tracks.length);
+      const t = tracks[rnd];
+      return {
+        id: t.id,
+        track_name: t.track_name,
+        duration_ms: t.duration_ms,
+        embed_url: t.embed_url || (t.spotify_track_id ? `https://open.spotify.com/embed/track/${t.spotify_track_id}?utm_source=generator&theme=0` : undefined),
+        spotify_track_id: t.spotify_track_id,
+        artist_name: (t as any)?.spotify_albums?.artist_name,
+          genre_id: (t as any)?.spotify_albums?.genre_id,
+    };
+    }
+  }
+
+  // 2) pelo gênero selecionado
+  const genreId = room?.selected_genre_id || room?.next_genre_id;
+  if (genreId) {
+    const { data: tracks, error } = await supabase
+        .from('spotify_tracks')
+        .select(
+            'id, spotify_track_id, track_name, duration_ms, embed_url, spotify_album_id, spotify_albums!inner(id, genre_id, artist_name)'
+        )
+        .eq('spotify_albums.genre_id', genreId);
+
+    if (!error && tracks && tracks.length > 0) {
+      const rnd = Math.floor(Math.random() * tracks.length);
+      const t = tracks[rnd];
+      return {
+        id: t.id,
+        track_name: t.track_name,
+        duration_ms: t.duration_ms,
+        embed_url: t.embed_url || (t.spotify_track_id ? `https://open.spotify.com/embed/track/${t.spotify_track_id}?utm_source=generator&theme=0` : undefined),
+        spotify_track_id: t.spotify_track_id,
+        artist_name: (t as any)?.spotify_albums?.artist_name,
+          genre_id: (t as any)?.spotify_albums?.genre_id,
+    };
+    }
+  }
+
+  return null;
+}
+
+/** Gera opções com músicas reais do mesmo gênero */
+async function buildOptionsFromGenre(
+    correctTitle: string,
+    genreId: string,
+    excludeId: string,
+    mode: 'mp3' | 'spotify'
+): Promise<string[]> {
+  const options = [correctTitle];
+
+  // Busca outras músicas do mesmo gênero
+  const otherTracks = mode === 'spotify'
+      ? await getOtherSpotifyTracksFromGenre(genreId, excludeId, 10)
+      : await getOtherMP3TracksFromGenre(genreId, excludeId, 10);
+
+  // Se temos outras músicas do gênero, usa elas
+  if (otherTracks.length >= 3) {
+    // Embaralha e pega 3 opções incorretas
+    const shuffled = otherTracks.sort(() => Math.random() - 0.5);
+    options.push(...shuffled.slice(0, 3));
+  } else {
+    // Fallback: gera opções baseadas no título (como estava antes)
+    console.warn(`[buildOptionsFromGenre] Poucas músicas do gênero (${otherTracks.length}), usando fallback`);
+    const fallbackOptions = [`${correctTitle} (Remix)`, `${correctTitle} (Live)`, `${correctTitle} (Acoustic)`];
+    options.push(...fallbackOptions.slice(0, 3));
+  }
+
+  // Embaralha todas as opções para randomizar a posição da resposta correta
+  return options.sort(() => Math.random() - 0.5);
+}
+
+/** Gera 3 alternativas extras a partir do próprio pool de faixas (fallback antigo).
+ * Mantido como backup se buildOptionsFromGenre falhar */
+function buildOptionsFromTitles(correctTitle: string, poolTitles: string[] = []): string[] {
+  const set = new Set<string>([correctTitle]);
+  while (set.size < 4) {
+    const fallbackTitle =
+        poolTitles[Math.floor(Math.random() * Math.max(1, poolTitles.length))] ||
+        `${correctTitle} (Alt ${set.size})`;
+    set.add(fallbackTitle);
+  }
+  return Array.from(set).sort(() => Math.random() - 0.5);
+}
+
+/* ----------------------------- HOOK PRINCIPAL ------------------------------ */
 
 export const useGameLogic = (roomCode: string, sessionId?: string) => {
   const { toast } = useToast();
@@ -95,10 +272,11 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     }, 1000);
   }, [clearTimers, isHost]);
 
-  // ---- dados
+  /* ---------------------- BUSCA DE PERGUNTA (SPOTIFY/MP3) ---------------------- */
+
+  /** Busca músicas MP3 respeitando seu edge function de gênero (flow atual) */
   const fetchSongsWithGenre = async (): Promise<Song[]> => {
     try {
-      // Buscar músicas usando o edge function para respeitar gênero ativo
       const { data: response, error } = await supabase.functions.invoke('game-manager', {
         body: {
           action: 'getSongsForGenre',
@@ -113,15 +291,13 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       }
 
       const { songs, activeGenreId, usedFallback, totalAvailable } = response;
-      
+
       if (!songs || songs.length === 0) {
         throw new Error('Nenhuma música encontrada na base de dados');
       }
 
-      // Log para debug e UX
       if (activeGenreId) {
         console.log(`🎵 Usando ${usedFallback ? 'fallback' : 'gênero específico'} | ${totalAvailable} músicas disponíveis`);
-        
         if (usedFallback) {
           toast({
             title: '⚠️ Fallback Ativado',
@@ -138,29 +314,107 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     }
   };
 
+  /** Monta a próxima questão priorizando Spotify quando game_mode = spotify */
   const buildQuestion = async (): Promise<GameQuestion> => {
+    const mode = await getGameMode();
+    const room = await getRoomByCode(roomCode);
+
+    if (mode === 'spotify') {
+      const track = await pickOneSpotifyTrack(room);
+
+      if (track) {
+        const durationSec = Math.max(
+            5,
+            Math.round((track.duration_ms || currentSettings.song_duration * 1000) / 1000)
+        );
+
+        // Usa o gênero da sala ou da track para buscar outras músicas
+        const genreId = room?.selected_genre_id || track.genre_id;
+
+        let options: string[];
+        if (genreId) {
+          try {
+            options = await buildOptionsFromGenre(track.track_name, genreId, track.id, 'spotify');
+          } catch (error) {
+            console.warn('[buildQuestion] Erro ao buscar opções do gênero, usando fallback:', error);
+            options = buildOptionsFromTitles(track.track_name);
+          }
+        } else {
+          options = buildOptionsFromTitles(track.track_name);
+        }
+
+        const correctIdx = options.indexOf(track.track_name);
+
+        const q: GameQuestion = {
+          song: {
+            id: track.id,
+            title: track.track_name,
+            artist: track.artist_name || '',
+            duration_seconds: durationSec,
+            // IMPORTANTE: não definir audioUrl para não cair em MP3
+            spotify_track_id: track.spotify_track_id,
+            embed_url: track.embed_url,
+          },
+          options,
+          correctAnswer: correctIdx >= 0 ? correctIdx : 0,
+        };
+
+        console.log('[useGameLogic] next question (spotify)', {
+              mode,
+              selected_spotify_album_id: room?.selected_spotify_album_id ?? null,
+            selected_genre_id: room?.selected_genre_id ?? null,
+            next_genre_id: room?.next_genre_id ?? null,
+            trackId: track.spotify_track_id,
+            embed_url: track.embed_url,
+            genreUsedForOptions: genreId
+      });
+
+        return q;
+      }
+
+      console.warn('[useGameLogic] Spotify ativo, mas sem faixas encontradas. Caindo para MP3...');
+    }
+
+    // Fallback: MP3 (seja porque o modo é mp3 ou porque não achou faixas Spotify)
     const songs = await fetchSongsWithGenre();
     const shuffled = [...songs].sort(() => Math.random() - 0.5);
     const correct = shuffled[0];
-    const titles = shuffled.map(s => s.title);
 
-    const opts: string[] = [];
-    for (let i = 0; i < Math.min(4, titles.length); i++) opts.push(titles[i]);
-    while (opts.length < 4) {
-      const r = shuffled[Math.floor(Math.random() * shuffled.length)];
-      opts.push(`${r.title} (Alt ${opts.length})`);
+    // Para MP3, tenta usar o gênero da sala ou busca no pool de músicas retornadas
+    const genreId = room?.selected_genre_id || room?.next_genre_id;
+
+    let options: string[];
+    if (genreId) {
+      try {
+        options = await buildOptionsFromGenre(correct.title, genreId, correct.id, 'mp3');
+      } catch (error) {
+        console.warn('[buildQuestion] Erro ao buscar opções do gênero (MP3), usando pool local:', error);
+        const titlesPool = shuffled.map(s => s.title);
+        options = buildOptionsFromTitles(correct.title, titlesPool);
+      }
+    } else {
+      // Usa o pool de músicas retornadas
+      const titlesPool = shuffled.map(s => s.title);
+      options = buildOptionsFromTitles(correct.title, titlesPool);
     }
-    const shuffledOptions = opts.sort(() => Math.random() - 0.5);
-    const correctIndex = shuffledOptions.indexOf(correct.title);
 
-    return {
+    const correctIndex = options.indexOf(correct.title);
+
+    const question: GameQuestion = {
       song: { ...correct, audioUrl: getAudioUrl(correct), duration_seconds: currentSettings.song_duration },
-      options: shuffledOptions,
-      correctAnswer: correctIndex,
+      options,
+      correctAnswer: correctIndex >= 0 ? correctIndex : 0,
     };
+
+    console.log('[useGameLogic] next question (mp3 fallback)', {
+      genreUsedForOptions: genreId,
+      optionsFromGenre: genreId ? true : false
+    });
+    return question;
   };
 
-  // ---- broadcast helpers
+  /* ------------------------------- BROADCAST ------------------------------- */
+
   const broadcastRoundStart = useCallback(async (q: GameQuestion, round: number) => {
     if (!sessionId || !gameChannelRef.current) return;
 
@@ -215,7 +469,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     });
   }, [sessionId]);
 
-  // ---- ações públicas
+  /* --------------------------------- AÇÕES -------------------------------- */
+
   const startFirstRound = useCallback(async () => {
     setAudioUnlocked(true);
 
@@ -254,19 +509,19 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       (async () => {
         try {
           const { data: room } = await supabase
-            .from('game_rooms')
-            .select('id')
-            .eq('room_code', roomCode)
-            .maybeSingle();
+              .from('game_rooms')
+              .select('id')
+              .eq('room_code', roomCode)
+              .maybeSingle();
 
           if (room?.id) {
             // Buscar dados atuais do participante
             const { data: participant } = await supabase
-              .from('room_participants')
-              .select('current_eggs, correct_answers, total_answers, total_response_time')
-              .eq('room_id', room.id)
-              .eq('client_id', clientId.current)
-              .maybeSingle();
+                .from('room_participants')
+                .select('current_eggs, correct_answers, total_answers, total_response_time')
+                .eq('room_id', room.id)
+                .eq('client_id', clientId.current)
+                .maybeSingle();
 
             if (participant) {
               const newEggs = participant.current_eggs + (isCorrect ? currentSettings.eggs_per_correct + (timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0) : 0);
@@ -276,15 +531,15 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
               // Atualizar estatísticas do participante
               await supabase
-                .from('room_participants')
-                .update({
-                  current_eggs: newEggs,
-                  correct_answers: newCorrectAnswers,
-                  total_answers: newTotalAnswers,
-                  total_response_time: newTotalResponseTime
-                })
-                .eq('room_id', room.id)
-                .eq('client_id', clientId.current);
+                  .from('room_participants')
+                  .update({
+                    current_eggs: newEggs,
+                    correct_answers: newCorrectAnswers,
+                    total_answers: newTotalAnswers,
+                    total_response_time: newTotalResponseTime
+                  })
+                  .eq('room_id', room.id)
+                  .eq('client_id', clientId.current);
             }
           }
         } catch (error) {
@@ -307,7 +562,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     broadcastAnswer(idx);
   }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode]);
 
-  // ---- inicialização (carrega config + liga Realtime + descobre host)
+  /* -------------------------- INICIALIZAÇÃO/REALTIME ------------------------- */
+
   useEffect(() => {
     let cancelled = false;
 
@@ -322,28 +578,28 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             setCurrentSettings(prev => ({ ...prev, ...s }));
           }
         }
-        } catch {
-            // usa defaults silenciosamente
-        }
+      } catch {
+          // usa defaults silenciosamente
+      }
 
-        // Carregar gênero ativo da sala
-        try {
-          const { data: genreResponse } = await supabase.functions.invoke('game-manager', {
-            body: {
-              action: 'getActiveGenre',
-              roomCode
-            }
-          });
-
-          if (!cancelled && genreResponse?.activeGenre) {
-            setActiveGenre(genreResponse.activeGenre);
+      // Carregar gênero ativo da sala
+      try {
+        const { data: genreResponse } = await supabase.functions.invoke('game-manager', {
+          body: {
+            action: 'getActiveGenre',
+            roomCode
           }
-        } catch (error) {
-          console.error('Erro ao carregar gênero ativo:', error);
-        }
+        });
 
-        // se houver sessão, conecta no canal e descobre se sou host
-        if (sessionId) {
+        if (!cancelled && genreResponse?.activeGenre) {
+          setActiveGenre(genreResponse.activeGenre);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar gênero ativo:', error);
+      }
+
+      // se houver sessão, conecta no canal e descobre se sou host
+      if (sessionId) {
         try {
           const ch = supabase.channel(`game:${sessionId}`, {
             config: { broadcast: { ack: true }, presence: { key: clientId.current } }
@@ -449,7 +705,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           // Ao final da 10ª pergunta, host dispara evento para todos redirecionarem
           console.log('[host] Fim das 10 perguntas, enviando broadcast para redirecionar todos');
           await broadcastEndOfRound(roomCode, playerEggs, sessionId);
-          
+
           // Host também precisa ser redirecionado
           setTimeout(() => {
             const navigateEvent = new CustomEvent("navigateToRoundLobby", {
@@ -468,8 +724,6 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState, roomCode, playerEggs, sessionId, broadcastEndOfRound]);
-
-
 
   return {
     // estado

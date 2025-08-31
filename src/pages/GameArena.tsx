@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
@@ -11,7 +11,13 @@ import { Loader2 } from "lucide-react";
 import GameArenaGuard from "./GameArenaGuard";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { getOrCreateClientId } from "@/utils/clientId";
-import { useRef } from "react"; // se não estiver importado
+
+/** Util: extrai o trackId a partir de uma URL de embed do Spotify */
+function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  const m = url.match(/spotify\.com\/(?:embed\/)?track\/([A-Za-z0-9]+)/i);
+  return m?.[1];
+}
 
 function GameArenaContent() {
   const { roomCode } = useParams<{ roomCode: string }>();
@@ -19,26 +25,24 @@ function GameArenaContent() {
   const [searchParams] = useSearchParams();
   const sid = (searchParams.get("sid") || "").trim();
 
-    // Adicionar após as outras declarações de hooks
-    const { user } = useAuthSession();
-    const clientId = useRef(getOrCreateClientId());
-    const avatarUrl = user?.user_metadata?.avatar_url || "";
+  const { user } = useAuthSession();
+  const clientId = useRef(getOrCreateClientId());
+  const avatarUrl = (user?.user_metadata?.avatar_url as string) || "";
 
-  // volta ao lobby ao finalizar set
+  // navegação pós-set
   useEffect(() => {
     const handleNavigateToLobby = (event: CustomEvent) => {
       const { roomCode: navRoomCode, setComplete, eggs } = event.detail;
       navigate(`/game/lobby/${navRoomCode}?setComplete=${setComplete}&eggs=${eggs}`);
     };
-    
+
     const handleNavigateToRoundLobby = (event: CustomEvent) => {
       const { roomCode: navRoomCode, playerEggs, sessionId } = event.detail;
       navigate(`/round-lobby/${navRoomCode}?sid=${sessionId}&eggs=${playerEggs}`);
     };
-    
+
     window.addEventListener("navigateToLobby", handleNavigateToLobby as EventListener);
     window.addEventListener("navigateToRoundLobby", handleNavigateToRoundLobby as EventListener);
-    
     return () => {
       window.removeEventListener("navigateToLobby", handleNavigateToLobby as EventListener);
       window.removeEventListener("navigateToRoundLobby", handleNavigateToRoundLobby as EventListener);
@@ -63,9 +67,74 @@ function GameArenaContent() {
       answersByOption,
       isHost,
       activeGenre,
+      // se seu hook expõe gameMode, ele é usado como pista inicial:
+      gameMode: hookGameMode, // pode vir undefined em versões antigas
   } = useGameLogic(roomCode || "", sid);
 
-  // loader somente enquanto inicia plugin/rt + conf
+  // ---------- helpers ----------
+  const currentPlayer = {
+    id: "current",
+    name: "Você",
+    avatar: "🐔",
+    eggs: playerEggs,
+    selectedAnswer: selectedAnswer,
+  };
+
+  const playersOnOption = (optionIndex: number) => answersByOption?.[optionIndex] || [];
+
+  const getAnswerColor = (index: number) => {
+    if (!showResults) {
+      return selectedAnswer === index ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted";
+    }
+    if (currentQuestion && index === currentQuestion.correctAnswer) return "bg-accent text-accent-foreground";
+    if (selectedAnswer === index) return "bg-destructive text-destructive-foreground";
+    return "bg-muted text-muted-foreground";
+  };
+
+  // ---------- DECISÃO: Spotify vs MP3 para a música atual ----------
+  const song = currentQuestion?.song ?? {};
+
+  // pega possíveis campos vindos do backend
+  const rawSpotifyTrackId: string | undefined =
+      song.spotify_track_id ||
+      song.spotifyTrackId ||
+      song.track_id ||
+      extractSpotifyTrackIdFromUrl(song.embed_url || song.spotify_embed_url);
+
+  const spotifyEmbedUrl: string | undefined =
+      song.embed_url || song.spotify_embed_url || (rawSpotifyTrackId ? `https://open.spotify.com/embed/track/${rawSpotifyTrackId}?utm_source=generator&theme=0` : undefined);
+
+  // regra: priorizamos Spotify SE houver identificador de faixa OU embed_url válido
+  const preferSpotify = !!rawSpotifyTrackId || !!spotifyEmbedUrl;
+
+  // modo final: se preferSpotify true => spotify; senão usamos o modo do hook; senão mp3
+  const finalGameMode: "mp3" | "spotify" = preferSpotify ? "spotify" : (hookGameMode === "spotify" ? "spotify" : "mp3");
+
+  // log de depuração por música/rodada
+  if (currentQuestion?.song?.id) {
+    // um único log por mudança de música
+    // eslint-disable-next-line no-console
+    console.log("[GameArena] track decision", {
+      round: currentRound,
+      gameState,
+      hookGameMode,
+      preferSpotify,
+      reason: preferSpotify ? "spotify data present" : "no spotify fields on this song",
+      song: {
+        id: song.id,
+        title: song.title,
+        artist: song.artist,
+        audioUrl: song.audioUrl,
+        spotify_track_id: song.spotify_track_id || song.spotifyTrackId || song.track_id,
+        embed_url: song.embed_url || song.spotify_embed_url,
+      },
+      finalGameMode,
+      rawSpotifyTrackId,
+      spotifyEmbedUrl,
+    });
+  }
+
+  // ---------- LOADING ----------
   if (isLoading) {
     return (
         <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
@@ -78,30 +147,12 @@ function GameArenaContent() {
     );
   }
 
-  const currentPlayer = {
-    id: "current",
-    name: "Você",
-    avatar: "🐔",
-    eggs: playerEggs,
-    selectedAnswer: selectedAnswer
-  };
-
-  const playersOnOption = (optionIndex: number) => answersByOption?.[optionIndex] || [];
-
-  const getAnswerColor = (index: number) => {
-    if (!showResults) return selectedAnswer === index ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted";
-    if (currentQuestion && index === currentQuestion.correctAnswer) return "bg-accent text-accent-foreground";
-    if (selectedAnswer === index) return "bg-destructive text-destructive-foreground";
-    return "bg-muted text-muted-foreground";
-  };
-
+  // ---------- RENDER ----------
   return (
       <div className="min-h-screen bg-gradient-sky p-4">
-        {/* Navigation */}
         <GameNavigation showLeaveRoom={true} />
-        
-        <div className="max-w-6xl mx-auto">
 
+        <div className="max-w-6xl mx-auto">
           {/* Header com rodada/tempo/valor + gênero ativo */}
           <div className="grid md:grid-cols-4 gap-4 mb-6">
             <BarnCard variant="nest" className="text-center">
@@ -133,19 +184,19 @@ function GameArenaContent() {
               </div>
             </BarnCard>
             {activeGenre && (
-              <BarnCard variant="nest" className="text-center">
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-2xl">{activeGenre.emoji}</span>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Estilo</p>
-                    <p className="text-lg font-bold text-primary">{activeGenre.name}</p>
+                <BarnCard variant="nest" className="text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-2xl">{activeGenre.emoji}</span>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Estilo</p>
+                      <p className="text-lg font-bold text-primary">{activeGenre.name}</p>
+                    </div>
                   </div>
-                </div>
-              </BarnCard>
+                </BarnCard>
             )}
           </div>
 
-          {/* Estado IDLE: NÃO depende de currentQuestion */}
+          {/* Estado IDLE */}
           {gameState === "idle" && (
               <div className="mb-6">
                 <BarnCard variant="golden" className="text-center">
@@ -176,26 +227,36 @@ function GameArenaContent() {
               </div>
           )}
 
-          {/* Arena somente quando houver pergunta */}
+          {/* Arena */}
           {gameState !== "idle" && currentQuestion && (
               <>
               <BarnCard variant="golden" className="mb-6">
                 <MusicPlayer
-                    songTitle={currentQuestion.song.title}
-                    artist={currentQuestion.song.artist}
-                    audioUrl={currentQuestion.song.audioUrl}
-                    duration={currentQuestion.song.duration_seconds || 15}
-                    autoPlay={gameState === 'playing'}
+                    // identificação da música
+                    songTitle={song.title}
+                    artist={song.artist}
+                    duration={song.duration_seconds || 15}
+
+
+                    // modo + fontes
+                    gameMode={finalGameMode}
+                    spotifyTrackId={rawSpotifyTrackId}
+                    spotifyEmbedUrl={spotifyEmbedUrl}
+                    audioUrl={finalGameMode === "mp3" ? song.audioUrl : undefined}
+
+
+                    // controle
+                    autoPlay={gameState === "playing"}
                     muted={!audioUnlocked}
                     gameState={gameState}
-                    roundKey={`${currentRound}-${currentQuestion.song.id}`}
+                    roundKey={`${currentRound}-${song.id || rawSpotifyTrackId || song.title || "unk"}`}
                     onTimeUpdate={() => {}}
                     onEnded={() => {}}
                 />
               </BarnCard>
 
               <div className="grid md:grid-cols-2 gap-4 mb-6">
-                {currentQuestion.options.map((option, index) => (
+                {currentQuestion.options.map((option: string, index: number) => (
                     <BarnCard
                         key={index}
                         variant="default"
@@ -210,30 +271,25 @@ function GameArenaContent() {
                           <span className="font-semibold text-lg">{option}</span>
                         </div>
                         <div className="flex -space-x-1">
-                          {playersOnOption(index).map(p => (
+                          {playersOnOption(index).map((p: any) => (
                               <div key={p.id} className="relative">
-                                  {user && p.id === clientId.current ? (
-                                      // Usuário logado - usar avatar do perfil
-                                      avatarUrl ? (
-                                          <img
-                                              src={avatarUrl}
-                                              alt="Seu Avatar"
-                                              className="w-8 h-8 rounded-full object-cover border-2 border-white"
-                                          />
-                                      ) : (
-                                      <img
-                                          src={p.avatar}
-                                          alt="Seu Avatar"
-                                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                                      />
-
-                                      )
-                                  ) : (
-                                      // Outros jogadores - usar avatar emoji
-                                      <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />
-
-                                  )}
-                                {/*<ChickenAvatar emoji={p.avatar} size="sm" className="border-2 border-background" />*/}
+                                {user && p.id === clientId.current ? (
+                                    avatarUrl ? (
+                                        <img
+                                            src={avatarUrl}
+                                            alt="Seu Avatar"
+                                            className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                                        />
+                                    ) : (
+                                        <img
+                                            src={p.avatar}
+                                            alt="Seu Avatar"
+                                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                                        />
+                                    )
+                                ) : (
+                                    <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />
+                                )}
                               </div>
                           ))}
                         </div>
@@ -248,18 +304,18 @@ function GameArenaContent() {
                   <h3 className="text-xl font-bold text-barn-brown">Sua Pontuação - Rodada {currentRound}</h3>
                 </div>
                 <div className="text-center">
-                    {user && avatarUrl ? (
-                        <img
-                            src={avatarUrl}
-                            alt="Seu Avatar"
-                            className="w-24 h-24 rounded-full object-cover border-2 border-white mx-auto mb-2"
-                        />
-                    ) : (
-                        <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="lg" className="border-2 border-background" />
-                    )}
-                    <p className="font-semibold text-lg mb-2">
-                        {user?.user_metadata?.display_name || "Você"}
-                    </p>
+                  {user && avatarUrl ? (
+                      <img
+                          src={avatarUrl}
+                          alt="Seu Avatar"
+                          className="w-24 h-24 rounded-full object-cover border-2 border-white mx-auto mb-2"
+                      />
+                  ) : (
+                      <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="lg" className="border-2 border-background" />
+                  )}
+                  <p className="font-semibold text-lg mb-2">
+                    {user?.user_metadata?.display_name || "Você"}
+                  </p>
                   <EggCounter count={currentPlayer.eggs} size="lg" variant="golden" />
                   {selectedAnswer !== null && (
                       <div className="mt-4 p-3 bg-muted/50 rounded-lg">
@@ -267,7 +323,9 @@ function GameArenaContent() {
                           Sua resposta: <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
                         </p>
                         {answerTime && (
-                            <p className="text-xs text-muted-foreground mt-1">Tempo de resposta: {answerTime.toFixed(1)}s</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Tempo de resposta: {answerTime.toFixed(1)}s
+                            </p>
                         )}
                       </div>
                   )}
