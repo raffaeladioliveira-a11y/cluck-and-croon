@@ -225,6 +225,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   const [currentQuestion, setCurrentQuestion] = useState<GameQuestion | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [playerEggs, setPlayerEggs] = useState(0);
+  const [players, setPlayers] = useState<PlayerFace[] & { eggs: number }[]>([]);
   const [answerTime, setAnswerTime] = useState<number | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [isHost, setIsHost] = useState(false);
@@ -540,6 +541,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
                   })
                   .eq('room_id', room.id)
                   .eq('client_id', clientId.current);
+              await loadPlayersFromRoom();
+
             }
           }
         } catch (error) {
@@ -561,6 +564,37 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
     broadcastAnswer(idx);
   }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode]);
+
+
+  const loadPlayersFromRoom = useCallback(async () => {
+    try {
+      const { data: room } = await supabase
+          .from('game_rooms')
+          .select('id')
+          .eq('room_code', roomCode)
+          .maybeSingle();
+
+      if (room?.id) {
+        const { data: participants, error } = await supabase
+            .from('room_participants')
+            .select('client_id, display_name, avatar, current_eggs')
+            .eq('room_id', room.id);
+
+        if (!error && participants) {
+          const playerList = participants.map(p => ({
+            id: p.client_id,
+            name: p.display_name || 'Jogador',
+            avatar: p.avatar || '🐔',
+            eggs: p.current_eggs || 0
+          }));
+
+          setPlayers(playerList);
+        }
+      }
+    } catch (e) {
+      console.error('[loadPlayersFromRoom] erro ao carregar jogadores:', e);
+    }
+  }, [roomCode]);
 
   /* -------------------------- INICIALIZAÇÃO/REALTIME ------------------------- */
 
@@ -682,9 +716,14 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       }
 
       if (!cancelled) setIsLoading(false);
+      await loadPlayersFromRoom();
+
     };
 
     init();
+
+
+
 
     return () => {
       cancelled = true;
@@ -692,6 +731,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       if (gameChannelRef.current) supabase.removeChannel(gameChannelRef.current);
     };
   }, [sessionId, roomCode, clearTimers, startRoundTimer]);
+
 
   // próxima rodada (host)
   useEffect(() => {
@@ -752,5 +792,6 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     isHost,
     answersByOption,
     activeGenre,
+    players,
   };
 };

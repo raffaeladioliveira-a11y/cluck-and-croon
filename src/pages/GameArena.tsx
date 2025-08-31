@@ -62,6 +62,7 @@ function GameArenaContent() {
       handleAnswerSelect,
       startFirstRound,
       playerEggs,
+      players,
       answerTime,
       currentSettings,
       answersByOption,
@@ -97,12 +98,14 @@ function GameArenaContent() {
   // pega possíveis campos vindos do backend
   const rawSpotifyTrackId: string | undefined =
       song.spotify_track_id ||
-      song.spotifyTrackId ||
-      song.track_id ||
-      extractSpotifyTrackIdFromUrl(song.embed_url || song.spotify_embed_url);
+      (song as any).spotifyTrackId ||
+      (song as any).track_id ||
+      extractSpotifyTrackIdFromUrl((song as any).embed_url || (song as any).spotify_embed_url);
 
   const spotifyEmbedUrl: string | undefined =
-      song.embed_url || song.spotify_embed_url || (rawSpotifyTrackId ? `https://open.spotify.com/embed/track/${rawSpotifyTrackId}?utm_source=generator&theme=0` : undefined);
+      (song as any).embed_url ||
+      (song as any).spotify_embed_url ||
+      (rawSpotifyTrackId ? `https://open.spotify.com/embed/track/${rawSpotifyTrackId}?utm_source=generator&theme=0` : undefined);
 
   // regra: priorizamos Spotify SE houver identificador de faixa OU embed_url válido
   const preferSpotify = !!rawSpotifyTrackId || !!spotifyEmbedUrl;
@@ -112,7 +115,6 @@ function GameArenaContent() {
 
   // log de depuração por música/rodada
   if (currentQuestion?.song?.id) {
-    // um único log por mudança de música
     // eslint-disable-next-line no-console
     console.log("[GameArena] track decision", {
       round: currentRound,
@@ -121,12 +123,12 @@ function GameArenaContent() {
       preferSpotify,
       reason: preferSpotify ? "spotify data present" : "no spotify fields on this song",
       song: {
-        id: song.id,
-        title: song.title,
-        artist: song.artist,
-        audioUrl: song.audioUrl,
-        spotify_track_id: song.spotify_track_id || song.spotifyTrackId || song.track_id,
-        embed_url: song.embed_url || song.spotify_embed_url,
+        id: (song as any).id,
+        title: (song as any).title,
+        artist: (song as any).artist,
+        audioUrl: (song as any).audioUrl,
+        spotify_track_id: (song as any).spotify_track_id || (song as any).spotifyTrackId || (song as any).track_id,
+        embed_url: (song as any).embed_url || (song as any).spotify_embed_url,
       },
       finalGameMode,
       rawSpotifyTrackId,
@@ -196,183 +198,221 @@ function GameArenaContent() {
             )}
           </div>
 
-          {/* Estado IDLE */}
-          {gameState === "idle" && (
-              <div className="mb-6">
-                <BarnCard variant="golden" className="text-center">
-                  <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
-                  <h3 className="text-2xl font-bold text-white mb-2">
-                    {isHost ? "Pronto para começar?" : (sid ? "A partida já foi iniciada!" : "Aguardando o host...")}
-                  </h3>
-                  <p className="text-white/80 mb-6">
-                    {isHost
-                        ? "Clique para iniciar e sincronizar todos os jogadores."
-                        : (sid ? "Clique para entrar na partida que o host iniciou." : "Quando o host iniciar, você entra automaticamente.")}
-                  </p>
-
-                  <ChickenButton
-                      variant="feather"
-                      size="lg"
-                      className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-                      chickenStyle="bounce"
-                      onClick={startFirstRound}
-                  >
-                    {isHost ? "🎵 Iniciar Jogo" : (sid ? "🎵 Entrar na partida" : "🔊 Liberar áudio")}
-                  </ChickenButton>
-
-                  <p className="text-white/70 text-xs mt-3">
-                    Dica: se o áudio não tocar quando o jogo começar, clique uma vez no player acima para liberar o som.
-                  </p>
-                </BarnCard>
-              </div>
-          )}
-
-          {/* Arena */}
-          {gameState !== "idle" && currentQuestion && (
-              <>
-              <BarnCard variant="golden" className="mb-6">
-                <MusicPlayer
-                    // identificação da música
-                    songTitle={song.title}
-                    artist={song.artist}
-                    duration={song.duration_seconds || 15}
-
-
-                    // modo + fontes
-                    gameMode={finalGameMode}
-                    spotifyTrackId={rawSpotifyTrackId}
-                    spotifyEmbedUrl={spotifyEmbedUrl}
-                    audioUrl={finalGameMode === "mp3" ? song.audioUrl : undefined}
-
-
-                    // controle
-                    autoPlay={gameState === "playing"}
-                    muted={!audioUnlocked}
-                    gameState={gameState}
-                    roundKey={`${currentRound}-${song.id || rawSpotifyTrackId || song.title || "unk"}`}
-                    onTimeUpdate={() => {}}
-                    onEnded={() => {}}
-                />
-              </BarnCard>
-
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
-                {currentQuestion.options.map((option: string, index: number) => (
-                    <BarnCard
-                        key={index}
-                        variant="default"
-                        className={`cursor-pointer transition-all duration-300 ${getAnswerColor(index)}`}
-                        onClick={() => handleAnswerSelect(index)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-lg">
-                            {String.fromCharCode(65 + index)}
-                          </div>
-                          <span className="font-semibold text-lg">{option}</span>
-                        </div>
-                        <div className="flex -space-x-1">
-                          {playersOnOption(index).map((p: any) => (
-                              <div key={p.id} className="relative">
-                                {user && p.id === clientId.current ? (
-                                    avatarUrl ? (
-                                        <img
-                                            src={avatarUrl}
-                                            alt="Seu Avatar"
-                                            className="w-8 h-8 rounded-full object-cover border-2 border-white"
-                                        />
-                                    ) : (
-                                        <img
-                                            src={p.avatar}
-                                            alt="Seu Avatar"
-                                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                                        />
-                                    )
-                                ) : (
-                                    <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />
-                                )}
-                              </div>
-                          ))}
-                        </div>
-                      </div>
-                    </BarnCard>
-                ))}
-              </div>
-
-              <BarnCard variant="coop">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-xl">🏆</span>
-                  <h3 className="text-xl font-bold text-barn-brown">Sua Pontuação - Rodada {currentRound}</h3>
-                </div>
-                <div className="text-center">
-                  {user && currentPlayer.client_id === clientId.current ? (
-                      avatarUrl ? (
-                          <img
-                              src={avatarUrl}
-                              alt="Seu Avatar"
-                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                          />
-                      ) : currentPlayer.avatar?.startsWith("/") ? (
-                      <img
-                          src={currentPlayer.avatar}
-                          alt="Seu Avatar"
-                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                      />
-                  ) : (
-                      <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
-                  )
-                  ) : currentPlayer.avatar?.startsWith("/") ? (
-                  <img
-                      src={currentPlayer.avatar}
-                      alt={currentPlayer.name}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                  />
-                  ) : (
-                  <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
-                  )}
-                  <p className="font-semibold text-lg mb-2">
-                    {user?.user_metadata?.display_name || "Você"}
-                  </p>
-                  <EggCounter count={currentPlayer.eggs} size="lg" variant="golden" />
-                  {selectedAnswer !== null && (
-                      <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                        <p className="text-sm font-medium">
-                          Sua resposta: <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
-                        </p>
-                        {answerTime && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Tempo de resposta: {answerTime.toFixed(1)}s
-                            </p>
-                        )}
-                      </div>
-                  )}
+          {/* GRID PRINCIPAL: ESQUERDA = RANKING (3 col) | DIREITA = JOGO (9 col) */}
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            {/* Ranking – ESQUERDA */}
+            <div className="md:col-span-3">
+              <BarnCard variant="coop" className="text-center">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold text-barn-brown mb-2">🏆 Ranking da Partida</h3>
+                  <div className="flex flex-col gap-2 items-center">
+                    {Array.isArray(players) && players.length > 0 ? (
+                        players
+                            .sort((a, b) => (b.eggs || 0) - (a.eggs || 0))
+                            .map((player, index) => (
+                                <div key={player.id} className="flex items-center gap-4">
+                                  <span className="text-lg font-bold w-6 text-right">{index + 1}º</span>
+                                  {player.avatar?.startsWith("/") ? (
+                                  <img
+                                      src={player.avatar}
+                                      alt={player.name}
+                                      className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                                  />
+                                  ) : (
+                                  <ChickenAvatar emoji={player.avatar || "🐔"} size="sm" className="border-2 border-white" />
+                                  )}
+                                  <span className="text-md font-semibold">{player.name || "Jogador"}</span>
+                                  <EggCounter count={player.eggs || 0} size="sm" variant="golden" />
+                                </div>
+                            ))
+                    ) : (
+                        <p className="text-sm text-muted-foreground">Ranking ainda não disponível...</p>
+                    )}
+                  </div>
                 </div>
               </BarnCard>
+            </div>
 
-              {showResults && (
-                  <div className="mt-6">
+            {/* Conteúdo do jogo – DIREITA */}
+            <div className="md:col-span-9">
+              {/* Estado IDLE */}
+              {gameState === "idle" && (
+                  <div className="mb-6">
                     <BarnCard variant="golden" className="text-center">
-                      <div className="mb-4">
-                        <div className="text-6xl mb-4">
-                          {selectedAnswer === currentQuestion.correctAnswer ? "🎉" : "😅"}
-                        </div>
-                        <h3 className="text-2xl font-bold text-white mb-2">
-                          {selectedAnswer === currentQuestion.correctAnswer
-                              ? `🥚 Parabéns! Você ganhou ${currentSettings.eggs_per_correct || 10} ovos${
-                              timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
-                                  ? ` + ${currentSettings.speed_bonus || 5} bônus velocidade!`
-                                  : "!"
-                              }`
-                              : "💔 Que pena! A resposta correta era: " + currentQuestion.options[currentQuestion.correctAnswer]}
-                        </h3>
-                        <p className="text-white/80 text-lg">
-                          {currentRound < 10 ? "Próxima música em instantes..." : "Fim do jogo! Parabéns!"}
-                        </p>
-                      </div>
+                      <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
+                      <h3 className="text-2xl font-bold text-white mb-2">
+                        {isHost ? "Pronto para começar?" : (sid ? "A partida já foi iniciada!" : "Aguardando o host...")}
+                      </h3>
+                      <p className="text-white/80 mb-6">
+                        {isHost
+                            ? "Clique para iniciar e sincronizar todos os jogadores."
+                            : (sid ? "Clique para entrar na partida que o host iniciou." : "Quando o host iniciar, você entra automaticamente.")}
+                      </p>
+
+                      <ChickenButton
+                          variant="feather"
+                          size="lg"
+                          className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                          chickenStyle="bounce"
+                          onClick={startFirstRound}
+                      >
+                        {isHost ? "🎵 Iniciar Jogo" : (sid ? "🎵 Entrar na partida" : "🔊 Liberar áudio")}
+                      </ChickenButton>
+
+                      <p className="text-white/70 text-xs mt-3">
+                        Dica: se o áudio não tocar quando o jogo começar, clique uma vez no player acima para liberar o som.
+                      </p>
                     </BarnCard>
                   </div>
               )}
-              </>
-          )}
+
+              {/* Arena */}
+              {gameState !== "idle" && currentQuestion && (
+                  <>
+                  <BarnCard variant="golden" className="mb-6">
+                    <MusicPlayer
+                        // identificação da música
+                        songTitle={(song as any).title}
+                        artist={(song as any).artist}
+                        duration={(song as any).duration_seconds || 15}
+                        // modo + fontes
+                        gameMode={finalGameMode}
+                        spotifyTrackId={rawSpotifyTrackId}
+                        spotifyEmbedUrl={spotifyEmbedUrl}
+                        audioUrl={finalGameMode === "mp3" ? (song as any).audioUrl : undefined}
+                        // controle
+                        autoPlay={gameState === "playing"}
+                        muted={!audioUnlocked}
+                        gameState={gameState}
+                        roundKey={`${currentRound}-${(song as any).id || rawSpotifyTrackId || (song as any).title || "unk"}`}
+                        onTimeUpdate={() => {}}
+                        onEnded={() => {}}
+                    />
+                  </BarnCard>
+
+                  <div className="grid md:grid-cols-2 gap-4 mb-6">
+                    {currentQuestion.options.map((option: string, index: number) => (
+                        <BarnCard
+                            key={index}
+                            variant="default"
+                            className={`cursor-pointer transition-all duration-300 ${getAnswerColor(index)}`}
+                            onClick={() => handleAnswerSelect(index)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-lg">
+                                {String.fromCharCode(65 + index)}
+                              </div>
+                              <span className="font-semibold text-lg">{option}</span>
+                            </div>
+                            <div className="flex -space-x-1">
+                              {playersOnOption(index).map((p: any) => (
+                                  <div key={p.id} className="relative">
+                                    {user && p.id === clientId.current ? (
+                                        avatarUrl ? (
+                                            <img
+                                                src={avatarUrl}
+                                                alt="Seu Avatar"
+                                                className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                                            />
+                                        ) : (
+                                            <img
+                                                src={p.avatar}
+                                                alt="Seu Avatar"
+                                                className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                                            />
+                                        )
+                                    ) : (
+                                        <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />
+                                    )}
+                                  </div>
+                              ))}
+                            </div>
+                          </div>
+                        </BarnCard>
+                    ))}
+                  </div>
+
+                  <BarnCard variant="coop">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-xl">🏆</span>
+                      <h3 className="text-xl font-bold text-barn-brown">Sua Pontuação - Rodada {currentRound}</h3>
+                    </div>
+                    <div className="text-center">
+                      {/* avatar do jogador atual */}
+                      {user && (currentPlayer as any).client_id === clientId.current ? (
+                          avatarUrl ? (
+                              <img
+                                  src={avatarUrl}
+                                  alt="Seu Avatar"
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                              />
+                          ) : currentPlayer.avatar?.startsWith("/") ? (
+                          <img
+                              src={currentPlayer.avatar}
+                              alt="Seu Avatar"
+                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                          />
+                      ) : (
+                          <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
+                      )
+                      ) : currentPlayer.avatar?.startsWith("/") ? (
+                      <img
+                          src={currentPlayer.avatar}
+                          alt={currentPlayer.name}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                      />
+                      ) : (
+                      <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
+                      )}
+
+                      <p className="font-semibold text-lg mb-2">
+                        {user?.user_metadata?.display_name || "Você"}
+                      </p>
+                      <EggCounter count={currentPlayer.eggs} size="lg" variant="golden" />
+
+                      {selectedAnswer !== null && (
+                          <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                            <p className="text-sm font-medium">
+                              Sua resposta: <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
+                            </p>
+                            {answerTime && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Tempo de resposta: {answerTime.toFixed(1)}s
+                                </p>
+                            )}
+                          </div>
+                      )}
+                    </div>
+                  </BarnCard>
+
+                  {showResults && (
+                      <div className="mt-6">
+                        <BarnCard variant="golden" className="text-center">
+                          <div className="mb-4">
+                            <div className="text-6xl mb-4">
+                              {selectedAnswer === currentQuestion.correctAnswer ? "🎉" : "😅"}
+                            </div>
+                            <h3 className="text-2xl font-bold text-white mb-2">
+                              {selectedAnswer === currentQuestion.correctAnswer
+                                  ? `🥚 Parabéns! Você ganhou ${currentSettings.eggs_per_correct || 10} ovos${
+                                  timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
+                                      ? ` + ${currentSettings.speed_bonus || 5} bônus velocidade!`
+                                      : "!"
+                                  }`
+                                  : "💔 Que pena! A resposta correta era: " + currentQuestion.options[currentQuestion.correctAnswer]}
+                            </h3>
+                            <p className="text-white/80 text-lg">
+                              {currentRound < 10 ? "Próxima música em instantes..." : "Fim do jogo! Parabéns!"}
+                            </p>
+                          </div>
+                        </BarnCard>
+                      </div>
+                  )}
+                  </>
+              )}
+            </div>
+          </div>
 
           {/* enfeites */}
           <div className="fixed inset-0 pointer-events-none z-0">

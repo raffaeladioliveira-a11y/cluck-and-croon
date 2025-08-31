@@ -353,23 +353,25 @@ export default function RoundLobby() {
                           );
                         }
 
-                        if (isCurrentUser) {
-                          // Usuário atual (logado sem avatarUrl ou não logado) - usar avatar escolhido
-                          return player.avatar && player.avatar.startsWith('/') ? (
+// Para qualquer jogador (atual ou outros) - verifica se é imagem primeiro
+                        if (player.avatar && player.avatar.startsWith('/')) {
+                          return (
                               <img
                                   src={player.avatar}
-                                  alt="Seu Avatar"
+                                  alt={isCurrentUser ? "Seu Avatar" : player.name}
                                   className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                              />
-                          ) : (
-                              <ChickenAvatar
-                                  emoji={player.avatar || profile.current.avatar || "🐔"}
-                                  size="lg"
-                                  animated={player.position <= 3}
                               />
                           );
                         }
 
+// Fallback para emoji
+                        return (
+                            <ChickenAvatar
+                                emoji={player.avatar || (isCurrentUser ? profile.current.avatar : null) || "🐔"}
+                                size="lg"
+                                animated={player.position <= 3}
+                            />
+                        );
                         // Outros jogadores
                         return player.avatar && player.avatar.startsWith('/') ? (
                             <img
