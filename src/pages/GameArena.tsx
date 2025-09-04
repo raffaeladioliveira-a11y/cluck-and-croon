@@ -256,7 +256,7 @@ function GameArenaContent() {
                                                     <img
                                                         src={player.avatar}
                                                         alt={player.name}
-                                                        className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                                                        className="w-16 h-16 rounded-full object-cover border-2 border-white"
                                                     />
                                                     )}
                                                     <span className="text-md font-semibold">{player.name || "Jogador"}</span>
@@ -352,7 +352,7 @@ function GameArenaContent() {
                                                         <img
                                                             src={p.avatar}
                                                             alt={p.name}
-                                                            className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                                                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
                                                             title={p.name}
                                                         />
                                                         )}
