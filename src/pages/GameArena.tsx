@@ -119,9 +119,9 @@ function GameArenaContent() {
 
     // Verifique especificamente o que está sendo renderizado
     const debugPlayer = players?.find((p) => p.id === clientId.current);
-    console.log("7. Avatar do jogador logado:", debugPlayer?.avatar);
-    console.log("8. Tipo do avatar:", typeof debugPlayer?.avatar);
-    console.log("9. Começa com '/'?", debugPlayer?.avatar?.startsWith("/"));
+    // console.log("7. Avatar do jogador logado:", debugPlayer?.avatar);
+    // console.log("8. Tipo do avatar:", typeof debugPlayer?.avatar);
+    // console.log("9. Começa com '/'?", debugPlayer?.avatar?.startsWith("/"));
 
     // ---------- helpers ----------
     // CORREÇÃO: Usar o avatar real do jogador logado
@@ -189,27 +189,27 @@ function GameArenaContent() {
     const finalGameMode: "mp3" | "spotify" = preferSpotify ? "spotify" : (hookGameMode === "spotify" ? "spotify" : "mp3");
 
     // log de depuração por música/rodada
-    if (currentQuestion?.song?.id) {
-        // eslint-disable-next-line no-console
-        console.log("[GameArena] track decision", {
-            round: currentRound,
-            gameState,
-            hookGameMode,
-            preferSpotify,
-            reason: preferSpotify ? "spotify data present" : "no spotify fields on this song",
-            song: {
-                id: (song as any).id,
-                title: (song as any).title,
-                artist: (song as any).artist,
-                audioUrl: (song as any).audioUrl,
-                spotify_track_id: (song as any).spotify_track_id || (song as any).spotifyTrackId || (song as any).track_id,
-                embed_url: (song as any).embed_url || (song as any).spotify_embed_url,
-            },
-            finalGameMode,
-            rawSpotifyTrackId,
-            spotifyEmbedUrl,
-        });
-    }
+    // if (currentQuestion?.song?.id) {
+    //     // eslint-disable-next-line no-console
+    //     console.log("[GameArena] track decision", {
+    //         round: currentRound,
+    //         gameState,
+    //         hookGameMode,
+    //         preferSpotify,
+    //         reason: preferSpotify ? "spotify data present" : "no spotify fields on this song",
+    //         song: {
+    //             id: (song as any).id,
+    //             title: (song as any).title,
+    //             artist: (song as any).artist,
+    //             audioUrl: (song as any).audioUrl,
+    //             spotify_track_id: (song as any).spotify_track_id || (song as any).spotifyTrackId || (song as any).track_id,
+    //             embed_url: (song as any).embed_url || (song as any).spotify_embed_url,
+    //         },
+    //         finalGameMode,
+    //         rawSpotifyTrackId,
+    //         spotifyEmbedUrl,
+    //     });
+    // }
 
     // ---------- LOADING ----------
     if (isLoading) {
@@ -234,7 +234,7 @@ function GameArenaContent() {
                     countdownTime={countdownTime}
                     onComplete={() => {
             // Opcional: tocar som ou vibração quando countdown acaba
-            console.log('Countdown finalizado, música começando!');
+            {/*console.log('Countdown finalizado, música começando!');*/}
           }}
                 />
             )}

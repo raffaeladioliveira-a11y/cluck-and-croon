@@ -50,7 +50,7 @@ async function getGameMode(): Promise<'mp3' | 'spotify'> {
       .maybeSingle();
 
   if (error) {
-    console.warn('[useGameLogic] game_mode fallback mp3 (erro ao ler game_settings)', error);
+    // console.warn('[useGameLogic] game_mode fallback mp3 (erro ao ler game_settings)', error);
     return 'mp3';
   }
 
@@ -190,7 +190,7 @@ async function buildOptionsFromGenre(
     options.push(...shuffled.slice(0, 3));
   } else {
     // Fallback: gera opções baseadas no título (como estava antes)
-    console.warn(`[buildOptionsFromGenre] Poucas músicas do gênero (${otherTracks.length}), usando fallback`);
+    // console.warn(`[buildOptionsFromGenre] Poucas músicas do gênero (${otherTracks.length}), usando fallback`);
     const fallbackOptions = [`${correctTitle} (Remix)`, `${correctTitle} (Live)`, `${correctTitle} (Acoustic)`];
     options.push(...fallbackOptions.slice(0, 3));
   }
@@ -202,21 +202,21 @@ async function buildOptionsFromGenre(
 /** Gera 3 alternativas extras a partir do próprio pool de faixas (fallback antigo).
  * Mantido como backup se buildOptionsFromGenre falhar */
 function buildOptionsFromTitles(correctTitle: string, poolTitles: string[] = []): string[] {
-  console.log('🔧 [buildOptionsFromTitles] Entrada:', { correctTitle, poolTitlesCount: poolTitles.length });
+  // console.log('🔧 [buildOptionsFromTitles] Entrada:', { correctTitle, poolTitlesCount: poolTitles.length });
 
   const options = [correctTitle];
   const availablePool = poolTitles.filter(title => title !== correctTitle);
 
-  console.log('🔧 [buildOptionsFromTitles] Pool disponível:', availablePool.length);
+  // console.log('🔧 [buildOptionsFromTitles] Pool disponível:', availablePool.length);
 
   // Se temos títulos suficientes no pool, usar eles
   if (availablePool.length >= 3) {
     const shuffled = [...availablePool].sort(() => Math.random() - 0.5);
     options.push(...shuffled.slice(0, 3));
-    console.log('🔧 [buildOptionsFromTitles] Usando pool:', options);
+    // console.log('🔧 [buildOptionsFromTitles] Usando pool:', options);
   } else {
     // Se não temos títulos suficientes, criar opções genéricas
-    console.log('🔧 [buildOptionsFromTitles] Pool insuficiente, criando opções genéricas');
+    // console.log('🔧 [buildOptionsFromTitles] Pool insuficiente, criando opções genéricas');
 
     // Adicionar títulos do pool se existirem
     options.push(...availablePool);
@@ -248,7 +248,7 @@ function buildOptionsFromTitles(correctTitle: string, poolTitles: string[] = [])
 
       // Proteção contra loop infinito
       if (counter > 10) {
-        console.error('🔧 [buildOptionsFromTitles] Loop detectado, forçando saída');
+        // console.error('🔧 [buildOptionsFromTitles] Loop detectado, forçando saída');
         break;
       }
     }
@@ -256,7 +256,7 @@ function buildOptionsFromTitles(correctTitle: string, poolTitles: string[] = [])
 
   // Embaralhar as opções finais
   const finalOptions = options.sort(() => Math.random() - 0.5);
-  console.log('🔧 [buildOptionsFromTitles] Opções finais:', finalOptions);
+  // console.log('🔧 [buildOptionsFromTitles] Opções finais:', finalOptions);
 
   return finalOptions;
 }
@@ -391,7 +391,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           .single();
 
       if (roomData?.selected_mp3_album_id) {
-        console.log('🎵 Álbum MP3 específico selecionado');
+        // console.log('🎵 Álbum MP3 específico selecionado');
 
         const { data: songs, error: songsError } = await supabase
             .from('songs')
@@ -424,7 +424,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       });
 
       if (error) {
-        console.error('Erro ao buscar músicas:', error);
+        // console.error('Erro ao buscar músicas:', error);
         throw error;
       }
 
@@ -433,7 +433,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       if (!songs || songs.length === 0) {
         // Se não há mais músicas disponíveis, reset o histórico
         if (usedSongIds.length > 0) {
-          console.log('🔄 Todas as músicas foram usadas, resetando histórico...');
+          // console.log('🔄 Todas as músicas foram usadas, resetando histórico...');
           setUsedSongIds([]);
           toast({
             title: '🔄 Reiniciando Músicas',
@@ -458,34 +458,34 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       }
 
       if (activeGenreId) {
-        console.log(`🎵 ${songs.length} músicas disponíveis (${usedSongIds.length} já usadas) | ${usedFallback ? 'fallback' : 'gênero específico'}`);
+        // console.log(`🎵 ${songs.length} músicas disponíveis (${usedSongIds.length} já usadas) | ${usedFallback ? 'fallback' : 'gênero específico'}`);
       }
 
       return songs;
     } catch (error) {
-      console.error('Erro ao buscar músicas:', error);
+      // console.error('Erro ao buscar músicas:', error);
       throw error;
     }
   };
 
   /** Monta a próxima questão priorizando Spotify quando game_mode = spotify */
   const buildQuestion = async (): Promise<GameQuestion> => {
-    console.log('🎯 [buildQuestion] Iniciando construção da questão...');
-    console.log('🎯 [buildQuestion] Músicas já usadas:', usedSongIds.length);
+    // console.log('🎯 [buildQuestion] Iniciando construção da questão...');
+    // console.log('🎯 [buildQuestion] Músicas já usadas:', usedSongIds.length);
 
     try {
       const mode = await getGameMode();
-      console.log('🎯 [buildQuestion] Modo do jogo:', mode);
+      // console.log('🎯 [buildQuestion] Modo do jogo:', mode);
 
       const room = await getRoomByCode(roomCode);
-      console.log('🎯 [buildQuestion] Dados da sala:', room);
+      // console.log('🎯 [buildQuestion] Dados da sala:', room);
 
       if (mode === 'spotify') {
-        console.log('🎯 [buildQuestion] Tentando Spotify...');
+        // console.log('🎯 [buildQuestion] Tentando Spotify...');
         const track = await pickOneSpotifyTrack(room, usedSongIds); // PASSAR EXCLUSÕES
 
         if (track) {
-          console.log('🎯 [buildQuestion] Track Spotify encontrada:', track);
+          // console.log('🎯 [buildQuestion] Track Spotify encontrada:', track);
 
           // REGISTRAR MÚSICA COMO USADA
           setUsedSongIds(prev => [...prev, track.id]);
@@ -502,7 +502,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             try {
               options = await buildOptionsFromGenre(track.track_name, genreId, track.id, 'spotify');
             } catch (error) {
-              console.warn('[buildQuestion] Erro ao buscar opções do gênero, usando fallback:', error);
+              // console.warn('[buildQuestion] Erro ao buscar opções do gênero, usando fallback:', error);
               options = buildOptionsFromTitles(track.track_name);
             }
           } else {
@@ -524,7 +524,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             correctAnswer: correctIdx >= 0 ? correctIdx : 0,
           };
 
-          console.log('🎯 [buildQuestion] Questão Spotify criada:', q);
+          // console.log('🎯 [buildQuestion] Questão Spotify criada:', q);
           return q;
         }
 
@@ -532,9 +532,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       }
 
       // MP3 Mode ou fallback
-      console.log('🎯 [buildQuestion] Tentando buscar músicas MP3...');
+      // console.log('🎯 [buildQuestion] Tentando buscar músicas MP3...');
       const songs = await fetchSongsWithGenre();
-      console.log('🎯 [buildQuestion] Músicas encontradas:', songs.length);
+      // console.log('🎯 [buildQuestion] Músicas encontradas:', songs.length);
 
       if (songs.length === 0) {
         throw new Error('Nenhuma música encontrada');
@@ -542,7 +542,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
       const shuffled = [...songs].sort(() => Math.random() - 0.5);
       const correct = shuffled[0];
-      console.log('🎯 [buildQuestion] Música selecionada:', correct);
+      // console.log('🎯 [buildQuestion] Música selecionada:', correct);
 
       // REGISTRAR MÚSICA COMO USADA
       setUsedSongIds(prev => [...prev, correct.id]);
@@ -553,15 +553,15 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       let options: string[];
       if (genreId) {
         try {
-          console.log('🎯 [buildQuestion] Construindo opções por gênero:', genreId);
+          // console.log('🎯 [buildQuestion] Construindo opções por gênero:', genreId);
           options = await buildOptionsFromGenre(correct.title, genreId, correct.id, 'mp3');
         } catch (error) {
-          console.warn('[buildQuestion] Erro ao buscar opções do gênero (MP3), usando pool local:', error);
+          // console.warn('[buildQuestion] Erro ao buscar opções do gênero (MP3), usando pool local:', error);
           const titlesPool = shuffled.map(s => s.title);
           options = buildOptionsFromTitles(correct.title, titlesPool);
         }
       } else {
-        console.log('🎯 [buildQuestion] Construindo opções do pool de músicas');
+        // console.log('🎯 [buildQuestion] Construindo opções do pool de músicas');
         const titlesPool = shuffled.map(s => s.title);
         options = buildOptionsFromTitles(correct.title, titlesPool);
       }
@@ -574,11 +574,11 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         correctAnswer: correctIndex >= 0 ? correctIndex : 0,
       };
 
-      console.log('🎯 [buildQuestion] Questão MP3 final criada:', question);
+      // console.log('🎯 [buildQuestion] Questão MP3 final criada:', question);
       return question;
 
     } catch (error) {
-      console.error('🎯 [buildQuestion] ERRO na construção da questão:', error);
+      // console.error('🎯 [buildQuestion] ERRO na construção da questão:', error);
       throw error;
     }
   };
@@ -586,7 +586,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 // 5. ADICIONAR reset do histórico quando o jogo reinicia
   const resetUsedSongs = useCallback(() => {
     setUsedSongIds([]);
-    console.log('🔄 Histórico de músicas resetado');
+    // console.log('🔄 Histórico de músicas resetado');
   }, []);
 
   /* ------------------------------- BROADCAST ------------------------------- */
@@ -651,10 +651,10 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   /* --------------------------------- AÇÕES -------------------------------- */
 
   const startFirstRound = useCallback(async () => {
-    console.log('🎮 [startFirstRound] Iniciando...', { gameState, audioUnlocked });
+    // console.log('🎮 [startFirstRound] Iniciando...', { gameState, audioUnlocked });
 
     if (gameState !== 'idle') {
-      console.log('🎮 [startFirstRound] Jogo não está em idle, retornando');
+      // console.log('🎮 [startFirstRound] Jogo não está em idle, retornando');
       return;
     }
 
@@ -662,22 +662,22 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
     if (sessionId && isHost) {
       try {
-        console.log('🎮 [startFirstRound] Host construindo questão...');
+        // console.log('🎮 [startFirstRound] Host construindo questão...');
         const q = await buildQuestion();
-        console.log('🎮 [startFirstRound] Questão construída com sucesso:', q);
+        // console.log('🎮 [startFirstRound] Questão construída com sucesso:', q);
 
-        console.log('🎮 [startFirstRound] Fazendo broadcast...');
+        // console.log('🎮 [startFirstRound] Fazendo broadcast...');
         await broadcastRoundStart(q, 1);
-        console.log('🎮 [startFirstRound] Broadcast concluído!');
+        // console.log('🎮 [startFirstRound] Broadcast concluído!');
 
       } catch (e) {
-        console.error('🎮 [startFirstRound] ERRO ao iniciar 1ª rodada:', e);
+        // console.error('🎮 [startFirstRound] ERRO ao iniciar 1ª rodada:', e);
         toast({ title: 'Erro', description: 'Não foi possível iniciar a rodada.', variant: 'destructive' });
       }
       return;
     }
 
-    console.log('🎮 [startFirstRound] Modo single player');
+    // console.log('🎮 [startFirstRound] Modo single player');
     setGameState('playing');
     startRoundTimer(currentSettings.time_per_question);
   }, [sessionId, isHost, gameState, startRoundTimer, currentSettings.time_per_question, broadcastRoundStart, toast]);
@@ -737,7 +737,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             }
           }
         } catch (error) {
-          console.error('[stats] Erro ao salvar estatísticas:', error);
+          // console.error('[stats] Erro ao salvar estatísticas:', error);
         }
       })();
     }
@@ -790,7 +790,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         }
       }
     } catch (e) {
-      console.error('[loadPlayersFromRoom] erro ao carregar jogadores:', e);
+      // console.error('[loadPlayersFromRoom] erro ao carregar jogadores:', e);
     }
   }, [roomCode]);
 
@@ -826,7 +826,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           setActiveGenre(genreResponse.activeGenre);
         }
       } catch (error) {
-        console.error('Erro ao carregar gênero ativo:', error);
+        // console.error('Erro ao carregar gênero ativo:', error);
       }
 
       // se houver sessão, conecta no canal e descobre se sou host
@@ -920,7 +920,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             const { roomCode, sessionId } = msg.payload as {
               roomCode: string; sessionId: string;
             };
-            console.log('[realtime] Round complete, redirecting to lobby...');
+            // console.log('[realtime] Round complete, redirecting to lobby...');
             const navigateEvent = new CustomEvent("navigateToRoundLobby", {
               detail: { roomCode, playerEggs, sessionId }
             });
@@ -928,7 +928,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           });
 
           ch.subscribe((status) => {
-            console.log('[realtime] game channel status:', status);
+            // console.log('[realtime] game channel status:', status);
           });
 
           gameChannelRef.current = ch;
@@ -955,7 +955,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
               /* ok */
           }
         } catch (e) {
-          console.error('[realtime] erro ao iniciar canal:', e);
+          // console.error('[realtime] erro ao iniciar canal:', e);
         }
       }
 
@@ -1014,7 +1014,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         });
         }
       } catch (error) {
-        console.error('Erro ao carregar info do álbum:', error);
+
       }
     };
 
@@ -1031,7 +1031,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         const nextRound = currentRound + 1;
         if (nextRound > 10) {
           // Ao final da 10ª pergunta, host dispara evento para todos redirecionarem
-          console.log('[host] Fim das 10 perguntas, enviando broadcast para redirecionar todos');
+          // console.log('[host] Fim das 10 perguntas, enviando broadcast para redirecionar todos');
           await broadcastEndOfRound(roomCode, playerEggs, sessionId);
 
           // Host também precisa ser redirecionado
@@ -1046,7 +1046,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         const q = await buildQuestion();
         await broadcastRoundStart(q, nextRound);
       } catch (err) {
-        console.error('[host] erro ao iniciar próxima rodada:', err);
+        // console.error('[host] erro ao iniciar próxima rodada:', err);
         toast({ title: 'Erro', description: 'Falha ao iniciar a próxima rodada.', variant: 'destructive' });
       }
     })();
