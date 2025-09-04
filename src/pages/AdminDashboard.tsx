@@ -37,12 +37,6 @@ interface Song {
   url?: string;
   created_at?: string;
   updated_at?: string;
-  albums?: {
-    name: string;
-    artist_name: string;
-    release_year: number;
-    cover_image_url: string;
-  };
 }
 
 interface Genre {
@@ -1074,16 +1068,27 @@ export default function AdminDashboard() {
                               onChange={(e) => setFilters(prev => ({...prev, song: e.target.value}))}
                           />
                         </div>
-                        <div>
-                          <Label>Buscar por Ano</Label>
-                          <Input
-                              type="number"
-                              placeholder="Ex: 2024"
-                              value={filters.year}
-                              onChange={(e) => setFilters(prev => ({...prev, year: e.target.value}))}
-                          />
-                        </div>
+                        {/*<div>*/}
+                          {/*<Label>Buscar por Ano</Label>*/}
+                          {/*<Input*/}
+                              {/*type="number"*/}
+                              {/*placeholder="Ex: 2024"*/}
+                              {/*value={filters.year}*/}
+                              {/*onChange={(e) => setFilters(prev => ({...prev, year: e.target.value}))}*/}
+                          {/*/>*/}
+                        {/*</div>*/}
                       </div>
+                      {(filters.artist || filters.song || filters.year) && (
+                          <div className="mt-4">
+                            <ChickenButton
+                                variant="feather"
+                                size="sm"
+                                onClick={() => setFilters({artist: '', song: '', year: ''})}
+                            >
+                              Limpar Filtros
+                            </ChickenButton>
+                          </div>
+                      )}
                     </BarnCard>
 
                     {/* Formulário de Novo Álbum - só mostra quando não há filtros */}
@@ -1132,11 +1137,57 @@ export default function AdminDashboard() {
                                 </Select>
                               </div>
 
+                              <div>
+                                <Label className="text-white/90">Ano de Lançamento</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="2024"
+                                    value={newAlbum.release_year}
+                                    onChange={(e) => setNewAlbum(prev => ({...prev, release_year: e.target.value}))}
+                                    className="bg-white/20 border-white/30 text-white placeholder:text-white/60"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-4">
+                              <div>
+                                <Label className="text-white/90">Descrição</Label>
+                                <Textarea
+                                    placeholder="Descrição do álbum..."
+                                    value={newAlbum.description}
+                                    onChange={(e) => setNewAlbum(prev => ({...prev, description: e.target.value}))}
+                                    className="bg-white/20 border-white/30 text-white placeholder:text-white/60"
+                                    rows={4}
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-white/90">Capa do Álbum</Label>
+                                <Input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                handleCoverUpload(file);
+              }
+            }}
+                                    className="bg-white/20 border-white/30 text-white"
+                                />
+                                {newAlbum.cover_image_url && (
+                                    <img
+                                        src={newAlbum.cover_image_url}
+                                        alt="Capa do Álbum"
+                                        className="mt-3 w-32 h-32 object-cover rounded-lg border-2 border-white/30"
+                                    />
+                                )}
+                              </div>
+
                               <ChickenButton
                                   variant="feather"
                                   onClick={handleAddAlbum}
                                   disabled={isUploadingCover}
-                                  className="w-full"
+                                  className="w-full mt-6"
                               >
                                 {isUploadingCover ? "Carregando..." : "Criar Álbum"}
                               </ChickenButton>
@@ -1145,8 +1196,76 @@ export default function AdminDashboard() {
                         </BarnCard>
                     )}
 
+                    {(filters.artist || filters.song || filters.year) && (
+                        <BarnCard variant="default" className="p-6">
+                          <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                            <Music className="w-5 h-5" />
+                            Resultados da Busca
+                            {isSearching && <span className="text-sm text-muted-foreground">(buscando...)</span>}
+                          </h4>
 
-                    {/* Grid de Álbuns */}
+                          {searchResults.length === 0 && !isSearching && (
+                              <p className="text-muted-foreground text-center py-8">
+                                Nenhuma música encontrada com os filtros aplicados
+                              </p>
+                          )}
+
+                          <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {searchResults.map((song, index) => (
+                                <div key={song.id} className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
+                                  {song.albums?.cover_image_url && (
+                                  <img
+                                      src={song.albums.cover_image_url}
+                                      alt={song.albums.name}
+                                      className="w-16 h-16 object-cover rounded-lg"
+                                  />
+                                  )}
+
+                                  <div className="flex-1">
+                                    <h5 className="font-semibold text-lg">{song.title}</h5>
+                                    <p className="text-muted-foreground">{song.artist}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <Badge variant="outline" className="text-xs">
+                                        Álbum: {song.albums?.name}
+                                      </Badge>
+                                      {song.albums?.release_year && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {song.albums.release_year}
+                                      </Badge>
+                                      )}
+                                      <Badge variant="secondary" className="text-xs">
+                                        {song.duration_seconds}s
+                                      </Badge>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => {
+                setEditingSong(song);
+                setIsEditSongModalOpen(true);
+              }}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => handleDeleteSong(song.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                            ))}
+                          </div>
+                        </BarnCard>
+                    )}
+
+
+                    {/* Grid de Álbuns - só mostra quando NÃO há filtros */}
                     {!filters.artist && !filters.song && !filters.year && (
                     <div className="grid md:grid-cols-5 gap-6">
                       {albums.map(album => (
@@ -1217,17 +1336,16 @@ export default function AdminDashboard() {
                   </div>
               )}
 
-              {/* Contador de Resultados */}
-              {(filters.artist || filters.song || filters.year) && (
-                  <div className="flex items-center justify-between mb-4">
-                    <p className="text-muted-foreground">
-                      {filteredAlbums.length} de {albums.length} álbuns encontrados
-                    </p>
-                    <Badge variant="outline">
-                      {filteredAlbums.length} resultados
-                    </Badge>
-                  </div>
-              )}
+              {/*/!* Contador de Resultados *!/*/}
+              {/*{(filters.artist || filters.song || filters.year) && (*/}
+                  {/*<div className="flex items-center justify-between mb-4">*/}
+                    {/*<p className="text-muted-foregr   Nenhuma música encbums.length} álbuns encontrados*/}
+                    {/*</p>*/}
+                    {/*<Badge variant="outline">*/}
+                      {/*{filteredAlbums.length} resultados*/}
+                    {/*</Badge>*/}
+                  {/*</div>*/}
+              {/*)}*/}
 
               {currentView === 'album-detail' && selectedAlbum && (
                   <div className="space-y-6">
@@ -1683,6 +1801,7 @@ export default function AdminDashboard() {
 
 
           {/* Modal de edição */}
+          {/* Modal de edição */}
           <Dialog open={isEditAlbumModalOpen} onOpenChange={setIsEditAlbumModalOpen}>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
@@ -1694,25 +1813,40 @@ export default function AdminDashboard() {
                     <Input
                         placeholder="Nome do Álbum"
                         value={editingAlbum.name}
-                        onChange={e => setEditingAlbum(prev => prev ? { ...prev, name: e.target.value } : null)}
+                        onChange={e =>
+            setEditingAlbum(prev => prev ? { ...prev, name: e.target.value } : null)
+          }
                     />
                     <Input
                         placeholder="Artista/Intérprete"
                         value={editingAlbum.artist_name}
-                        onChange={e => setEditingAlbum(prev => prev ? { ...prev, artist_name: e.target.value } : null)}
+                        onChange={e =>
+            setEditingAlbum(prev => prev ? { ...prev, artist_name: e.target.value } : null)
+          }
                     />
                     <Input
                         placeholder="Ano de Lançamento"
                         type="number"
-                        value={editingAlbum.release_year || ''}
-                        onChange={e => setEditingAlbum(prev => prev ? { ...prev, release_year: parseInt(e.target.value) || null } : null)}
+                        value={editingAlbum.release_year || ""}
+                        onChange={e =>
+            setEditingAlbum(prev =>
+              prev ? { ...prev, release_year: parseInt(e.target.value) || null } : null
+            )
+          }
                     />
                     <Textarea
                         placeholder="Descrição"
                         value={editingAlbum.description}
-                        onChange={e => setEditingAlbum(prev => prev ? { ...prev, description: e.target.value } : null)}
+                        onChange={e =>
+            setEditingAlbum(prev => prev ? { ...prev, description: e.target.value } : null)
+          }
                     />
-                    <Select value={editingAlbum.genre_id} onValueChange={value => setEditingAlbum(prev => prev ? { ...prev, genre_id: value } : null)}>
+                    <Select
+                        value={editingAlbum.genre_id}
+                        onValueChange={value =>
+            setEditingAlbum(prev => prev ? { ...prev, genre_id: value } : null)
+          }
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Escolher gênero" />
                       </SelectTrigger>
@@ -1725,6 +1859,58 @@ export default function AdminDashboard() {
                       </SelectContent>
                     </Select>
 
+                    {/* Upload de capa */}
+                    <div className="space-y-2">
+                      <Label>Capa do Álbum</Label>
+                      {editingAlbum.cover_image_url && (
+                          <img
+                              src={editingAlbum.cover_image_url}
+                              alt="Capa do Álbum"
+                              className="w-32 h-32 object-cover rounded-lg border"
+                          />
+                      )}
+                      <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              try {
+                const timestamp = Date.now();
+                const slug = editingAlbum.name
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]/gi, "-");
+                const ext = file.name.split(".").pop();
+                const fileName = `${slug}-${timestamp}.${ext}`;
+
+                const { error } = await supabase.storage
+                  .from("album-covers")
+                  .upload(fileName, file, { cacheControl: "3600", upsert: true });
+
+                if (error) throw error;
+
+                const { data: { publicUrl } } = supabase.storage
+                  .from("album-covers")
+                  .getPublicUrl(fileName);
+
+                // Atualiza localmente
+                setEditingAlbum(prev =>
+                  prev ? { ...prev, cover_image_url: publicUrl } : null
+                );
+
+                toast({ title: "✅ Nova capa carregada!" });
+              } catch (err) {
+                console.error("Erro no upload da capa:", err);
+                toast({
+                  title: "❌ Erro",
+                  description: "Falha ao fazer upload da capa",
+                  variant: "destructive",
+                });
+              }
+            }}
+                      />
+                    </div>
+
                     <div className="flex gap-2 pt-4">
                       <ChickenButton
                           variant="corn"
@@ -1733,15 +1919,16 @@ export default function AdminDashboard() {
               if (!editingAlbum) return;
               try {
                 const { error } = await supabase
-                  .from('albums')
+                  .from("albums")
                   .update({
                     name: editingAlbum.name,
                     artist_name: editingAlbum.artist_name,
                     release_year: editingAlbum.release_year,
                     description: editingAlbum.description,
                     genre_id: editingAlbum.genre_id,
+                    cover_image_url: editingAlbum.cover_image_url, // 👈 agora salva também a capa
                   })
-                  .eq('id', editingAlbum.id);
+                  .eq("id", editingAlbum.id);
 
                 if (error) throw error;
 
@@ -1760,7 +1947,10 @@ export default function AdminDashboard() {
                       >
                         ✅ Salvar Alterações
                       </ChickenButton>
-                      <ChickenButton variant="feather" onClick={() => setIsEditAlbumModalOpen(false)}>
+                      <ChickenButton
+                          variant="feather"
+                          onClick={() => setIsEditAlbumModalOpen(false)}
+                      >
                         ❌ Cancelar
                       </ChickenButton>
                     </div>
