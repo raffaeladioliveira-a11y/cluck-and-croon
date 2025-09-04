@@ -67,8 +67,11 @@ export default {
 				'neon-purple': 'hsl(var(--neon-purple))',
 				'neon-green': 'hsl(var(--neon-green))',
 				'neon-blue': 'hsl(var(--neon-blue))',
+				'neon-yellow': 'hsl(var(--neon-yellow))',
 				'surface': 'hsl(var(--surface))',
 				'surface-elevated': 'hsl(var(--surface-elevated))',
+				'glass-light': 'hsl(var(--glass-light))',
+				'glass-border': 'hsl(var(--glass-border))',
 				'danger': 'hsl(var(--danger))',
 				// Galinheiro Musical custom colors
 				'chicken-orange': 'hsl(var(--chicken-orange))',
@@ -78,10 +81,11 @@ export default {
 				'corn-golden': 'hsl(var(--corn-golden))'
 			},
 			backgroundImage: {
-				'gradient-sunrise': 'var(--gradient-sunrise)',
-				'gradient-barn': 'var(--gradient-barn)',
-				'gradient-grass': 'var(--gradient-grass)',
-				'gradient-sky': 'var(--gradient-sky)'
+				'gradient-sunrise': 'linear-gradient(135deg, hsl(var(--neon-orange)), hsl(var(--neon-yellow)))',
+				'gradient-barn': 'linear-gradient(180deg, hsl(var(--neon-purple)), hsl(var(--neon-blue)))',
+				'gradient-grass': 'linear-gradient(180deg, hsl(var(--neon-green)), hsl(var(--accent)))',
+				'gradient-sky': 'linear-gradient(180deg, hsl(var(--neon-blue)), hsl(var(--background)))',
+				'glass': 'linear-gradient(135deg, hsl(var(--glass-light) / 0.1), hsl(var(--glass-light) / 0.05))'
 			},
 			boxShadow: {
 				'soft': 'var(--shadow-soft)',

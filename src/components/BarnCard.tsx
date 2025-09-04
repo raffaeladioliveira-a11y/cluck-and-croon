@@ -18,10 +18,10 @@ export const BarnCard = ({
   onClick
 }: BarnCardProps) => {
   const variants = {
-    default: "bg-card border-border shadow-soft",
-    coop: "bg-surface-elevated border-neon-purple/30 shadow-barn",
-    nest: "bg-gradient-to-br from-neon-orange/10 to-neon-purple/5 border-neon-orange/30 shadow-soft",
-    golden: "bg-gradient-to-br from-neon-orange to-neon-purple border-neon-orange shadow-barn text-foreground"
+    default: "bg-glass backdrop-blur-md border-glass-border/30 shadow-soft",
+    coop: "bg-glass backdrop-blur-md border-neon-purple/30 shadow-barn",
+    nest: "bg-glass backdrop-blur-md border-neon-orange/40 shadow-soft",
+    golden: "bg-gradient-to-br from-neon-orange/20 to-neon-yellow/20 backdrop-blur-md border-neon-orange/50 shadow-barn text-foreground"
   };
 
   return (
