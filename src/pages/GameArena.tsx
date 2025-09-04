@@ -12,12 +12,47 @@ import GameArenaGuard from "./GameArenaGuard";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { getOrCreateClientId } from "@/utils/clientId";
 
+
 /** Util: extrai o trackId a partir de uma URL de embed do Spotify */
 function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
     if (!url) return undefined;
     const m = url.match(/spotify\.com\/(?:embed\/)?track\/([A-Za-z0-9]+)/i);
     return m?.[1];
 }
+
+// ========== INSERIR O COUNTDOWN OVERLAY AQUI ==========
+const CountdownOverlay = ({ countdownTime, onComplete }: {
+    countdownTime: number;
+    onComplete?: () => void;
+}) => {
+    useEffect(() => {
+        if (countdownTime <= 0 && onComplete) {
+            onComplete();
+        }
+    }, [countdownTime, onComplete]);
+
+    if (countdownTime <= 0) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <BarnCard variant="golden" className="text-center p-12">
+                <div className="text-8xl mb-6 animate-pulse font-bold text-white">
+                    {countdownTime}
+                </div>
+                <h2 className="text-3xl font-bold text-white mb-4">
+                    Prepare-se!
+                </h2>
+                <p className="text-white/80 text-lg mb-6">
+                    A música começará em instantes...
+                </p>
+                <div className="flex justify-center">
+                    <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+                </div>
+            </BarnCard>
+        </div>
+    );
+};
+// ========== FIM DO COUNTDOWN OVERLAY ==========
 
 function GameArenaContent() {
 
@@ -68,18 +103,19 @@ function GameArenaContent() {
         answersByOption,
         isHost,
         activeGenre,
+        countdownTime, // NOVA IMPORTAÇÃO
         // se seu hook expõe gameMode, ele é usado como pista inicial:
         gameMode: hookGameMode, // pode vir undefined em versões antigas
     } = useGameLogic(roomCode || "", sid);
 
-    // ADICIONE ESTES LOGS PARA DEBUG:
-    console.log("=== DEBUG COMPLETO ===");
-    console.log("1. clientId.current:", clientId.current);
-    console.log("2. players array completo:", players);
-    console.log("3. jogador encontrado:", players?.find((p) => p.id === clientId.current));
-    console.log("4. user do supabase:", user);
-    console.log("5. user.user_metadata:", user?.user_metadata);
-    console.log("6. answersByOption:", answersByOption);
+    // // ADICIONE ESTES LOGS PARA DEBUG:
+    // console.log("=== DEBUG COMPLETO ===");
+    // console.log("1. clientId.current:", clientId.current);
+    // console.log("2. players array completo:", players);
+    // console.log("3. jogador encontrado:", players?.find((p) => p.id === clientId.current));
+    // console.log("4. user do supabase:", user);
+    // console.log("5. user.user_metadata:", user?.user_metadata);
+    // console.log("6. answersByOption:", answersByOption);
 
     // Verifique especificamente o que está sendo renderizado
     const debugPlayer = players?.find((p) => p.id === clientId.current);
@@ -192,6 +228,18 @@ function GameArenaContent() {
     return (
         <div className="min-h-screen bg-gradient-sky p-4">
             <GameNavigation showLeaveRoom={true} />
+            {/* ADICIONAR O OVERLAY DE COUNTDOWN */}
+            {gameState === 'countdown' && (
+                <CountdownOverlay
+                    countdownTime={countdownTime}
+                    onComplete={() => {
+            // Opcional: tocar som ou vibração quando countdown acaba
+            console.log('Countdown finalizado, música começando!');
+          }}
+                />
+            )}
+
+
 
             <div className="max-w-6xl mx-auto">
                 {/* Header com rodada/tempo/valor + gênero ativo */}
@@ -205,15 +253,34 @@ function GameArenaContent() {
                             </div>
                         </div>
                     </BarnCard>
+
+                    {/* CARD DINÂMICO - muda baseado no estado */}
                     <BarnCard variant="golden" className="text-center">
                         <div className="flex items-center justify-center gap-2">
-                            <span className="text-3xl animate-chicken-walk">🐓</span>
+            <span className={`text-3xl ${gameState === 'countdown' ? 'animate-pulse' : 'animate-chicken-walk'}`}>
+                {gameState === 'countdown' ? '⏰' : '🐓'}
+            </span>
                             <div>
-                                <p className="text-sm text-white/80">Tempo</p>
-                                <p className="text-2xl font-bold text-white">{timeLeft}s</p>
+                                <p className="text-sm text-white/80">
+                                    {gameState === 'countdown' ? 'Preparando...' : 'Tempo'}
+                                </p>
+                                <p className="text-2xl font-bold text-white">
+                                    {gameState === 'countdown' ? `${countdownTime}s` : `${timeLeft}s`}
+                                </p>
                             </div>
                         </div>
                     </BarnCard>
+
+
+                    {/*<BarnCard variant="golden" className="text-center">*/}
+                        {/*<div className="flex items-center justify-center gap-2">*/}
+                            {/*<span className="text-3xl animate-chicken-walk">🐓</span>*/}
+                            {/*<div>*/}
+                                {/*<p className="text-sm text-white/80">Tempo</p>*/}
+                                {/*<p className="text-2xl font-bold text-white">{timeLeft}s</p>*/}
+                            {/*</div>*/}
+                        {/*</div>*/}
+                    {/*</BarnCard>*/}
                     <BarnCard variant="coop" className="text-center">
                         <div className="flex items-center justify-center gap-2">
                             <span className="text-2xl animate-egg-bounce">🥚</span>
@@ -305,7 +372,7 @@ function GameArenaContent() {
                         )}
 
                         {/* Arena */}
-                        {gameState !== "idle" && currentQuestion && (
+                        {gameState !== "idle" && gameState !== "countdown" && currentQuestion && (
                             <>
                             <BarnCard variant="golden" className="mb-6">
                                 <MusicPlayer

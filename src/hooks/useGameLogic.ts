@@ -28,7 +28,9 @@ export interface PlayerFace {
   avatar: string;
 }
 
-export type GameState = 'idle' | 'playing' | 'reveal' | 'transition' | 'finished';
+// Adicionar novo estado no hook
+export type GameState = 'idle' | 'countdown' | 'playing' | 'reveal' | 'transition' | 'finished';
+
 type AnswersByOption = Record<number, PlayerFace[]>;
 
 function getAudioUrl(song: Song): string {
@@ -288,6 +290,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   const [isHost, setIsHost] = useState(false);
   const [usedSongIds, setUsedSongIds] = useState<string[]>([]);
 
+  // Adicionar estado para o countdown
+  const [countdownTime, setCountdownTime] = useState(5); // 3 segundos de countdown
+
   const [currentSettings, setCurrentSettings] = useState({
     eggs_per_correct: 10,
     speed_bonus: 5,
@@ -311,24 +316,66 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     if (timeoutRef.current)  { clearTimeout(timeoutRef.current);   timeoutRef.current  = null; }
   }, []);
 
-  const startRoundTimer = useCallback((duration: number) => {
+  // Modificar a função startRoundTimer para incluir countdown
+  const startRoundTimer = useCallback((duration: number, withCountdown: boolean = true) => {
     clearTimers();
-    setTimeLeft(duration);
-    intervalRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearTimers();
-          setGameState('reveal');
-          if (isHost) {
-            timeoutRef.current = setTimeout(() => {
-              setGameState('transition'); // host dispara próxima
-            }, 3000);
+
+    if (withCountdown) {
+      const countdownTime = currentSettings.countdown_duration || 5;
+      // Fase 1: Countdown
+      setGameState('countdown');
+      setCountdownTime(countdownTime);
+
+      intervalRef.current = setInterval(() => {
+        setCountdownTime(prev => {
+          if (prev <= 1) {
+            clearTimers();
+            // Fase 2: Inicia o jogo após countdown
+            setGameState('playing');
+            setTimeLeft(duration);
+
+            // Timer do jogo propriamente dito
+            intervalRef.current = setInterval(() => {
+              setTimeLeft(prev => {
+                if (prev <= 1) {
+                  clearTimers();
+                  setGameState('reveal');
+                  if (isHost) {
+                    timeoutRef.current = setTimeout(() => {
+                      setGameState('transition');
+                    }, 3000);
+                  }
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+
+            return 0;
           }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      // Sem countdown, direto para o jogo
+      setGameState('playing');
+      setTimeLeft(duration);
+      intervalRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearTimers();
+            setGameState('reveal');
+            if (isHost) {
+              timeoutRef.current = setTimeout(() => {
+                setGameState('transition');
+              }, 3000);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
   }, [clearTimers, isHost]);
 
   /* ---------------------- BUSCA DE PERGUNTA (SPOTIFY/MP3) ---------------------- */
@@ -544,6 +591,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
   /* ------------------------------- BROADCAST ------------------------------- */
 
+  // Modificar broadcastRoundStart para incluir countdown
   const broadcastRoundStart = useCallback(async (q: GameQuestion, round: number) => {
     if (!sessionId || !gameChannelRef.current) return;
 
@@ -552,6 +600,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       round,
       settings: currentSettings,
       startedAt: Date.now(),
+      countdownDuration: currentSettings.countdown_duration || 5, // 5 segundos de countdown
     };
 
     await gameChannelRef.current.send({
@@ -565,8 +614,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     setCurrentRound(round);
     setSelectedAnswer(null);
     setAnswersByOption({});
-    setGameState('playing');
-    startRoundTimer(currentSettings.time_per_question);
+    startRoundTimer(currentSettings.time_per_question, true); // true = com countdown
   }, [currentSettings, sessionId, startRoundTimer]);
 
   const broadcastEndOfRound = useCallback(async (roomCode: string, playerEggs: number, sessionId: string) => {
@@ -789,21 +837,64 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           });
 
           ch.on('broadcast', { event: 'ROUND_START' }, (msg) => {
-            const { question, round, settings, startedAt } = msg.payload as {
-              question: GameQuestion; round: number; settings: typeof currentSettings; startedAt: number;
+            const { question, round, settings, startedAt, countdownDuration = 3 } = msg.payload as {
+              question: GameQuestion;
+              round: number;
+              settings: typeof currentSettings;
+              startedAt: number;
+              countdownDuration?: number;
             };
+
+            // Usar a configuração vinda do broadcast ou fallback para a configuração local
+            const actualCountdownDuration = countdownDuration || settings.countdown_duration || 5;
 
             setCurrentQuestion(question);
             setCurrentRound(round);
             setCurrentSettings(settings);
             setSelectedAnswer(null);
             setAnswersByOption({});
-            setGameState('playing');
 
             const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-            const duration = settings.time_per_question;
-            const remaining = Math.max(1, duration - elapsed);
-            startRoundTimer(remaining);
+
+            if (elapsed < countdownDuration) {
+              // Ainda está no countdown
+              const countdownRemaining = countdownDuration - elapsed;
+              setGameState('countdown');
+              setCountdownTime(countdownRemaining);
+
+              intervalRef.current = setInterval(() => {
+                setCountdownTime(prev => {
+                  if (prev <= 1) {
+                    clearTimers();
+                    setGameState('playing');
+                    setTimeLeft(settings.time_per_question);
+
+                    intervalRef.current = setInterval(() => {
+                      setTimeLeft(prev => {
+                        if (prev <= 1) {
+                          clearTimers();
+                          setGameState('reveal');
+                          return 0;
+                        }
+                        return prev - 1;
+                      });
+                    }, 1000);
+
+                    return 0;
+                  }
+                  return prev - 1;
+                });
+              }, 1000);
+            } else if (elapsed < countdownDuration + settings.time_per_question) {
+              // Já passou do countdown, mas ainda está jogando
+              const remaining = Math.max(1, countdownDuration + settings.time_per_question - elapsed);
+              setGameState('playing');
+              setTimeLeft(remaining);
+              startRoundTimer(remaining, false); // false = sem countdown
+            } else {
+              // Já acabou
+              setGameState('reveal');
+            }
           });
 
           ch.on('broadcast', { event: 'ANSWER' }, (msg) => {
@@ -988,6 +1079,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     //Não utilizar músicas repetidas na rodada
     resetUsedSongs, // NOVA FUNÇÃO PARA RESETAR
     usedSongsCount: usedSongIds.length,
+    countdownTime,
 
     // sync
     isHost,
