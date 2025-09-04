@@ -34,5 +34,5 @@ export function getDisplayNameOrDefault(profile: Profile): string {
 }
 
 export function getAvatarOrDefault(profile: Profile): string {
-  return profile.avatar || '🐔';
+  return profile.avatar || null;
 }

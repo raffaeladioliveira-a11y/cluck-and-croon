@@ -205,7 +205,6 @@ export function RoomLobby() {
       console.log('🔍 Avatar debug:', data.map(p => ({
         name: p.display_name,
         avatar: p.avatar,
-        avatar_emoji: p.avatar_emoji
       })));
 
 

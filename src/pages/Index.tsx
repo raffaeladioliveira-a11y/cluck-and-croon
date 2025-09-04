@@ -386,8 +386,9 @@ const Index = () => {
               <h1 className="text-6xl md:text-8xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">
                 🐔 Galinheiro Musical 🎵
               </h1>
-              <p className="text-xl md:text-2xl text-muted-foreground font-medium mb-2">
-                Onde o carro da rua passa no seu ovo e as galinha choram!
+
+              <p className="text-xl md:text-4xl text-muted-foreground font-medium mb-2">
+                Onde o carro da rua passa no seu ovo e as galinhas choram!
               </p>
               <p className="text-lg text-muted-foreground">
                 Teste seus conhecimentos musicais em um quiz multiplayer cheio de diversão

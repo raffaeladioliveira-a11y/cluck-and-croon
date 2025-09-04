@@ -79,7 +79,7 @@ export default function GameLobby() {
         if (!profile.displayName && !profile.avatar) {
             const def: Profile = {
                 displayName: getDisplayNameOrDefault(profile),
-                avatar: getAvatarOrDefault(profile),
+                avatar: profile.avatar
             };
             saveProfile(def);
             return def;
@@ -132,7 +132,7 @@ export default function GameLobby() {
         try {
             setIsLoading(true);
             const avatarFromLogin = user?.user_metadata?.avatar_url;
-            const finalAvatar = avatarFromLogin || userProfile.avatar || "🐔";
+            const finalAvatar = avatarFromLogin || userProfile.avatar;
 
             const { data: participantId, error: joinError } = await supabase.rpc("join_room", {
                 p_room_code: roomCode.trim(),
@@ -220,7 +220,7 @@ export default function GameLobby() {
         const mappedPlayers = (data || []).map((p: any) => ({
             id: p.id,
             name: p.display_name || p.display_name_user || "Guest",
-            avatar: p.avatar_emoji || p.avatar_user || p.avatar || "🐔",
+            avatar: p.avatar || p.avatar_user || null,
             isHost: Boolean(p.is_host),
             eggs: p.current_eggs || 0,
             client_id: p.client_id,

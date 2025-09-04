@@ -551,6 +551,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
   const broadcastAnswer = useCallback(async (answerIndex: number) => {
     if (!sessionId || !gameChannelRef.current) return;
+    const loggedPlayer = players?.find((p) => p.id === clientId.current);
+
     await gameChannelRef.current.send({
       type: 'broadcast',
       event: 'ANSWER',
@@ -558,10 +560,10 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         answerIndex,
         participantId: clientId.current,
         name: profile.current.displayName || 'Jogador',
-        avatar: profile.current.avatar || '🐔',
+        avatar: loggedPlayer?.avatar,
       },
     });
-  }, [sessionId]);
+  }, [sessionId, players]);
 
   /* --------------------------------- AÇÕES -------------------------------- */
 
@@ -662,7 +664,14 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       const next = { ...prev };
       const list = next[idx] ? [...next[idx]] : [];
       if (!list.find(p => p.id === clientId.current)) {
-        list.push({ id: clientId.current, name: profile.current.displayName || 'Jogador', avatar: profile.current.avatar || '🐔' });
+        const loggedPlayer = players?.find((p) => p.id === clientId.current);
+        if (loggedPlayer?.avatar?.startsWith("/")) {  // Só adiciona se tiver avatar válido
+          list.push({
+            id: clientId.current,
+            name: loggedPlayer.name,
+            avatar: loggedPlayer.avatar
+          });
+        }
       }
       next[idx] = list;
       return next;
@@ -690,7 +699,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           const playerList = participants.map(p => ({
             id: p.client_id,
             name: p.display_name || 'Jogador',
-            avatar: p.avatar || '🐔',
+            avatar: p.avatar,
             eggs: p.current_eggs || 0
           }));
 
@@ -766,11 +775,15 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             const { answerIndex, participantId, name, avatar } = msg.payload as {
               answerIndex: number; participantId: string; name: string; avatar: string;
             };
+
             setAnswersByOption(prev => {
               const next = { ...prev };
               const list = next[answerIndex] ? [...next[answerIndex]] : [];
               if (!list.find(p => p.id === participantId)) {
-                list.push({ id: participantId, name, avatar });
+                // CORREÇÃO: Só adiciona se o avatar for URL válida
+                if (avatar?.startsWith("/")) {
+                  list.push({ id: participantId, name, avatar });
+                }
               }
               next[answerIndex] = list;
               return next;

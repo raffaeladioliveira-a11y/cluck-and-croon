@@ -73,7 +73,7 @@ export default function RoundLobby() {
     const rankingData = participants.map((p) => ({
       id: p.client_id || p.id,
       name: p.display_name || 'Jogador Anônimo',
-      avatar: p.avatar_emoji || p.avatar || '🐔',
+      avatar: p.avatar,
       // avatar_url: p.avatar_url || null,
       eggs: p.current_eggs || 0, // Dados reais dos ovos acumulados
       correct_answers: p.correct_answers || 0, // Dados reais de acertos
@@ -410,34 +410,30 @@ export default function RoundLobby() {
                       </div>
                       {(() => {
                         const isCurrentUser  = player.id === clientId.current;
-                        if (user && isCurrentUser  && avatarUrl) {
-                          return (
-                              <img
-                                  src={avatarUrl}
-                                  alt="Seu Avatar"
-                                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                              />
-                          );
-                        }
-                        if (player.avatar && isImageUrl(player.avatar)) {
-                          return (
-                              <img
-                                  src={player.avatar}
-                                  alt={isCurrentUser  ? "Seu Avatar" : player.name}
-                                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                              />
-                          );
-                        }
-                        // Fallback para emoji
-                        return (
-                            <ChickenAvatar
-                                emoji={player.avatar || (isCurrentUser  ? profile.current.avatar : null) || "🐔"}
-                                size="lg"
-                                animated={player.position <= 3}
-                            />
-                        );
-                      })()}
+                          if (user && isCurrentUser && avatarUrl) {
+                              return (
+                                  <img
+                                      src={avatarUrl}
+                                      alt="Seu Avatar"
+                                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                                  />
+                              );
+                          }
 
+                          // Avatar do player (URL)
+                          if (player.avatar && isImageUrl(player.avatar)) {
+                              return (
+                                  <img
+                                      src={player.avatar}
+                                      alt={player.name}
+                                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
+                                  />
+                              );
+                          }
+
+                          // SEM fallback - não mostra nada se não tiver avatar válido
+                          return null;
+                      })()}
                       <div>
                         <h3 className="text-xl font-bold">{player.name}</h3>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
