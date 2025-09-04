@@ -37,6 +37,12 @@ interface Song {
   url?: string;
   created_at?: string;
   updated_at?: string;
+  albums?: {
+    name: string;
+    artist_name: string;
+    release_year: number;
+    cover_image_url: string;
+  };
 }
 
 interface Genre {
@@ -66,6 +72,7 @@ export default function AdminDashboard() {
   const [albums, setAlbums] = useState<Album[]>([]);
   const [newAlbum, setNewAlbum] = useState({
     name: '',
+    artist_name: '',
     release_year: '',
     description: '',
     cover_file: null as File | null,
@@ -95,36 +102,68 @@ export default function AdminDashboard() {
   const [searchResults, setSearchResults] = useState<Song[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
+
+
   // Estado para músicas filtradas
   const [filteredSongs, setFilteredSongs] = useState<Song[]>([]);
   const [allSongs, setAllSongs] = useState<Song[]>([]);
 
-  const filterSongs = useCallback(() => {
-    let filtered = [...allSongs];
+  const searchSongs = useCallback(async () => {
+    // Se não há filtros, limpa os resultados
+    if (!filters.artist && !filters.song && !filters.year) {
+      setSearchResults([]);
+      return;
+    }
 
-    // Filtro por artista (da música)
-    if (filters.artist) {
-      filtered = filtered.filter(song =>
-          song.artist && song.artist.toLowerCase().includes(filters.artist.toLowerCase())
+    setIsSearching(true);
+    try {
+      let query = supabase
+          .from('songs')
+          .select(`
+        *,
+        albums (
+          name,
+          artist_name,
+          release_year,
+          cover_image_url
+        )
+      `);
+
+      // Filtro por artista da música
+      if (filters.artist) {
+        query = query.ilike('artist', `%${filters.artist}%`);
+      }
+
+      // Filtro por nome da música
+      if (filters.song) {
+        query = query.ilike('title', `%${filters.song}%`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      let filtered = data || [];
+
+      // Filtro por ano (do álbum) - feito após a query
+      if (filters.year) {
+        filtered = filtered.filter(song =>
+            song.albums?.release_year?.toString().includes(filters.year)
       );
-    }
+      }
 
-    // Filtro por música
-    if (filters.song) {
-      filtered = filtered.filter(song =>
-          song.title && song.title.toLowerCase().includes(filters.song.toLowerCase())
-      );
+      setSearchResults(filtered);
+    } catch (error) {
+      console.error('Erro ao buscar músicas:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao buscar músicas",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSearching(false);
     }
-
-    // Filtro por ano (do álbum)
-    if (filters.year) {
-      filtered = filtered.filter(song =>
-          song.albums?.release_year?.toString().includes(filters.year)
-    );
-    }
-
-    setFilteredSongs(filtered);
-  }, [allSongs, filters]);
+  }, [filters]);
 
   const loadAllSongs = async () => {
     try {
@@ -199,6 +238,14 @@ export default function AdminDashboard() {
   useEffect(() => {
     filterAlbums();
   }, [albums, filters]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      searchSongs();
+    }, 500); // Debounce de 500ms
+
+    return () => clearTimeout(timeoutId);
+  }, [searchSongs]);
 
 // Estado para álbuns filtrados
   const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
@@ -1009,7 +1056,7 @@ export default function AdminDashboard() {
 
                     {/* Formulário de Novo Álbum */}
                     <BarnCard variant="nest" className="p-4">
-                      <h4 className="text-lg font-semibold text-primary mb-4">Filtrar Álbuns</h4>
+                      <h4 className="text-lg font-semibold text-primary mb-4">Filtrar Músicas</h4>
                       <div className="grid md:grid-cols-3 gap-4">
                         <div>
                           <Label>Buscar por Artista</Label>
@@ -1037,25 +1084,70 @@ export default function AdminDashboard() {
                           />
                         </div>
                       </div>
-                      {(filters.artist || filters.song || filters.year) && (
-                          <div className="mt-4">
-                            <ChickenButton
-                                variant="feather"
-                                size="sm"
-                                onClick={() => setFilters({artist: '', song: '', year: ''})}
-                            >
-                              Limpar Filtros
-                            </ChickenButton>
-                          </div>
-                      )}
                     </BarnCard>
 
-                    {filteredAlbums.length === 0 && albums.length > 0 && (
-                        <div className="text-center py-8">
-                          <p className="text-muted-foreground">Nenhum álbum encontrado com os filtros aplicados</p>
-                        </div>
+                    {/* Formulário de Novo Álbum - só mostra quando não há filtros */}
+                    {!filters.artist && !filters.song && !filters.year && (
+                        <BarnCard variant="golden" className="p-6">
+                          <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                            <Plus className="w-6 h-6" />
+                            Adicionar Novo Álbum
+                          </h3>
+
+                          <div className="grid md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                              <div>
+                                <Label className="text-white/90">Nome do Álbum</Label>
+                                <Input
+                                    placeholder="Ex: Clássicos Sertanejos"
+                                    value={newAlbum.name}
+                                    onChange={(e) => setNewAlbum(prev => ({...prev, name: e.target.value}))}
+                                    className="bg-white/20 border-white/30 text-white placeholder:text-white/60"
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-white/90">Artista/Intérprete</Label>
+                                <Input
+                                    placeholder="Ex: Chitãozinho & Xororó"
+                                    value={newAlbum.artist_name}
+                                    onChange={(e) => setNewAlbum(prev => ({...prev, artist_name: e.target.value}))}
+                                    className="bg-white/20 border-white/30 text-white placeholder:text-white/60"
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="text-white/90">Gênero Musical</Label>
+                                <Select value={newAlbum.genre_id} onValueChange={(value) => setNewAlbum(prev => ({...prev, genre_id: value}))}>
+                                  <SelectTrigger className="bg-white/20 border-white/30 text-white">
+                                    <SelectValue placeholder="Escolher gênero" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {genres.map(genre => (
+                                        <SelectItem key={genre.id} value={genre.id}>
+                                          {genre.emoji} {genre.name}
+                                        </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <ChickenButton
+                                  variant="feather"
+                                  onClick={handleAddAlbum}
+                                  disabled={isUploadingCover}
+                                  className="w-full"
+                              >
+                                {isUploadingCover ? "Carregando..." : "Criar Álbum"}
+                              </ChickenButton>
+                            </div>
+                          </div>
+                        </BarnCard>
                     )}
+
+
                     {/* Grid de Álbuns */}
+                    {!filters.artist && !filters.song && !filters.year && (
                     <div className="grid md:grid-cols-5 gap-6">
                       {albums.map(album => (
                           <Card
@@ -1120,7 +1212,7 @@ export default function AdminDashboard() {
                     </div>
 
 
-
+                    )}
 
                   </div>
               )}
