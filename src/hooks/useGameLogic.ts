@@ -104,8 +104,8 @@ async function getOtherMP3TracksFromGenre(genreId: string, excludeSongId: string
  * 2) Qualquer álbum do gênero (selected_genre_id ou next_genre_id)
  * Retorna track + nome do artista via join em spotify_albums
  */
-async function pickOneSpotifyTrack(room: any): Promise<{
-  id: string; // uuid (id da track)
+async function pickOneSpotifyTrack(room: any, excludeIds: string[] = []): Promise<{
+  id: string;
   track_name: string;
   duration_ms: number;
   embed_url?: string;
@@ -120,7 +120,8 @@ async function pickOneSpotifyTrack(room: any): Promise<{
         .select(
             'id, spotify_track_id, track_name, duration_ms, embed_url, spotify_album_id, spotify_albums!inner(artist_name, genre_id)'
         )
-        .eq('spotify_album_id', room.selected_spotify_album_id);
+        .eq('spotify_album_id', room.selected_spotify_album_id)
+        .not('id', 'in', `(${excludeIds.length > 0 ? excludeIds.join(',') : 'null'})`); // FILTRAR USADAS
 
     if (!error && tracks && tracks.length > 0) {
       const rnd = Math.floor(Math.random() * tracks.length);
@@ -145,7 +146,8 @@ async function pickOneSpotifyTrack(room: any): Promise<{
         .select(
             'id, spotify_track_id, track_name, duration_ms, embed_url, spotify_album_id, spotify_albums!inner(id, genre_id, artist_name)'
         )
-        .eq('spotify_albums.genre_id', genreId);
+        .eq('spotify_albums.genre_id', genreId)
+        .not('id', 'in', `(${excludeIds.length > 0 ? excludeIds.join(',') : 'null'})`); // FILTRAR USADAS
 
     if (!error && tracks && tracks.length > 0) {
       const rnd = Math.floor(Math.random() * tracks.length);
@@ -284,6 +286,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   const [answerTime, setAnswerTime] = useState<number | null>(null);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [usedSongIds, setUsedSongIds] = useState<string[]>([]);
 
   const [currentSettings, setCurrentSettings] = useState({
     eggs_per_correct: 10,
@@ -346,7 +349,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         const { data: songs, error: songsError } = await supabase
             .from('songs')
             .select('*')
-            .eq('album_id', roomData.selected_mp3_album_id);
+            .eq('album_id', roomData.selected_mp3_album_id)
+            .not('id', 'in', `(${usedSongIds.length > 0 ? usedSongIds.join(',') : 'null'})`); // FILTRAR USADAS
 
         if (!songsError && songs && songs.length > 0) {
           return songs.map(song => ({
@@ -362,12 +366,13 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         }
       }
 
-      // Se não há álbum selecionado, usar o comportamento atual
+      // Se não há álbum selecionado, usar o comportamento atual com filtro
       const { data: response, error } = await supabase.functions.invoke('game-manager', {
         body: {
           action: 'getSongsForGenre',
           roomCode,
-          roundNumber: currentRound
+          roundNumber: currentRound,
+          excludeSongIds: usedSongIds // PASSAR IDS USADAS PARA O EDGE FUNCTION
         }
       });
 
@@ -379,18 +384,34 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       const { songs, activeGenreId, usedFallback, totalAvailable } = response;
 
       if (!songs || songs.length === 0) {
+        // Se não há mais músicas disponíveis, reset o histórico
+        if (usedSongIds.length > 0) {
+          console.log('🔄 Todas as músicas foram usadas, resetando histórico...');
+          setUsedSongIds([]);
+          toast({
+            title: '🔄 Reiniciando Músicas',
+            description: 'Todas as músicas foram tocadas. Reiniciando o catálogo.',
+            variant: 'default'
+          });
+
+          // Refazer a busca sem exclusões
+          const { data: retryResponse } = await supabase.functions.invoke('game-manager', {
+            body: {
+              action: 'getSongsForGenre',
+              roomCode,
+              roundNumber: currentRound,
+              excludeSongIds: [] // SEM EXCLUSÕES
+            }
+          });
+
+          return retryResponse?.songs || [];
+        }
+
         throw new Error('Nenhuma música encontrada na base de dados');
       }
 
       if (activeGenreId) {
-        console.log(`🎵 Usando ${usedFallback ? 'fallback' : 'gênero específico'} | ${totalAvailable} músicas disponíveis`);
-        if (usedFallback) {
-          toast({
-            title: '⚠️ Fallback Ativado',
-            description: 'Poucas músicas do gênero selecionado. Usando catálogo completo.',
-            variant: 'default'
-          });
-        }
+        console.log(`🎵 ${songs.length} músicas disponíveis (${usedSongIds.length} já usadas) | ${usedFallback ? 'fallback' : 'gênero específico'}`);
       }
 
       return songs;
@@ -403,6 +424,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   /** Monta a próxima questão priorizando Spotify quando game_mode = spotify */
   const buildQuestion = async (): Promise<GameQuestion> => {
     console.log('🎯 [buildQuestion] Iniciando construção da questão...');
+    console.log('🎯 [buildQuestion] Músicas já usadas:', usedSongIds.length);
 
     try {
       const mode = await getGameMode();
@@ -413,10 +435,14 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
       if (mode === 'spotify') {
         console.log('🎯 [buildQuestion] Tentando Spotify...');
-        const track = await pickOneSpotifyTrack(room);
+        const track = await pickOneSpotifyTrack(room, usedSongIds); // PASSAR EXCLUSÕES
 
         if (track) {
           console.log('🎯 [buildQuestion] Track Spotify encontrada:', track);
+
+          // REGISTRAR MÚSICA COMO USADA
+          setUsedSongIds(prev => [...prev, track.id]);
+
           const durationSec = Math.max(
               5,
               Math.round((track.duration_ms || currentSettings.song_duration * 1000) / 1000)
@@ -471,6 +497,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       const correct = shuffled[0];
       console.log('🎯 [buildQuestion] Música selecionada:', correct);
 
+      // REGISTRAR MÚSICA COMO USADA
+      setUsedSongIds(prev => [...prev, correct.id]);
+
       // Para MP3, tenta usar o gênero da sala ou busca no pool de músicas retornadas
       const genreId = room?.selected_genre_id || room?.next_genre_id;
 
@@ -506,6 +535,12 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       throw error;
     }
   };
+
+// 5. ADICIONAR reset do histórico quando o jogo reinicia
+  const resetUsedSongs = useCallback(() => {
+    setUsedSongIds([]);
+    console.log('🔄 Histórico de músicas resetado');
+  }, []);
 
   /* ------------------------------- BROADCAST ------------------------------- */
 
@@ -949,6 +984,10 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     playerEggs,
     answerTime,
     currentSettings,
+
+    //Não utilizar músicas repetidas na rodada
+    resetUsedSongs, // NOVA FUNÇÃO PARA RESETAR
+    usedSongsCount: usedSongIds.length,
 
     // sync
     isHost,

@@ -13,6 +13,7 @@ import { UserMenu } from "@/components/UserMenu";
 import { toast } from "@/hooks/use-toast";
 import { loadProfile, saveProfile, Profile, getDisplayNameOrDefault, getAvatarOrDefault } from "@/utils/clientId";
 import heroImage from "@/assets/galinheiro-hero.jpg";
+import heroImagelogo from "@/assets/smokechicken.png";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -382,9 +383,16 @@ const Index = () => {
 
           <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
             {/* Main Title */}
+            <div className="mb-2 text-center">
+              <img
+                  src={heroImagelogo}
+                  alt="Galinheiro Musical"
+                  className="mx-auto w-48 md:w-84"
+              />
+            </div>
             <div className="mb-8 animate-barn-door-open">
               <h1 className="text-6xl md:text-8xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">
-                🐔 Galinheiro Musical 🎵
+                🎵Galinheiro Musical 🎵
               </h1>
 
               <p className="text-xl md:text-4xl text-muted-foreground font-medium mb-2">
