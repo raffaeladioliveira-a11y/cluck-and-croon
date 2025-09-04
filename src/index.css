@@ -8,45 +8,54 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Galinheiro Musical Theme - Chicken Farm Colors */
-    --background: 45 30% 96%;
-    --foreground: 25 30% 15%;
+    /* Dark Mode Galinheiro Musical - Modern Gaming Theme */
+    --background: 240 15% 8%;
+    --foreground: 45 15% 92%;
 
-    --card: 40 40% 98%;
-    --card-foreground: 25 30% 15%;
+    --card: 240 12% 12%;
+    --card-foreground: 45 15% 92%;
 
-    --popover: 40 40% 98%;
-    --popover-foreground: 25 30% 15%;
+    --popover: 240 12% 12%;
+    --popover-foreground: 45 15% 92%;
 
-    /* Golden Yellow - Corn/Egg theme */
-    --primary: 45 93% 58%;
-    --primary-foreground: 25 30% 15%;
+    /* Vibrant Orange - Primary Action */
+    --primary: 25 95% 65%;
+    --primary-foreground: 240 15% 8%;
 
-    /* Barn Red */
-    --secondary: 14 85% 55%;
-    --secondary-foreground: 0 0% 100%;
+    /* Electric Purple - Secondary */
+    --secondary: 270 85% 60%;
+    --secondary-foreground: 240 15% 8%;
 
-    /* Soft Straw */
-    --muted: 45 25% 90%;
-    --muted-foreground: 25 15% 45%;
+    /* Dark Surface */
+    --muted: 240 10% 16%;
+    --muted-foreground: 45 8% 60%;
 
-    /* Fresh Green - Grass */
-    --accent: 90 60% 45%;
-    --accent-foreground: 0 0% 100%;
+    /* Neon Green - Accent */
+    --accent: 120 85% 55%;
+    --accent-foreground: 240 15% 8%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 240 15% 8%;
 
-    --border: 45 20% 85%;
-    --input: 45 20% 92%;
-    --ring: 45 93% 58%;
+    --border: 240 8% 24%;
+    --input: 240 10% 16%;
+    --ring: 25 95% 65%;
 
-    /* Chicken Farm specific colors */
-    --chicken-orange: 25 85% 60%;
-    --egg-shell: 45 15% 95%;
-    --barn-brown: 25 40% 35%;
-    --feather-white: 45 10% 98%;
-    --corn-golden: 50 100% 65%;
+    /* Modern Gaming Colors */
+    --neon-orange: 25 95% 65%;
+    --neon-purple: 270 85% 60%;
+    --neon-green: 120 85% 55%;
+    --neon-blue: 200 85% 60%;
+    --surface: 240 12% 12%;
+    --surface-elevated: 240 12% 16%;
+    --danger: 0 85% 60%;
+    
+    /* Chicken Farm specific colors - updated for dark mode */
+    --chicken-orange: 25 95% 65%;
+    --egg-shell: 45 30% 20%;
+    --barn-brown: 25 60% 40%;
+    --feather-white: 45 15% 85%;
+    --corn-golden: 50 100% 70%;
 
     /* Gradients */
     --gradient-sunrise: linear-gradient(135deg, hsl(45 93% 70%), hsl(25 85% 60%));

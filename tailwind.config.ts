@@ -62,6 +62,14 @@ export default {
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
 				},
+				// Modern Gaming Colors
+				'neon-orange': 'hsl(var(--neon-orange))',
+				'neon-purple': 'hsl(var(--neon-purple))',
+				'neon-green': 'hsl(var(--neon-green))',
+				'neon-blue': 'hsl(var(--neon-blue))',
+				'surface': 'hsl(var(--surface))',
+				'surface-elevated': 'hsl(var(--surface-elevated))',
+				'danger': 'hsl(var(--danger))',
 				// Galinheiro Musical custom colors
 				'chicken-orange': 'hsl(var(--chicken-orange))',
 				'egg-shell': 'hsl(var(--egg-shell))',

@@ -19,9 +19,9 @@ export const BarnCard = ({
 }: BarnCardProps) => {
   const variants = {
     default: "bg-card border-border shadow-soft",
-    coop: "bg-gradient-to-br from-barn-brown/10 to-barn-brown/5 border-barn-brown/20 shadow-barn",
-    nest: "bg-gradient-to-br from-primary/10 to-corn-golden/5 border-primary/20 shadow-soft",
-    golden: "bg-gradient-sunrise border-corn-golden shadow-barn text-white"
+    coop: "bg-surface-elevated border-neon-purple/30 shadow-barn",
+    nest: "bg-gradient-to-br from-neon-orange/10 to-neon-purple/5 border-neon-orange/30 shadow-soft",
+    golden: "bg-gradient-to-br from-neon-orange to-neon-purple border-neon-orange shadow-barn text-foreground"
   };
 
   return (
