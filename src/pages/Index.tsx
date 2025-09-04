@@ -553,30 +553,7 @@ const Index = () => {
             </div>
 
             {/* Auth Access - Só para não logados (LÓGICA ORIGINAL) */}
-            {!user && (
-                <div className="mt-8 text-center space-y-2">
-                  <div>
-                    <ChickenButton
-                        variant="feather"
-                        size="md"
-                        onClick={() => navigate('/auth')}
-                        className="opacity-90 hover:opacity-100"
-                    >
-                      🐔 Entrar/Cadastrar
-                    </ChickenButton>
-                  </div>
-                  <div>
-                    <ChickenButton
-                        variant="barn"
-                        size="sm"
-                        onClick={() => navigate('/admin')}
-                        className="opacity-75 hover:opacity-100"
-                    >
-                      🚜 Acesso Administrativo
-                    </ChickenButton>
-                  </div>
-                </div>
-            )}
+
           </div>
         </section>
       </div>

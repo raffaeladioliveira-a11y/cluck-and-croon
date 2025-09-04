@@ -46,7 +46,6 @@ const App = () => (
               <Route path="/game/lobby" element={<GameLobby />} />
               <Route path="/round-lobby/:roomCode" element={<RoundLobby />} />
               <Route path="/game/:roomCode" element={<GameArena />} />
-              <Route path="/admin" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -82,6 +82,7 @@ export default function AdminDashboard() {
     const [editingAlbum, setEditingAlbum] = useState<Album | null>(null);
     const [isEditAlbumModalOpen, setIsEditAlbumModalOpen] = useState(false);
     const [isUploadingCover, setIsUploadingCover] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
 
     // Estados para configurações
     const [gameSettings, setGameSettings] = useState({
@@ -156,7 +157,6 @@ export default function AdminDashboard() {
 
             setSearchResults(filtered);
         } catch (error) {
-            console.error('Erro ao buscar músicas:', error);
             toast({
                 title: "Erro",
                 description: "Erro ao buscar músicas",
@@ -230,7 +230,6 @@ export default function AdminDashboard() {
                     filtered = filtered.filter(album => albumIdsWithSong.includes(album.id));
                 }
             } catch (error) {
-                console.error('Erro ao filtrar por música:', error);
             }
         }
 
@@ -317,7 +316,6 @@ export default function AdminDashboard() {
                 totalSongs: count || 0
             }));
         } catch (error) {
-            console.error('Erro ao contar músicas:', error);
         }
     };
     // Load data from Supabase
@@ -327,6 +325,7 @@ export default function AdminDashboard() {
         loadGameSettings();
         loadAlbums();
         loadTotalSongsCount();
+        loadAllUsers();
     }, []);
 
 
@@ -346,11 +345,6 @@ export default function AdminDashboard() {
                 .order('created_at', {ascending: false});
 
             if (error) throw error;
-            // Adicione este log para debug
-            console.log('Dados dos álbuns:', data);
-            console.log('Primeiro álbum:', data ?.[0]
-        )
-            ;
 
             setAlbums(data || []);
         } catch (error) {
@@ -411,7 +405,6 @@ export default function AdminDashboard() {
             setNewAlbum(prev => ({...prev, cover_image_url: publicUrl}));
             toast({title: "✅ Capa carregada!"});
         } catch (error) {
-            console.error('Erro no upload da capa:', error);
             toast({
                 title: "❌ Erro",
                 description: "Falha ao fazer upload da capa",
@@ -469,9 +462,72 @@ export default function AdminDashboard() {
         }
     };
 
+    const [allUsers, setAllUsers] = useState([]);
+
     const openEditAlbumModal = (album: Album) => {
         setEditingAlbum(album);
         setIsEditAlbumModalOpen(true);
+    };
+
+    // Adicione estas funções
+    const loadAllUsers = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setAllUsers(data || []);
+        } catch (error) {
+            toast({
+                title: "Erro",
+                description: "Não foi possível carregar usuários",
+                variant: "destructive",
+            });
+        }
+    };
+
+    const toggleAdminPermission = async (userId: string, currentIsAdmin: boolean) => {
+
+
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .update({ is_admin: !currentIsAdmin })
+                .eq('user_id', userId)
+                .select(); // Importante: adicionar .select() para ver o resultado
+
+
+
+            if (error) {
+
+                throw error;
+            }
+
+            // Verificar se realmente atualizou
+            const { data: checkData, error: checkError } = await supabase
+                .from('profiles')
+                .select('user_id, is_admin')
+                .eq('user_id', userId)
+                .single();
+
+
+
+            toast({
+                title: "Permissões atualizadas",
+                description: `Usuário ${!currentIsAdmin ? 'promovido a' : 'removido de'} administrador`,
+            });
+
+            await loadAllUsers();
+        } catch (error) {
+
+            toast({
+                title: "Erro",
+                description: `Erro ao atualizar permissões: ${error.message}`,
+                variant: "destructive",
+            });
+        }
     };
 
     const handleUpdateAlbum = async() => {
@@ -538,21 +594,21 @@ export default function AdminDashboard() {
 
     const loadGenres = async() => {
         try {
-            console.log('🎼 AdminDashboard: Carregando gêneros...');
+
             const {data, error} = await supabase
                 .from('genres')
                 .select('*')
                 .order('name');
 
             if (error) {
-                console.error('❌ Erro ao carregar gêneros:', error);
+
                 throw error;
             }
 
-            console.log('✅ Gêneros carregados:', data);
+
             setGenres(data || []);
         } catch (error) {
-            console.error('❌ Erro ao carregar gêneros:', error);
+
             toast({
                 title: "❌ Erro",
                 description: "Não foi possível carregar os gêneros",
@@ -563,7 +619,7 @@ export default function AdminDashboard() {
 
     const loadSongs = async() => {
         try {
-            console.log('🎵 AdminDashboard: Carregando músicas...');
+
             const {data, error} = await supabase
                 .from('songs')
                 .select(`
@@ -577,11 +633,11 @@ export default function AdminDashboard() {
                 .order('created_at', {ascending: false});
 
             if (error) {
-                console.error('❌ Erro ao carregar músicas:', error);
+
                 throw error;
             }
 
-            console.log('✅ Músicas carregadas:', data);
+
 
             // Transformar dados para o formato esperado
             const songsFormatted = (data || []).map(song => ({
@@ -597,7 +653,7 @@ export default function AdminDashboard() {
 
             setSongs(songsFormatted);
         } catch (error) {
-            console.error('❌ Erro ao carregar músicas:', error);
+
             toast({
                 title: "❌ Erro",
                 description: "Não foi possível carregar as músicas",
@@ -608,22 +664,57 @@ export default function AdminDashboard() {
         }
     };
 
-    // Check authentication on mount
+    // Substitua o useEffect de autenticação por:
     useEffect(() => {
-        const authData = localStorage.getItem('adminAuth');
-        if (!authData) {
-            navigate('/admin');
-            return;
-        }
+        const checkAdminAccess = async () => {
+            try {
+                // Verificar se há usuário logado no Supabase Auth
+                const { data: { user }, error } = await supabase.auth.getUser();
 
-        const auth = JSON.parse(authData);
-        if (!auth.isAuthenticated || Date.now() - auth.loginTime > 24 * 60 * 60 * 1000) {
-            localStorage.removeItem('adminAuth');
-            navigate('/admin');
-            return;
-        }
+                if (error || !user) {
+                    navigate('/login'); // ou sua rota de login
+                    return;
+                }
 
-        setIsAuthenticated(true);
+                // Verificar se o usuário tem permissão de admin
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (profileError || !profile) {
+                    toast({
+                        title: "Erro",
+                        description: "Perfil não encontrado",
+                        variant: "destructive",
+                    });
+                    navigate('/');
+                    return;
+                }
+
+                if (!profile.is_admin) {
+                    toast({
+                        title: "Acesso Negado",
+                        description: "Você não tem permissões de administrador",
+                        variant: "destructive",
+                    });
+                    navigate('/');
+                    return;
+                }
+
+                // Se chegou até aqui, é admin
+                setCurrentUser(profile);
+                setIsAuthenticated(true);
+
+            } catch (error) {
+                navigate('/');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        checkAdminAccess();
     }, [navigate]);
 
     // Carregar configurações do banco
@@ -644,13 +735,12 @@ export default function AdminDashboard() {
 
             setGameSettings(prev => ({...prev, ...settings}));
         } catch (error) {
-            console.error('❌ Erro ao carregar configurações:', error);
+
         }
     };
 
     // Função para salvar configurações
     const saveGameSettings = async() => {
-        console.log('💾 AdminDashboard: Salvando configurações:', gameSettings);
         try {
             // Salvar cada configuração no banco
             const promises = Object.entries(gameSettings).map(([key, value]) =>
@@ -667,7 +757,6 @@ export default function AdminDashboard() {
             });
 
         } catch (error) {
-            console.error('❌ AdminDashboard: Erro ao salvar configurações:', error);
             toast({
                 title: "❌ Erro",
                 description: "Erro ao salvar configurações",
@@ -683,11 +772,13 @@ export default function AdminDashboard() {
         }));
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem('adminAuth');
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setCurrentUser(null);
+        setIsAuthenticated(false);
         toast({
-            title: "👋 Até logo, Fazendeiro!",
-            description: "Você foi desconectado da Central do Galinheiro",
+            title: "Até logo!",
+            description: "Você foi desconectado do painel administrativo",
         });
         navigate('/');
     };
@@ -724,7 +815,6 @@ export default function AdminDashboard() {
 
             return publicUrl;
         } catch (error) {
-            console.error('Erro no upload:', error);
             toast({
                 title: "Erro no Upload",
                 description: "Não foi possível fazer upload do arquivo de áudio",
@@ -749,7 +839,6 @@ export default function AdminDashboard() {
                 description: "Reproduzindo 3 segundos do arquivo",
             });
         }).catch(error => {
-            console.error('❌ Erro ao testar áudio:', error);
             toast({
                 title: "❌ Erro",
                 description: "Não foi possível reproduzir o áudio",
@@ -833,7 +922,6 @@ export default function AdminDashboard() {
         if (!editingSong) return;
 
         try {
-            console.log('✏️ AdminDashboard: Atualizando música...', editingSong);
 
             const {error} = await supabase
                 .from('songs')
@@ -853,11 +941,9 @@ export default function AdminDashboard() {
                 .eq('id', editingSong.id);
 
             if (error) {
-                console.error('❌ Erro ao atualizar música:', error);
                 throw error;
             }
 
-            console.log('✅ Música atualizada com sucesso');
 
             // Recarregar lista de músicas
             await loadSongs();
@@ -871,7 +957,6 @@ export default function AdminDashboard() {
                 description: `${editingSong.title} foi atualizada com sucesso`,
             });
         } catch (error) {
-            console.error('❌ Erro ao atualizar música:', error);
             toast({
                 title: "❌ Erro",
                 description: "Não foi possível atualizar a música",
@@ -915,7 +1000,6 @@ export default function AdminDashboard() {
         }
 
         try {
-            console.log('🎼 AdminDashboard: Salvando gênero...', newGenre);
 
             const {data, error} = await supabase
                 .from('genres')
@@ -924,11 +1008,8 @@ export default function AdminDashboard() {
                 .single();
 
             if (error) {
-                console.error('❌ Erro ao salvar gênero:', error);
                 throw error;
             }
-
-            console.log('✅ Gênero salvo com sucesso:', data);
 
             // Recarregar lista de gêneros
             await loadGenres();
@@ -941,7 +1022,6 @@ export default function AdminDashboard() {
                 description: `${newGenre.name} foi adicionado ao banco de dados`,
             });
         } catch (error) {
-            console.error('❌ Erro ao adicionar gênero:', error);
             toast({
                 title: "❌ Erro",
                 description: "Não foi possível salvar o gênero no banco de dados",
@@ -1075,8 +1155,8 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Main Content Tabs */}
-                <Tabs defaultValue="albums" className="space-y-6">
-                    <TabsList className="grid w-full grid-cols-3">
+                <Tabs defaultValue="albums" className="space-y-10">
+                    <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="albums" className="flex items-center gap-2">
                             <FolderOpen className="w-4 h-4"/>
                             Álbuns & Músicas
@@ -1088,7 +1168,51 @@ export default function AdminDashboard() {
                             <Settings className="w-4 h-4"/>
                             Configurações
                         </TabsTrigger>
+                        <TabsTrigger value="users" className="flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Usuários & Permissões
+                        </TabsTrigger>
                     </TabsList>
+
+                <TabsContent value="users">
+                    <BarnCard variant="default">
+                        <h3 className="text-xl font-bold mb-4">Gerenciar Administradores</h3>
+
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {allUsers.map((user) => (
+                                <div key={user.user_id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-1xl"> <img
+                                            src={user.avatar_url}
+                                            alt="Capa do Álbum"
+                                            className="mt-3 w-14 h-14 object-cover rounded-lg border-2 border-white/30"
+                                        /></span>
+                                        <div>
+                                            <h4 className="font-semibold">{user.display_name}</h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                {user.total_eggs} ovos | {user.games_played} jogos
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                        {user.is_admin && (
+                                            <Badge variant="secondary">Admin</Badge>
+                                        )}
+                                        <Button
+                                            variant={user.is_admin ? "destructive" : "default"}
+                                            size="sm"
+                                            onClick={() => toggleAdminPermission(user.user_id, user.is_admin)}
+                                            disabled={user.user_id === currentUser?.user_id} // Não pode remover próprias permissões
+            >
+                                            {user.is_admin ? 'Remover Admin' : 'Tornar Admin'}
+                                        </Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </BarnCard>
+                </TabsContent>
 
                     {/* Albums Management */}
                     <TabsContent value="albums">
@@ -1971,7 +2095,6 @@ export default function AdminDashboard() {
 
                 toast({ title: "✅ Nova capa carregada!" });
               } catch (err) {
-                console.error("Erro no upload da capa:", err);
                 toast({
                   title: "❌ Erro",
                   description: "Falha ao fazer upload da capa",
