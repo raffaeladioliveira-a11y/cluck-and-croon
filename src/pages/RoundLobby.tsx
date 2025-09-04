@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getOrCreateClientId, loadProfile } from "@/utils/clientId";
 import { Loader2, Crown, Trophy, Music } from "lucide-react";
 import { useAuthSession } from "@/hooks/useAuthSession";
+import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector"; // Novo import
 // import { getDisplayNameOrDefault, getAvatarOrDefault, loadProfile } from "@/utils/clientId";
 
 interface PlayerRanking {
@@ -30,6 +31,9 @@ interface Genre {
 }
 
 export default function RoundLobby() {
+  const isImageUrl = (url: string): boolean => {
+    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
+  };
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -52,6 +56,14 @@ export default function RoundLobby() {
   const email = user?.email ?? "";
   const meta = (user?.user_metadata ?? {}) as Record<string, any>;
   const avatarUrl = (meta.avatar_url as string) || "";
+
+  const [albumSelected, setAlbumSelected] = useState(false);
+  const [showAlbumSelector, setShowAlbumSelector] = useState(false);
+  const [selectedAlbumInfo, setSelectedAlbumInfo] = useState<{
+    name: string;
+    artist: string;
+    genre: string;
+  } | null>(null);
 
 
   const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -82,7 +94,7 @@ export default function RoundLobby() {
     if (participants) {
       console.log('Dados dos participantes:', participants);
       participants.forEach(p => {
-        console.log(`Jogador ${p.display_name}: avatar = "${p.avatar_emoji}", client_id = "${p.client_id}"`);
+        console.log(`Jogador ${p.display_name}: avatar = "${p.avatar}", client_id = "${p.client_id}"`);
       });
     }
 
@@ -151,6 +163,52 @@ export default function RoundLobby() {
     loadInitialData();
   }, [roomCode, calculateRanking, toast]);
 
+
+  // Listener para evento de álbum selecionado
+  useEffect(() => {
+    const handleAlbumSelected = async (event: any) => {
+      const { albumId, genreId } = event.detail;
+
+      try {
+        // Buscar informações do álbum selecionado
+        const { data: album } = await supabase
+            .from('albums')
+            .select(`
+          name,
+          artist_name,
+          genres (name)
+        `)
+            .eq('id', albumId)
+            .single();
+
+        if (album) {
+          const albumInfo = {
+                name: album.name,
+                artist: album.artist_name,
+                genre: album.genres?.name || ''
+        };
+
+          setSelectedAlbumInfo(albumInfo);
+          setAlbumSelected(true);
+
+          // Broadcast para outros jogadores
+          if (gameChannelRef.current) {
+            await gameChannelRef.current.send({
+              type: 'broadcast',
+              event: 'ALBUM_SELECTED',
+              payload: { albumInfo }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao processar seleção de álbum:', error);
+      }
+    };
+
+    window.addEventListener('albumSelected', handleAlbumSelected);
+    return () => window.removeEventListener('albumSelected', handleAlbumSelected);
+  }, []);
+
   // Configurar canal realtime
   useEffect(() => {
     if (!sessionId) return;
@@ -165,6 +223,17 @@ export default function RoundLobby() {
       toast({
         title: '🎵 Estilo Musical Selecionado',
         description: `Próxima rodada será de: ${genreName}`
+      });
+    });
+
+    // NOVO: Listener para álbum selecionado
+    channel.on('broadcast', { event: 'ALBUM_SELECTED' }, (msg) => {
+      const { albumInfo } = msg.payload;
+      setSelectedAlbumInfo(albumInfo);
+      setAlbumSelected(true);
+      toast({
+        title: '🎵 Álbum Selecionado',
+        description: `Próxima rodada: ${albumInfo.name} - ${albumInfo.artist}`
       });
     });
 
@@ -340,10 +409,8 @@ export default function RoundLobby() {
                         {getPositionIcon(player.position)}
                       </div>
                       {(() => {
-                        const isCurrentUser = player.id === clientId.current;
-
-                        if (user && isCurrentUser && avatarUrl) {
-                          // Usuário logado com avatar do perfil
+                        const isCurrentUser  = player.id === clientId.current;
+                        if (user && isCurrentUser  && avatarUrl) {
                           return (
                               <img
                                   src={avatarUrl}
@@ -352,36 +419,19 @@ export default function RoundLobby() {
                               />
                           );
                         }
-
-// Para qualquer jogador (atual ou outros) - verifica se é imagem primeiro
-                        if (player.avatar && player.avatar.startsWith('/')) {
+                        if (player.avatar && isImageUrl(player.avatar)) {
                           return (
                               <img
                                   src={player.avatar}
-                                  alt={isCurrentUser ? "Seu Avatar" : player.name}
+                                  alt={isCurrentUser  ? "Seu Avatar" : player.name}
                                   className="w-12 h-12 rounded-full object-cover border-2 border-white"
                               />
                           );
                         }
-
-// Fallback para emoji
+                        // Fallback para emoji
                         return (
                             <ChickenAvatar
-                                emoji={player.avatar || (isCurrentUser ? profile.current.avatar : null) || "🐔"}
-                                size="lg"
-                                animated={player.position <= 3}
-                            />
-                        );
-                        // Outros jogadores
-                        return player.avatar && player.avatar.startsWith('/') ? (
-                            <img
-                                src={player.avatar}
-                                alt="Avatar do jogador"
-                                className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                            />
-                        ) : (
-                            <ChickenAvatar
-                                emoji={player.avatar || "🐔"}
+                                emoji={player.avatar || (isCurrentUser  ? profile.current.avatar : null) || "🐔"}
                                 size="lg"
                                 animated={player.position <= 3}
                             />
@@ -409,37 +459,37 @@ export default function RoundLobby() {
           </div>
 
           {/* Seleção de Estilo Musical - apenas para o 1º colocado */}
-          {topPlayer && topPlayer.id === clientId.current && (
+          {topPlayer && topPlayer.id === clientId.current && !albumSelected && (
               <div className="mb-6">
                 <BarnCard variant="golden" className="p-6">
                   <div className="text-center mb-4">
                     <div className="text-4xl mb-2">👑</div>
                     <h2 className="text-2xl font-bold text-white mb-2">
-                      Você está no topo! Escolha o estilo da próxima rodada
+                      Você está no topo! Escolha o álbum da próxima rodada
                     </h2>
                     <p className="text-white/80">
-                      Como campeão desta rodada, você tem o privilégio de escolher o estilo musical
+                      Como campeão desta rodada, você tem o privilégio de escolher o álbum musical
                     </p>
                   </div>
 
-                  <div className="grid md:grid-cols-3 gap-3">
-                    {genres.map((genre) => (
-                        <ChickenButton
-                            key={genre.id}
-                            variant={selectedGenre === genre.id ? "feather" : "egg"}
-                            size="lg"
-                            onClick={() => handleGenreSelect(genre.id, genre.name)}
-                            className="flex items-center gap-2 p-4"
-                        >
-                          <span className="text-2xl">{genre.emoji}</span>
-                          <div className="text-left">
-                            <div className="font-bold text-sm">{genre.name}</div>
-                            {genre.description && (
-                                <div className="text-xs opacity-80">{genre.description}</div>
-                            )}
-                          </div>
-                        </ChickenButton>
-                    ))}
+                  <HostMp3AlbumSelector roomCode={roomCode!} />
+                </BarnCard>
+              </div>
+          )}
+
+          {/* Álbum selecionado - mostrar para todos */}
+          {albumSelected && selectedAlbumInfo && (
+              <div className="mb-6">
+                <BarnCard variant="golden" className="p-6 text-center">
+                  <div className="text-4xl mb-4">🎵</div>
+                  <h3 className="text-xl font-bold text-white mb-2">Álbum Selecionado</h3>
+                  <p className="text-white/80 mb-4">
+                    {topPlayer?.id === clientId.current ? 'Você escolheu:' : `${topPlayer?.name} escolheu:`}
+                  </p>
+                  <div className="bg-white/20 rounded-lg p-4">
+                    <h4 className="text-lg font-bold text-white">{selectedAlbumInfo.name}</h4>
+                    <p className="text-white/80">{selectedAlbumInfo.artist}</p>
+                    <p className="text-white/70 text-sm">{selectedAlbumInfo.genre}</p>
                   </div>
                 </BarnCard>
               </div>
@@ -482,7 +532,7 @@ export default function RoundLobby() {
                       variant="feather"
                       size="lg"
                       onClick={handleStartNewRound}
-                      disabled={isStartingNewRound || !selectedGenre}
+                      disabled={isStartingNewRound || !albumSelected}
                       className="bg-primary hover:bg-primary/90"
                   >
                     {isStartingNewRound ? (
@@ -497,9 +547,9 @@ export default function RoundLobby() {
                     )}
                   </ChickenButton>
 
-                  {!selectedGenre && (
+                  {!albumSelected && (
                       <p className="text-sm text-destructive/80 mt-2">
-                        ⚠️ Aguardando o campeão escolher o estilo musical
+                        ⚠️ Aguardando o campeão escolher o álbum
                       </p>
                   )}
                 </BarnCard>

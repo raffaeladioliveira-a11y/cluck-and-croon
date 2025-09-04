@@ -47,7 +47,6 @@ export const MusicPlayer = ({
   const audioRef = useRef<HTMLAudioElement>(null);
   const stopTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // -------- LÓGICA PARA MP3 (mantida) --------
   const teardownAudio = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -75,7 +74,7 @@ export const MusicPlayer = ({
     audio.volume = isMuted ? 0 : volume;
 
     try {
-      await audio.load();
+      audio.load();
       if (shouldAutoPlay) {
         await audio.play();
         setIsPlaying(true);
@@ -145,9 +144,8 @@ export const MusicPlayer = ({
 
   const progress = (currentTime / duration) * 100;
 
-  // -------- RENDER --------
   return (
-      <div className={cn("bg-white/20 rounded-lg p-6 border border-white/30", className)} key={roundKey}>
+      <div className={cn("bg-white/10 rounded-2xl p-6 shadow-lg", className)} key={roundKey}>
         {/* MP3: usa <audio> */}
         {gameMode === "mp3" && (
             <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
@@ -156,7 +154,7 @@ export const MusicPlayer = ({
         {/* SPOTIFY: usa embed */}
         {gameMode === "spotify" && spotifyTrackId && gameState === "playing" && (
             <iframe
-                src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator&theme=0&autoplay=1`}
+                src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator&theme=0`}
                 width="100%"
                 height="80"
                 frameBorder="0"
@@ -166,20 +164,26 @@ export const MusicPlayer = ({
             ></iframe>
         )}
 
+        {/* Estado inicial */}
         {gameState === "idle" && (
             <div className="text-center">
-              <div className="text-6xl mb-3 animate-chicken-walk">🎵</div>
-              <h3 className="text-xl font-bold text-white mb-1">Música Misteriosa</h3>
+              <div className="text-6xl mb-3 animate-bounce">🐔</div>
+              <h3 className="text-xl font-bold text-white mb-1">Adivinhe quem está cacarejando</h3>
               <p className="text-white/80">Clique em "Iniciar Jogo" para começar!</p>
             </div>
         )}
 
+        {/* Tocando */}
         {gameState === "playing" && (
             <>
             <div className="text-center mb-4">
-              <div className="text-6xl mb-3 animate-chicken-walk">🎵</div>
-              <h3 className="text-xl font-bold text-white mb-1">{songTitle}</h3>
-              <p className="text-white/80">{artist}</p>
+              <div className="text-6xl mb-3 animate-bounce">🐔</div>
+              <h3 className="text-xl font-bold text-white mb-1">
+                {gameMode === "mp3" ? "🎵 Música Misteriosa" : songTitle}
+              </h3>
+              {gameMode === "spotify" && (
+                  <p className="text-white/80">{artist}</p>
+              )}
             </div>
 
             {gameMode === "mp3" && (
@@ -192,8 +196,10 @@ export const MusicPlayer = ({
                     {currentTime.toFixed(0)}s / {duration}s
                   </div>
                   <Button
-                      onClick={() => setIsMuted((m) => !m)}
+                      variant="outline"
+                      size="sm"
                       className="bg-white/20 border-white/30 text-white"
+                      onClick={() => setIsMuted((m) => !m)}
                   >
                     {isMuted ? <VolumeX /> : <Volume2 />}
                   </Button>

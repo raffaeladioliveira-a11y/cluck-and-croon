@@ -27,7 +27,6 @@ function GameArenaContent() {
 
   const { user } = useAuthSession();
   const clientId = useRef(getOrCreateClientId());
-  const avatarUrl = (user?.user_metadata?.avatar_url as string) || "";
 
   // navegação pós-set
   useEffect(() => {
@@ -201,7 +200,7 @@ function GameArenaContent() {
           {/* GRID PRINCIPAL: ESQUERDA = RANKING (3 col) | DIREITA = JOGO (9 col) */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
             {/* Ranking – ESQUERDA */}
-            <div className="md:col-span-3">
+            <div className="md:col-span-4">
               <BarnCard variant="coop" className="text-center">
                 <div className="mb-4">
                   <h3 className="text-xl font-bold text-barn-brown mb-2">🏆 Ranking da Partida</h3>
@@ -234,7 +233,7 @@ function GameArenaContent() {
             </div>
 
             {/* Conteúdo do jogo – DIREITA */}
-            <div className="md:col-span-9">
+            <div className="md:col-span-8">
               {/* Estado IDLE */}
               {gameState === "idle" && (
                   <div className="mb-6">
@@ -305,29 +304,21 @@ function GameArenaContent() {
                               </div>
                               <span className="font-semibold text-lg">{option}</span>
                             </div>
-                            <div className="flex -space-x-1">
-                              {playersOnOption(index).map((p: any) => (
-                                  <div key={p.id} className="relative">
-                                    {user && p.id === clientId.current ? (
-                                        avatarUrl ? (
-                                            <img
-                                                src={avatarUrl}
-                                                alt="Seu Avatar"
-                                                className="w-8 h-8 rounded-full object-cover border-2 border-white"
-                                            />
-                                        ) : (
-                                            <img
-                                                src={p.avatar}
-                                                alt="Seu Avatar"
-                                                className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                                            />
-                                        )
-                                    ) : (
-                                        <ChickenAvatar emoji="🐔" size="sm" className="border-2 border-background" />
-                                    )}
-                                  </div>
-                              ))}
-                            </div>
+                              <div className="flex -space-x-1">
+                                  {playersOnOption(index).map((p: any) => (
+                                      <div key={p.id} className="relative">
+                                          {p.avatar?.startsWith("/") ? (
+                                          <img
+                                              src={p.avatar}
+                                              alt={p.name}
+                                              className="w-8 h-8 rounded-full object-cover border-2 border-white"
+                                          />
+                                          ) : (
+                                          <ChickenAvatar emoji={p.avatar || "🐔"} size="sm" className="border-2 border-white" />
+                                          )}
+                                      </div>
+                                  ))}
+                              </div>
                           </div>
                         </BarnCard>
                     ))}
@@ -338,37 +329,35 @@ function GameArenaContent() {
                       <span className="text-xl">🏆</span>
                       <h3 className="text-xl font-bold text-barn-brown">Sua Pontuação - Rodada {currentRound}</h3>
                     </div>
-                    <div className="text-center">
-                      {/* avatar do jogador atual */}
-                      {user && (currentPlayer as any).client_id === clientId.current ? (
-                          avatarUrl ? (
-                              <img
-                                  src={avatarUrl}
-                                  alt="Seu Avatar"
-                                  className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                              />
-                          ) : currentPlayer.avatar?.startsWith("/") ? (
-                          <img
-                              src={currentPlayer.avatar}
-                              alt="Seu Avatar"
-                              className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                          />
-                      ) : (
-                          <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
-                      )
-                      ) : currentPlayer.avatar?.startsWith("/") ? (
-                      <img
-                          src={currentPlayer.avatar}
-                          alt={currentPlayer.name}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                      />
-                      ) : (
-                      <ChickenAvatar emoji={currentPlayer.avatar || "🐔"} size="sm" className="border-2 border-white" />
-                      )}
 
-                      <p className="font-semibold text-lg mb-2">
-                        {user?.user_metadata?.display_name || "Você"}
-                      </p>
+                      {/* Avatar + Nome alinhados */}
+                      <div className="flex flex-col items-center text-center">
+                          {(() => {
+                              const player = players?.find((p) => p.id === clientId.current);
+                              if (player?.avatar?.startsWith("/")) {
+                                  return (
+                                      <img
+                                          src={player.avatar}
+                                          alt={player.name}
+                                          className="w-16 h-16 rounded-full object-cover border-2 border-white mb-2"
+                                      />
+                                  );
+                              }
+                              return (
+                                  <ChickenAvatar
+                                      emoji={player?.avatar || "🐔"}
+          size="lg"
+          animated
+          className="mb-2 border-2 border-white"
+        />
+      );
+    })()}
+
+                          <p className="font-semibold text-lg mb-2">
+                              {players?.find((p) => p.id === clientId.current)?.name ||
+        user?.user_metadata?.display_name ||
+        "Você"}
+                          </p>
                       <EggCounter count={currentPlayer.eggs} size="lg" variant="golden" />
 
                       {selectedAnswer !== null && (

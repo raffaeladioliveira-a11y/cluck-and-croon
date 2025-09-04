@@ -7,6 +7,7 @@ import { loadProfile } from "@/utils/clientId";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { getOrCreateClientId } from "@/utils/clientId";
 import { HostAlbumSelector } from "@/components/HostAlbumSelector";
+import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector"; // Novo import
 import { supabase } from "@/integrations/supabase/client";
 
 interface Player {
@@ -28,6 +29,7 @@ interface PlayerListProps {
   roomCode: string;
   gameMode?: "mp3" | "spotify";
   selectedSpotifyAlbumId?: string | null;
+  selectedMp3AlbumId?: string | null; // Novo campo para álbum MP3
   roomStatus?: string; // "lobby" | "playing" | "album_selection" ...
   showAlbumSelectorForHost?: boolean;
 }
@@ -60,31 +62,31 @@ async function fetchGameModeKV(): Promise<"mp3" | "spotify"> {
   return mode === "spotify" ? "spotify" : "mp3";
 }
 
-/** Busca status e selected_spotify_album_id da sala pela roomCode */
-// No fetchRoomBasics, adicionar winner_profile_id
+/** Busca status, selected_spotify_album_id e selected_mp3_album_id da sala pela roomCode */
 async function fetchRoomBasics(roomCode: string) {
   const { data, error } = await supabase
       .from("game_rooms")
-      .select("status, selected_spotify_album_id, winner_profile_id")
+      .select("status, selected_spotify_album_id, selected_mp3_album_id, winner_profile_id")
       .eq("room_code", roomCode)
       .maybeSingle();
 
   return {
     status: data?.status,
-      selected: data?.selected_spotify_album_id ?? null,
+      selectedSpotify: data?.selected_spotify_album_id ?? null,
+      selectedMp3: data?.selected_mp3_album_id ?? null,
       winnerId: data?.winner_profile_id ?? null,
 };
 }
-
 
 export function PlayerList({
     players,
     currentClientId,
     onToggleReady,
     roomCode,
-    gameMode: gameModeProp,                 // pode vir do pai (se vier, usamos)
-    selectedSpotifyAlbumId: selectedFromProp, // idem
-    roomStatus: roomStatusProp,             // idem
+    gameMode: gameModeProp,
+    selectedSpotifyAlbumId: selectedSpotifyFromProp,
+    selectedMp3AlbumId: selectedMp3FromProp, // Nova prop
+    roomStatus: roomStatusProp,
     showAlbumSelectorForHost = true,
 }: PlayerListProps) {
 
@@ -94,7 +96,6 @@ export function PlayerList({
   const isCurrentPlayerHost = currentPlayer?.isHost || false;
   const isCurrentPlayerReady = currentPlayer?.isReady || false;
 
-  // 2. DEPOIS: Usar nos debugs e lógica
   console.log("DEBUG currentPlayer:", currentPlayer);
   console.log("DEBUG isCurrentPlayerHost:", isCurrentPlayerHost);
 
@@ -106,9 +107,11 @@ export function PlayerList({
   const [gameMode, setGameMode] = useState<"mp3" | "spotify">(gameModeProp ?? "mp3");
   const [roomStatus, setRoomStatus] = useState<string | undefined>(roomStatusProp);
   const [selectedSpotifyAlbumId, setSelectedSpotifyAlbumId] = useState<string | null | undefined>(
-      selectedFromProp
+      selectedSpotifyFromProp
   );
-
+  const [selectedMp3AlbumId, setSelectedMp3AlbumId] = useState<string | null | undefined>(
+      selectedMp3FromProp
+  );
 
   // Se o pai NÃO passou gameMode/status/selected, buscamos no Supabase
   useEffect(() => {
@@ -123,20 +126,22 @@ export function PlayerList({
         setGameMode(gameModeProp);
       }
 
-      // status/album: se não vieram do pai, buscar da sala
-      if (roomStatusProp === undefined || selectedFromProp === undefined) {
-        const { status, selected } = await fetchRoomBasics(roomCode);
+      // status/albums: se não vieram do pai, buscar da sala
+      if (roomStatusProp === undefined || selectedSpotifyFromProp === undefined || selectedMp3FromProp === undefined) {
+        const { status, selectedSpotify, selectedMp3 } = await fetchRoomBasics(roomCode);
         if (mounted) {
           if (roomStatusProp === undefined) setRoomStatus(status);
-          if (selectedFromProp === undefined) setSelectedSpotifyAlbumId(selected);
+          if (selectedSpotifyFromProp === undefined) setSelectedSpotifyAlbumId(selectedSpotify);
+          if (selectedMp3FromProp === undefined) setSelectedMp3AlbumId(selectedMp3);
         }
       } else {
         setRoomStatus(roomStatusProp);
-        setSelectedSpotifyAlbumId(selectedFromProp);
+        setSelectedSpotifyAlbumId(selectedSpotifyFromProp);
+        setSelectedMp3AlbumId(selectedMp3FromProp);
       }
     })();
 
-    // realtime leve: ouvir mudanças básicas da sala (status/album)
+    // realtime leve: ouvir mudanças básicas da sala (status/albums)
     const ch = supabase
         .channel(`playerlist-room:${roomCode}`)
         .on(
@@ -145,7 +150,8 @@ export function PlayerList({
             (payload) => {
               const r: any = payload.new;
               if (roomStatusProp === undefined) setRoomStatus(r?.status);
-              if (selectedFromProp === undefined) setSelectedSpotifyAlbumId(r?.selected_spotify_album_id ?? null);
+              if (selectedSpotifyFromProp === undefined) setSelectedSpotifyAlbumId(r?.selected_spotify_album_id ?? null);
+              if (selectedMp3FromProp === undefined) setSelectedMp3AlbumId(r?.selected_mp3_album_id ?? null);
             }
         )
         .subscribe();
@@ -155,7 +161,7 @@ export function PlayerList({
       supabase.removeChannel(ch);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomCode, gameModeProp, roomStatusProp, selectedFromProp]);
+  }, [roomCode, gameModeProp, roomStatusProp, selectedSpotifyFromProp, selectedMp3FromProp]);
 
   if (players.length === 0) {
     return (
@@ -167,29 +173,28 @@ export function PlayerList({
     );
   }
 
-  // -------- DEBUG VISUAL (remova quando quiser) --------
-  // const __debugFlags = {
-  //   isCurrentPlayerHost,
-  //   gameMode,
-  //   selectedSpotifyAlbumId: selectedSpotifyAlbumId ?? null,
-  //   showAlbumSelectorForHost,
-  //   roomStatus: roomStatus ?? "(sem status)",
-  // };
-
-  const shouldShowAlbumSelector =
+  // Lógica para mostrar seletor de álbum Spotify
+  const shouldShowSpotifyAlbumSelector =
       showAlbumSelectorForHost &&
-      isCurrentPlayerHost && // ESTA LINHA está bloqueando
+      isCurrentPlayerHost &&
       gameMode === "spotify" &&
       !selectedSpotifyAlbumId &&
       (roomStatus ? ["lobby", "album_selection"].includes(roomStatus) : true);
 
-  console.log("shouldShowAlbumSelector final:", shouldShowAlbumSelector);
+  // Lógica para mostrar seletor de álbum MP3
+  const shouldShowMp3AlbumSelector =
+      showAlbumSelectorForHost &&
+      isCurrentPlayerHost &&
+      gameMode === "mp3" &&
+      !selectedMp3AlbumId &&
+      (roomStatus ? ["lobby", "album_selection"].includes(roomStatus) : true);
+
+  console.log("shouldShowSpotifyAlbumSelector:", shouldShowSpotifyAlbumSelector);
+  console.log("shouldShowMp3AlbumSelector:", shouldShowMp3AlbumSelector);
 
   return (
       <BarnCard variant="coop" className="mb-8">
         <div>
-
-
           <div className="flex items-center gap-3 mb-6">
             <Users className="w-6 h-6 text-barn-brown" />
             <h3 className="text-2xl font-bold text-barn-brown">
@@ -285,10 +290,17 @@ export function PlayerList({
               </div>
           )}
 
-          {/* SELETOR DE ÁLBUM PARA HOST */}
-          {shouldShowAlbumSelector && (
+          {/* SELETOR DE ÁLBUM PARA HOST - SPOTIFY */}
+          {shouldShowSpotifyAlbumSelector && (
               <div className="mt-8">
                 <HostAlbumSelector roomCode={roomCode} />
+              </div>
+          )}
+
+          {/* SELETOR DE ÁLBUM PARA HOST - MP3 */}
+          {shouldShowMp3AlbumSelector && (
+              <div className="mt-8">
+                <HostMp3AlbumSelector roomCode={roomCode} />
               </div>
           )}
         </div>

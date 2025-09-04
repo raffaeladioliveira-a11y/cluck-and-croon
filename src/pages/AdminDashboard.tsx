@@ -88,6 +88,9 @@ export default function AdminDashboard() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const [editingGenre, setEditingGenre] = useState<Genre | null>(null);
+  const [isEditGenreModalOpen, setIsEditGenreModalOpen] = useState(false);
+
 
 
   // States for different sections
@@ -604,6 +607,7 @@ export default function AdminDashboard() {
             artist: editingSong.artist,
             genre_id: editingSong.genre_id,
             album_name: editingSong.album_name || null,
+            album_id: editingSong.album_id || null,
             release_year: editingSong.release_year || null,
             duration_seconds: editingSong.duration_seconds || 15,
             spotify_url: editingSong.spotify_url || null,
@@ -719,6 +723,58 @@ export default function AdminDashboard() {
       });
     }
   };
+
+  const openEditGenreModal = (genre: Genre) => {
+    setEditingGenre(genre);
+    setIsEditGenreModalOpen(true);
+  };
+
+  const handleUpdateGenre = async () => {
+    if (!editingGenre) return;
+
+    try {
+      const { error } = await supabase
+          .from("genres")
+          .update({
+            name: editingGenre.name,
+            description: editingGenre.description,
+            chicken_description: editingGenre.chicken_description,
+            emoji: editingGenre.emoji,
+          })
+          .eq("id", editingGenre.id);
+
+      if (error) throw error;
+
+      toast({ title: "✅ Gênero atualizado!" });
+      setIsEditGenreModalOpen(false);
+      setEditingGenre(null);
+      await loadGenres();
+    } catch {
+        toast({
+      title: "❌ Erro",
+      description: "Não foi possível atualizar o gênero",
+      variant: "destructive",
+    });
+  }
+  };
+
+  const handleDeleteGenre = async (genreId: string) => {
+    try {
+      const { error } = await supabase.from("genres").delete().eq("id", genreId);
+      if (error) throw error;
+
+      toast({ title: "🗑️ Gênero removido" });
+      await loadGenres();
+    } catch {
+        toast({
+      title: "❌ Erro",
+      description: "Não foi possível remover o gênero",
+      variant: "destructive",
+    });
+  }
+  };
+
+
 
   if (!isAuthenticated || loading) {
     return (
@@ -1250,8 +1306,8 @@ export default function AdminDashboard() {
                   <h3 className="text-xl font-bold mb-4">Gêneros Musicais</h3>
 
                   <div className="space-y-3">
-                    {genres.map(genre => (
-                        <div key={genre.id} className="p-3 bg-muted/50 rounded-lg">
+                    {genres.map((genre) => (
+                        <div key={genre.id} className="p-3 bg-muted/50 rounded-lg flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <span className="text-2xl">{genre.emoji}</span>
                             <div className="flex-1">
@@ -1259,10 +1315,62 @@ export default function AdminDashboard() {
                               <p className="text-sm text-muted-foreground">{genre.chicken_description}</p>
                             </div>
                           </div>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="icon" onClick={() => openEditGenreModal(genre)}>
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => handleDeleteGenre(genre.id)}>
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                     ))}
+
                   </div>
                 </BarnCard>
+
+                <Dialog open={isEditGenreModalOpen} onOpenChange={setIsEditGenreModalOpen}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>✏️ Editar Gênero</DialogTitle>
+                    </DialogHeader>
+
+                    {editingGenre && (
+                        <div className="space-y-4">
+                          <Input
+                              placeholder="Nome do gênero"
+                              value={editingGenre.name}
+                              onChange={(e) => setEditingGenre(prev => prev ? { ...prev, name: e.target.value } : null)}
+                          />
+                          <Input
+                              placeholder="Descrição temática"
+                              value={editingGenre.chicken_description}
+                              onChange={(e) => setEditingGenre(prev => prev ? { ...prev, chicken_description: e.target.value } : null)}
+                          />
+                          <Input
+                              placeholder="Descrição (opcional)"
+                              value={editingGenre.description || ""}
+                              onChange={(e) => setEditingGenre(prev => prev ? { ...prev, description: e.target.value } : null)}
+                          />
+                          <Input
+                              placeholder="Emoji"
+                              value={editingGenre.emoji}
+                              onChange={(e) => setEditingGenre(prev => prev ? { ...prev, emoji: e.target.value } : null)}
+                          />
+
+                          <div className="flex gap-2">
+                            <ChickenButton variant="corn" className="flex-1" onClick={handleUpdateGenre}>
+                              ✅ Salvar Alterações
+                            </ChickenButton>
+                            <ChickenButton variant="feather" onClick={() => setIsEditGenreModalOpen(false)}>
+                              ❌ Cancelar
+                            </ChickenButton>
+                          </div>
+                        </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+
               </div>
             </TabsContent>
 
@@ -1425,28 +1533,49 @@ export default function AdminDashboard() {
                     </div>
 
                     <div>
-                      <Label>Álbum (opcional)</Label>
-                      <Input
-                          value={editingSong.album_name || ''}
-                          onChange={(e) => setEditingSong(prev => prev ? {...prev, album_name: e.target.value} : null)}
-                      />
+                      <Label htmlFor="song-album-select">Álbum</Label>
+                      <Select
+                          value={editingSong?.album_id || ''}
+    onValueChange={(value) =>
+                          setEditingSong(prev => prev ? { ...prev, album_id: value } : null)
+                      }
+                        >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Escolher álbum" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {albums.map(album => (
+                            <SelectItem key={album.id} value={album.id}>
+                              {album.name} ({album.release_year || 'Ano não informado'})
+                            </SelectItem>
+                        ))}
+                      </SelectContent>
+                      </Select>
                     </div>
 
-                    <div>
-                      <Label>URL Spotify (opcional)</Label>
-                      <Input
-                          value={editingSong.spotify_url || ''}
-                          onChange={(e) => setEditingSong(prev => prev ? {...prev, spotify_url: e.target.value} : null)}
-                      />
-                    </div>
+                    {/*<div>*/}
+                      {/*<Label>Álbum (opcional)</Label>*/}
+                      {/*<Input*/}
+                          {/*value={editingSong.album_name || ''}*/}
+                          {/*onChange={(e) => setEditingSong(prev => prev ? {...prev, album_name: e.target.value} : null)}*/}
+                      {/*/>*/}
+                    {/*</div>*/}
 
-                    <div>
-                      <Label>URL YouTube (opcional)</Label>
-                      <Input
-                          value={editingSong.youtube_url || ''}
-                          onChange={(e) => setEditingSong(prev => prev ? {...prev, youtube_url: e.target.value} : null)}
-                      />
-                    </div>
+                    {/*<div>*/}
+                      {/*<Label>URL Spotify (opcional)</Label>*/}
+                      {/*<Input*/}
+                          {/*value={editingSong.spotify_url || ''}*/}
+                          {/*onChange={(e) => setEditingSong(prev => prev ? {...prev, spotify_url: e.target.value} : null)}*/}
+                      {/*/>*/}
+                    {/*</div>*/}
+
+                    {/*<div>*/}
+                      {/*<Label>URL YouTube (opcional)</Label>*/}
+                      {/*<Input*/}
+                          {/*value={editingSong.youtube_url || ''}*/}
+                          {/*onChange={(e) => setEditingSong(prev => prev ? {...prev, youtube_url: e.target.value} : null)}*/}
+                      {/*/>*/}
+                    {/*</div>*/}
 
                     <div>
                       <Label>URL do arquivo de áudio (opcional)</Label>
