@@ -148,11 +148,8 @@ export default function AdminDashboard() {
             // Filtro por ano (do álbum) - feito após a query
             if (filters.year) {
                 filtered = filtered.filter(song =>
-                    song.albums ?.release_year ?
-            .
-                toString().includes(filters.year)
+                    song.albums ?.release_year ?.toString().includes(filters.year)
             )
-                ;
             }
 
             setSearchResults(filtered);
@@ -214,7 +211,7 @@ export default function AdminDashboard() {
             filtered = filtered.filter(album =>
                 album.release_year ?.toString().includes(filters.year)
         )
-            ;
+
         }
 
         // Filtro por música (busca nas músicas dos álbuns)
@@ -470,12 +467,12 @@ export default function AdminDashboard() {
     };
 
     // Adicione estas funções
-    const loadAllUsers = async () => {
+    const loadAllUsers = async() => {
         try {
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('profiles')
                 .select('*')
-                .order('created_at', { ascending: false });
+                .order('created_at', {ascending: false});
 
             if (error) throw error;
             setAllUsers(data || []);
@@ -488,16 +485,15 @@ export default function AdminDashboard() {
         }
     };
 
-    const toggleAdminPermission = async (userId: string, currentIsAdmin: boolean) => {
+    const toggleAdminPermission = async(userId: string, currentIsAdmin: boolean) => {
 
 
         try {
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from('profiles')
-                .update({ is_admin: !currentIsAdmin })
+                .update({is_admin: !currentIsAdmin})
                 .eq('user_id', userId)
                 .select(); // Importante: adicionar .select() para ver o resultado
-
 
 
             if (error) {
@@ -506,12 +502,11 @@ export default function AdminDashboard() {
             }
 
             // Verificar se realmente atualizou
-            const { data: checkData, error: checkError } = await supabase
+            const {data: checkData, error: checkError} = await supabase
                 .from('profiles')
                 .select('user_id, is_admin')
                 .eq('user_id', userId)
                 .single();
-
 
 
             toast({
@@ -638,7 +633,6 @@ export default function AdminDashboard() {
             }
 
 
-
             // Transformar dados para o formato esperado
             const songsFormatted = (data || []).map(song => ({
                 ...song,
@@ -666,10 +660,10 @@ export default function AdminDashboard() {
 
     // Substitua o useEffect de autenticação por:
     useEffect(() => {
-        const checkAdminAccess = async () => {
+        const checkAdminAccess = async() => {
             try {
                 // Verificar se há usuário logado no Supabase Auth
-                const { data: { user }, error } = await supabase.auth.getUser();
+                const {data: {user}, error} = await supabase.auth.getUser();
 
                 if (error || !user) {
                     navigate('/login'); // ou sua rota de login
@@ -677,7 +671,7 @@ export default function AdminDashboard() {
                 }
 
                 // Verificar se o usuário tem permissão de admin
-                const { data: profile, error: profileError } = await supabase
+                const {data: profile, error: profileError} = await supabase
                     .from('profiles')
                     .select('*')
                     .eq('user_id', user.id)
@@ -727,9 +721,7 @@ export default function AdminDashboard() {
             if (error) throw error;
 
             const settings: any = {};
-            data ?
-        .
-            forEach(setting => {
+            data ?.forEach(setting => {
                 settings[setting.key] = parseInt(setting.value as string);
             });
 
@@ -772,7 +764,7 @@ export default function AdminDashboard() {
         }));
     };
 
-    const handleLogout = async () => {
+    const handleLogout = async() => {
         await supabase.auth.signOut();
         setCurrentUser(null);
         setIsAuthenticated(false);
@@ -1169,50 +1161,51 @@ export default function AdminDashboard() {
                             Configurações
                         </TabsTrigger>
                         <TabsTrigger value="users" className="flex items-center gap-2">
-                            <Users className="w-4 h-4" />
+                            <Users className="w-4 h-4"/>
                             Usuários & Permissões
                         </TabsTrigger>
                     </TabsList>
 
-                <TabsContent value="users">
-                    <BarnCard variant="default">
-                        <h3 className="text-xl font-bold mb-4">Gerenciar Administradores</h3>
+                    <TabsContent value="users">
+                        <BarnCard variant="default">
+                            <h3 className="text-xl font-bold mb-4">Gerenciar Administradores</h3>
 
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                            {allUsers.map((user) => (
-                                <div key={user.user_id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                                    <div className="flex items-center gap-4">
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                {allUsers.map((user) => (
+                                    <div key={user.user_id}
+                                         className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                                        <div className="flex items-center gap-4">
                                         <span className="text-1xl"> <img
                                             src={user.avatar_url}
                                             alt="Capa do Álbum"
                                             className="mt-3 w-14 h-14 object-cover rounded-lg border-2 border-white/30"
                                         /></span>
-                                        <div>
-                                            <h4 className="font-semibold">{user.display_name}</h4>
-                                            <p className="text-sm text-muted-foreground">
-                                                {user.total_eggs} ovos | {user.games_played} jogos
-                                            </p>
+                                            <div>
+                                                <h4 className="font-semibold">{user.display_name}</h4>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {user.total_eggs} ovos | {user.games_played} jogos
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            {user.is_admin && (
+                                                <Badge variant="secondary">Admin</Badge>
+                                            )}
+                                            <Button
+                                                variant={user.is_admin ? "destructive" : "default"}
+                                                size="sm"
+                                                onClick={() => toggleAdminPermission(user.user_id, user.is_admin)}
+                                                disabled={user.user_id === currentUser?.user_id} // Não pode remover próprias permissões
+            >
+                                                {user.is_admin ? 'Remover Admin' : 'Tornar Admin'}
+                                            </Button>
                                         </div>
                                     </div>
-
-                                    <div className="flex items-center gap-3">
-                                        {user.is_admin && (
-                                            <Badge variant="secondary">Admin</Badge>
-                                        )}
-                                        <Button
-                                            variant={user.is_admin ? "destructive" : "default"}
-                                            size="sm"
-                                            onClick={() => toggleAdminPermission(user.user_id, user.is_admin)}
-                                            disabled={user.user_id === currentUser?.user_id} // Não pode remover próprias permissões
-            >
-                                            {user.is_admin ? 'Remover Admin' : 'Tornar Admin'}
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </BarnCard>
-                </TabsContent>
+                                ))}
+                            </div>
+                        </BarnCard>
+                    </TabsContent>
 
                     {/* Albums Management */}
                     <TabsContent value="albums">
