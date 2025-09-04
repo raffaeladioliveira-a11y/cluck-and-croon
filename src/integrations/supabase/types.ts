@@ -47,6 +47,50 @@ export type Database = {
         }
         Relationships: []
       }
+      albums: {
+        Row: {
+          artist_name: string | null
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          genre_id: string | null
+          id: string
+          name: string
+          release_year: number | null
+          updated_at: string
+        }
+        Insert: {
+          artist_name?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          genre_id?: string | null
+          id?: string
+          name: string
+          release_year?: number | null
+          updated_at?: string
+        }
+        Update: {
+          artist_name?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          genre_id?: string | null
+          id?: string
+          name?: string
+          release_year?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "albums_genre_id_fkey"
+            columns: ["genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       "cluck-and-croon": {
         Row: {
           created_at: string
@@ -82,11 +126,15 @@ export type Database = {
           next_genre_id: string | null
           room_code: string
           rounds_total: number | null
+          selected_genre_id: string | null
+          selected_mp3_album_id: string | null
+          selected_spotify_album_id: string | null
           speed_bonus: number | null
           started_at: string | null
           status: string
           time_per_question: number | null
           updated_at: string
+          winner_profile_id: string | null
         }
         Insert: {
           code?: string | null
@@ -107,11 +155,15 @@ export type Database = {
           next_genre_id?: string | null
           room_code: string
           rounds_total?: number | null
+          selected_genre_id?: string | null
+          selected_mp3_album_id?: string | null
+          selected_spotify_album_id?: string | null
           speed_bonus?: number | null
           started_at?: string | null
           status?: string
           time_per_question?: number | null
           updated_at?: string
+          winner_profile_id?: string | null
         }
         Update: {
           code?: string | null
@@ -132,11 +184,15 @@ export type Database = {
           next_genre_id?: string | null
           room_code?: string
           rounds_total?: number | null
+          selected_genre_id?: string | null
+          selected_mp3_album_id?: string | null
+          selected_spotify_album_id?: string | null
           speed_bonus?: number | null
           started_at?: string | null
           status?: string
           time_per_question?: number | null
           updated_at?: string
+          winner_profile_id?: string | null
         }
         Relationships: [
           {
@@ -151,6 +207,27 @@ export type Database = {
             columns: ["next_genre_id"]
             isOneToOne: false
             referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_rooms_selected_genre_id_fkey"
+            columns: ["selected_genre_id"]
+            isOneToOne: false
+            referencedRelation: "genres"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_rooms_selected_mp3_album_id_fkey"
+            columns: ["selected_mp3_album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "game_rooms_selected_spotify_album_id_fkey"
+            columns: ["selected_spotify_album_id"]
+            isOneToOne: false
+            referencedRelation: "spotify_albums"
             referencedColumns: ["id"]
           },
         ]
@@ -337,6 +414,7 @@ export type Database = {
       profiles: {
         Row: {
           avatar_emoji: string | null
+          avatar_url: string | null
           created_at: string
           display_name: string
           games_played: number | null
@@ -348,6 +426,7 @@ export type Database = {
         }
         Insert: {
           avatar_emoji?: string | null
+          avatar_url?: string | null
           created_at?: string
           display_name: string
           games_played?: number | null
@@ -359,6 +438,7 @@ export type Database = {
         }
         Update: {
           avatar_emoji?: string | null
+          avatar_url?: string | null
           created_at?: string
           display_name?: string
           games_played?: number | null
@@ -372,6 +452,7 @@ export type Database = {
       }
       room_participants: {
         Row: {
+          avatar: string | null
           avatar_emoji: string | null
           avatar_user: string | null
           avg_response_time: number | null
@@ -390,6 +471,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          avatar?: string | null
           avatar_emoji?: string | null
           avatar_user?: string | null
           avg_response_time?: number | null
@@ -408,6 +490,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          avatar?: string | null
           avatar_emoji?: string | null
           avatar_user?: string | null
           avg_response_time?: number | null
@@ -437,6 +520,7 @@ export type Database = {
       }
       songs: {
         Row: {
+          album_id: string | null
           album_name: string | null
           artist: string
           audio_file_url: string | null
@@ -455,6 +539,7 @@ export type Database = {
           youtube_url: string | null
         }
         Insert: {
+          album_id?: string | null
           album_name?: string | null
           artist: string
           audio_file_url?: string | null
@@ -473,6 +558,7 @@ export type Database = {
           youtube_url?: string | null
         }
         Update: {
+          album_id?: string | null
           album_name?: string | null
           artist?: string
           audio_file_url?: string | null
@@ -491,6 +577,13 @@ export type Database = {
           youtube_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "songs_album_id_fkey"
+            columns: ["album_id"]
+            isOneToOne: false
+            referencedRelation: "albums"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "songs_genre_id_fkey"
             columns: ["genre_id"]
@@ -593,11 +686,77 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_room_ranking: {
+        Row: {
+          avg_response_time: number | null
+          correct_answers: number | null
+          current_eggs: number | null
+          display_name: string | null
+          room_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          avg_response_time?: never
+          correct_answers?: never
+          current_eggs?: never
+          display_name?: string | null
+          room_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          avg_response_time?: never
+          correct_answers?: never
+          current_eggs?: never
+          display_name?: string | null
+          room_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "room_participants_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "game_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      apply_next_album_and_reset: {
+        Args: { p_album_id: string; p_genre_id: string; p_room_code: string }
+        Returns: Json
+      }
+      armor: {
+        Args: { "": string }
+        Returns: string
+      }
       create_room_with_host: {
         Args: { p_avatar: string; p_client_id: string; p_display_name: string }
+        Returns: string
+      }
+      dearmor: {
+        Args: { "": string }
+        Returns: string
+      }
+      end_round_allow_album_selection: {
+        Args: { p_room_code: string; p_winner_profile_id?: string }
+        Returns: Json
+      }
+      finish_round_and_open_album_selection: {
+        Args: { p_room_code: string }
+        Returns: Json
+      }
+      gen_random_bytes: {
+        Args: { "": number }
+        Returns: string
+      }
+      gen_random_uuid: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      gen_salt: {
+        Args: { "": string }
         Returns: string
       }
       generate_unique_room_code: {
@@ -613,13 +772,16 @@ export type Database = {
         }
         Returns: string
       }
-      join_room_with_identity: {
-        Args: {
-          p_avatar: string
-          p_client_id: string
-          p_display_name: string
-          p_room_code: string
-        }
+      pgp_armor_headers: {
+        Args: { "": string }
+        Returns: Record<string, unknown>[]
+      }
+      pgp_key_id: {
+        Args: { "": string }
+        Returns: string
+      }
+      room_winner: {
+        Args: { p_room_code: string } | { p_room_id: string }
         Returns: string
       }
       start_game: {

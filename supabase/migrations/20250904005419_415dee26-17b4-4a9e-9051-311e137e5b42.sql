@@ -1,0 +1,2 @@
+-- Regenerate the complete types definition
+-- This should run the migration and regenerate Supabase types
