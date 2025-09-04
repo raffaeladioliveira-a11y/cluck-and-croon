@@ -29,7 +29,28 @@ export default function Profile() {
     "/avatars/avatar8.jpg",
     "/avatars/avatar9.jpg",
     "/avatars/avatar10.jpg",
+    "/avatars/avatar11.webp",
+    "/avatars/avatar12.webp",
+    "/avatars/avatar13.webp",
+    "/avatars/avatar14.webp",
+    "/avatars/avatar15.webp",
+    "/avatars/avatar16.webp",
+    "/avatars/avatar17.webp",
+    "/avatars/avatar18.gif",
+    "/avatars/avatar19.webp",
+    "/avatars/avatar20.webp",
+    "/avatars/avatar21.webp",
+    "/avatars/avatar22.webp",
+    "/avatars/avatar23.webp",
+    "/avatars/avatar24.webp",
+    "/avatars/avatar25.webp",
+    "/avatars/avatar26.webp",
+    "/avatars/avatar27.webp",
+    "/avatars/avatar28.webp",
+    "/avatars/avatar29.webp",
+    "/avatars/avatar30.webp",
   ];
+
 
   useEffect(() => {
     if (!loading && !user) {
@@ -144,7 +165,7 @@ export default function Profile() {
             <div className="space-y-6">
               {/* Avatar Preview */}
               <div className="text-center">
-                <div className="mb-4">
+                <div className="mb-2 inline-block">
                   <ChickenAvatar emoji={selectedAvatar} size="xl" animated />
                 </div>
                 <p className="text-sm text-muted-foreground">Prévia do seu avatar</p>

@@ -18,7 +18,7 @@ export function UserMenu() {
     const meta = (user?.user_metadata ?? {}) as Record<string, any>;
     const displayName = (meta.display_name as string) || loadProfile().displayName || getDisplayNameOrDefault(loadProfile());
     const avatarEmoji = (meta.avatar_emoji as string) || loadProfile().avatar || getAvatarOrDefault(loadProfile());
-    const avatarUrl = (meta.avatar_url as string) || "";
+    const avatarUrl = (meta.avatar_url as string) || null;
 
     const initials = useMemo(() => {
         const n = (displayName || email || "U").trim();
@@ -58,8 +58,16 @@ export function UserMenu() {
     }
 
     const avatarNode = avatarUrl
-        ? <img src={avatarUrl} alt="Avatar do usuário" className="h-8 w-8 rounded-full object-cover" />
-        : <ChickenAvatar emoji={avatarEmoji || "🐔"} size="sm" />;
+        ? (
+        <img
+            src={avatarUrl}
+            alt="Avatar do usuário"
+            className="h-8 w-8 rounded-full object-cover"
+        />
+    )
+        : (
+        <ChickenAvatar emoji={avatarEmoji || "🐔"} size="sm" />
+    );
 
     return (
         <DropdownMenu>
@@ -72,7 +80,7 @@ export function UserMenu() {
             <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="flex items-center gap-2">
                     <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold">
-                        {avatarUrl ? "" : initials}
+                        {avatarNode}
                     </div>
                     <div className="min-w-0">
                         <div className="truncate font-semibold">{displayName || "Usuário"}</div>
