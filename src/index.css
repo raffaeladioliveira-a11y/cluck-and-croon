@@ -1,79 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    /* Modern Dark Gaming Theme - Deep Space */
-    --background: 220 20% 4%;
-    --foreground: 45 15% 95%;
+    /* Grove Guess Modern Dark Theme */
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 355.7 100% 97.3%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 12 6.5% 15.1%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 142 76% 36%;
+    --radius: 0.75rem;
 
-    --card: 220 15% 8%;
-    --card-foreground: 45 15% 95%;
+    /* Vibrant Accent Colors - Grove Guess Style */
+    --electric-purple: 271 81% 56%;
+    --neon-blue: 217 91% 60%;
+    --cyber-green: 142 76% 36%;
+    --hot-pink: 330 81% 60%;
+    --golden-yellow: 48 96% 66%;
+    --orange-red: 14 91% 60%;
 
-    --popover: 220 15% 8%;
-    --popover-foreground: 45 15% 95%;
-
-    /* Electric Orange - Primary Action */
-    --primary: 25 100% 60%;
-    --primary-foreground: 220 20% 4%;
-
-    /* Neon Purple - Secondary */
-    --secondary: 270 100% 65%;
-    --secondary-foreground: 220 20% 4%;
-
-    /* Dark Glass Surface */
-    --muted: 220 12% 12%;
-    --muted-foreground: 45 8% 65%;
-
-    /* Neon Green - Accent */
-    --accent: 120 100% 55%;
-    --accent-foreground: 220 20% 4%;
-
-    --destructive: 0 100% 65%;
-    --destructive-foreground: 220 20% 4%;
-
-    --border: 220 8% 20%;
-    --input: 220 10% 15%;
-    --ring: 25 100% 60%;
-
-    /* Vibrant Gaming Colors */
+    /* Gaming Theme Colors */
     --neon-orange: 25 100% 60%;
     --neon-purple: 270 100% 65%;
     --neon-green: 120 100% 55%;
-    --neon-blue: 200 100% 60%;
     --neon-yellow: 50 100% 60%;
-    --surface: 220 15% 8%;
-    --surface-elevated: 220 12% 12%;
+    --surface: 240 10% 3.9%;
+    --surface-elevated: 240 3.7% 15.9%;
     --danger: 0 100% 65%;
     
     /* Glass Effect Colors */
-    --glass-light: 220 15% 15%;
-    --glass-border: 220 8% 25%;
+    --glass-light: 240 15% 15%;
+    --glass-border: 240 8% 25%;
     
-    /* Chicken Farm Colors - Dark Mode */
+    /* Chicken Farm Colors - Modern Dark */
     --chicken-orange: 25 100% 60%;
     --egg-shell: 45 25% 25%;
     --barn-brown: 25 60% 45%;
     --feather-white: 45 15% 90%;
     --corn-golden: 50 100% 65%;
 
-    /* Gradients - Vibrant Glass Effects */
+    /* Modern Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--electric-purple)), hsl(var(--neon-blue)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--cyber-green)), hsl(var(--neon-blue)));
+    --gradient-accent: linear-gradient(135deg, hsl(var(--hot-pink)), hsl(var(--golden-yellow)));
+    --gradient-dark: linear-gradient(135deg, hsl(240 10% 3.9%), hsl(240 8% 8%));
     --gradient-sunrise: linear-gradient(135deg, hsl(25 100% 60% / 0.8), hsl(50 100% 60% / 0.6));
     --gradient-barn: linear-gradient(180deg, hsl(270 100% 65% / 0.8), hsl(200 100% 60% / 0.6));
     --gradient-grass: linear-gradient(180deg, hsl(120 100% 55% / 0.8), hsl(120 85% 50% / 0.6));
-    --gradient-sky: linear-gradient(180deg, hsl(200 100% 60% / 0.3), hsl(220 20% 4% / 0.1));
+    --gradient-sky: linear-gradient(180deg, hsl(200 100% 60% / 0.3), hsl(240 10% 3.9% / 0.1));
 
     /* Glass Effects */
-    --shadow-glass: 0 8px 32px hsl(0 0% 0% / 0.3);
-    --shadow-neon: 0 0 30px hsl(var(--neon-orange) / 0.5);
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --glass-bg: rgba(255, 255, 255, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-hover: rgba(255, 255, 255, 0.1);
 
-    --radius: 1rem;
+    /* Shadows */
+    --shadow-glow: 0 0 40px hsl(var(--electric-purple) / 0.3);
+    --shadow-neon: 0 0 20px hsl(var(--neon-blue) / 0.5);
+    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-glass: 0 8px 32px hsl(0 0% 0% / 0.3);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -93,5 +95,89 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', 'Poppins', system-ui, sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.6;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', system-ui, sans-serif;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+}
+
+@layer utilities {
+  /* Modern Glass Morphism */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .glass-button {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    transition: var(--transition-smooth);
+  }
+
+  .glass-button:hover {
+    background: var(--glass-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-neon);
+  }
+
+  /* Neon Effects */
+  .neon-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .neon-border {
+    border: 1px solid;
+    border-image: var(--gradient-primary) 1;
+  }
+
+  .text-gradient {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Interactive Elements */
+  .smooth-transition {
+    transition: var(--transition-smooth);
+  }
+
+  .hover-lift {
+    transition: transform 0.3s ease;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-4px);
+  }
+
+  .interactive-card {
+    @apply glass-card smooth-transition hover-lift cursor-pointer;
+  }
+
+  .interactive-card:hover {
+    @apply neon-glow;
+  }
+
+  .primary-button {
+    @apply glass-button text-white font-semibold py-3 px-6 rounded-xl;
+    background: var(--gradient-primary);
+  }
+
+  .primary-button:hover {
+    @apply neon-glow;
+    transform: translateY(-2px) scale(1.02);
   }
 }

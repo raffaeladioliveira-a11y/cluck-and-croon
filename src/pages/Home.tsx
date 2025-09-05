@@ -118,53 +118,65 @@ export default function Home() {
   const canAutoJoin = pendingRoomCode && playerName.trim() && selectedAvatar;
 
   return (
-      <div className="min-h-screen bg-gradient-sky">
+      <div className="min-h-screen bg-gradient-dark relative overflow-hidden">
+        {/* Animated Background Elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-electric-purple/20 rounded-full blur-3xl animate-pulse-beat"></div>
+          <div className="absolute top-40 right-20 w-24 h-24 bg-neon-blue/30 rounded-full blur-2xl animate-float-music"></div>
+          <div className="absolute bottom-32 left-1/4 w-40 h-40 bg-hot-pink/20 rounded-full blur-3xl animate-glow-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-28 h-28 bg-golden-yellow/25 rounded-full blur-2xl animate-pulse-beat"></div>
+        </div>
+
         {/* Hero Section */}
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
           {/* Background Hero Image */}
           <div
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20"
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-10"
               style={{ backgroundImage: `url(${heroImage})` }}
           />
 
-          {/* Animated Background Elements */}
+          {/* Musical Animated Elements */}
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-20 left-10 animate-chicken-walk text-4xl">🐔</div>
-            <div className="absolute top-32 right-20 animate-egg-bounce text-3xl">🥚</div>
-            <div className="absolute bottom-40 left-20 animate-chicken-walk text-3xl" style={{animationDelay: '1s'}}>🐓</div>
-            <div className="absolute top-60 left-1/4 animate-feather-float text-2xl" style={{animationDelay: '2s'}}>🪶</div>
-            <div className="absolute bottom-60 right-1/4 animate-egg-bounce text-2xl" style={{animationDelay: '0.5s'}}>🌽</div>
+            <div className="absolute top-20 left-10 animate-float-music text-4xl">🎵</div>
+            <div className="absolute top-32 right-20 animate-pulse-beat text-3xl">🎤</div>
+            <div className="absolute bottom-40 left-20 animate-float-music text-3xl" style={{animationDelay: '1s'}}>🎸</div>
+            <div className="absolute top-60 left-1/4 animate-glow-pulse text-2xl" style={{animationDelay: '2s'}}>🎹</div>
+            <div className="absolute bottom-60 right-1/4 animate-pulse-beat text-2xl" style={{animationDelay: '0.5s'}}>🥁</div>
           </div>
 
           <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
             {/* Main Title */}
-            <div className="mb-8 animate-barn-door-open">
-              <h1 className="text-6xl md:text-8xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">
-                🐔 Galinheiro Musical 🎵
-              </h1>
-              <p className="text-xl md:text-2xl text-muted-foreground font-medium mb-2">
-                Onde as galinhas mais musicais se encontram!
+            <div className="mb-12 animate-fade-in">
+              <div className="inline-block mb-6 p-6 glass-card rounded-3xl">
+                <h1 className="text-5xl md:text-7xl font-bold text-gradient font-poppins animate-float-music">
+                  🐔 Galinheiro Musical 🎵
+                </h1>
+              </div>
+              <p className="text-xl md:text-2xl text-foreground/80 font-medium mb-4 leading-relaxed">
+                Onde as galinhas mais <span className="text-electric-purple font-semibold">musicais</span> se encontram!
               </p>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-lg text-foreground/70 font-inter">
                 Teste seus conhecimentos musicais em um quiz multiplayer cheio de diversão
               </p>
             </div>
 
             {/* Auto-Join Form - Aparece quando há código de sala na URL */}
             {showAutoJoinForm && pendingRoomCode && (
-                <BarnCard variant="golden" className="max-w-2xl mx-auto mb-8">
-                  <div className="text-center">
-                    <h3 className="text-2xl font-bold mb-4 text-white">
-                      🎉 Você foi convidado para uma sala!
-                    </h3>
-                    <p className="text-white/90 mb-6">
-                      Código: <span className="font-mono font-bold">{pendingRoomCode}</span>
-                    </p>
-                    <p className="text-white/80 mb-4">
-                      Configure seu perfil e entre automaticamente na sala:
-                    </p>
+                <div className="max-w-2xl mx-auto mb-8 animate-scale-in">
+                  <div className="glass-card rounded-3xl p-8 border border-electric-purple/30 shadow-neon">
+                    <div className="text-center">
+                      <h3 className="text-2xl font-bold mb-4 text-foreground">
+                        🎉 Você foi convidado para uma sala!
+                      </h3>
+                      <p className="text-foreground/90 mb-6">
+                        Código: <span className="font-mono font-bold text-electric-purple">{pendingRoomCode}</span>
+                      </p>
+                      <p className="text-foreground/80 mb-4">
+                        Configure seu perfil e entre automaticamente na sala:
+                      </p>
+                    </div>
                   </div>
-                </BarnCard>
+                </div>
             )}
 
             {/* Action Cards - Esconde quando está no modo auto-join */}
@@ -189,26 +201,27 @@ export default function Home() {
             )}
 
             {/* Player Setup */}
-            <BarnCard variant="golden" className="max-w-2xl mx-auto">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold mb-6">Escolha sua Galinha</h3>
+            <div className="max-w-2xl mx-auto animate-slide-up">
+              <div className="glass-card rounded-3xl p-8 border border-white/10">
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold mb-6 text-foreground">Escolha sua Galinha</h3>
 
                 {/* Name Input */}
                 <div className="mb-6">
-                  <Label htmlFor="player-name" className="text-white/90">Nome da sua galinha</Label>
+                  <Label htmlFor="player-name" className="text-foreground/90">Nome da sua galinha</Label>
                   <Input
                       id="player-name"
                       placeholder="Ex: Galinha Pititica"
                       value={playerName}
                       onChange={(e) => setPlayerName(e.target.value)}
-                      className="mt-2 text-center bg-white/10 border-white/20 text-white placeholder:text-white/60"
+                      className="mt-2 text-center glass-button border-white/20 text-foreground placeholder:text-foreground/60"
                       maxLength={20}
                   />
                 </div>
 
                 {/* Avatar Selection */}
                 <div className="mb-6">
-                  <Label className="text-white/90 block mb-4">Escolha seu avatar</Label>
+                  <Label className="text-foreground/90 block mb-4">Escolha seu avatar</Label>
                   <div className="grid grid-cols-5 md:grid-cols-10 gap-2 justify-center">
                     {chickenAvatars.map((emoji) => (
                         <ChickenAvatar
@@ -252,19 +265,20 @@ export default function Home() {
 
                 {/* Selected Chicken Preview */}
                 {playerName && selectedAvatar && (
-                    <div className="bg-white/10 rounded-lg p-4 border border-white/20">
-                      <p className="text-white/90 mb-2">Sua galinha:</p>
+                    <div className="glass-button rounded-lg p-4 border border-electric-purple/30">
+                      <p className="text-foreground/90 mb-2">Sua galinha:</p>
                       <div className="flex items-center justify-center gap-4">
                         <ChickenAvatar emoji={selectedAvatar} size="xl" animated />
                         <div>
-                          <p className="text-xl font-bold text-white">{playerName}</p>
+                          <p className="text-xl font-bold text-foreground">{playerName}</p>
                           <EggCounter count={0} variant="golden" size="sm" />
                         </div>
                       </div>
                     </div>
                 )}
+                </div>
               </div>
-            </BarnCard>
+            </div>
 
             {/* Quick Stats */}
             <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto">
