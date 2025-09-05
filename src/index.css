@@ -5,78 +5,95 @@
 
 @layer base {
   :root {
-    /* Grove Guess Modern Dark Theme */
-    --background: 240 10% 3.9%;
+    /* Musical Theme Colors */
+    --background: 240 10% 8%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+
+    --card: 240 10% 12%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+
+    --popover: 240 10% 12%;
     --popover-foreground: 0 0% 98%;
-    --primary: 142 76% 36%;
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 12 6.5% 15.1%;
-    --accent-foreground: 0 0% 98%;
+
+    /* Musical Purple Primary */
+    --primary: 270 91% 65%;
+    --primary-foreground: 0 0% 8%;
+
+    /* Musical Blue Secondary */
+    --secondary: 220 91% 65%;
+    --secondary-foreground: 0 0% 8%;
+
+    --muted: 240 10% 20%;
+    --muted-foreground: 240 5% 65%;
+
+    /* Musical Pink Accent */
+    --accent: 320 91% 65%;
+    --accent-foreground: 0 0% 8%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 10% 20%;
+    --input: 240 10% 15%;
+    --ring: 270 91% 65%;
+
+    /* Musical Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(270, 91%, 65%), hsl(220, 91%, 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(320, 91%, 65%), hsl(270, 91%, 65%));
+    --gradient-success: linear-gradient(135deg, hsl(140, 91%, 65%), hsl(170, 91%, 65%));
+    --gradient-danger: linear-gradient(135deg, hsl(0, 84%, 60%), hsl(15, 91%, 65%));
+
+    /* Musical Shadows */
+    --shadow-glow: 0 0 40px hsl(270 91% 65% / 0.3);
+    --shadow-card: 0 10px 30px hsl(240 10% 0% / 0.5);
+
+    --radius: 1rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 142 76% 36%;
-    --radius: 0.75rem;
+    --destructive-foreground: 210 40% 98%;
 
-    /* Vibrant Accent Colors - Grove Guess Style */
-    --electric-purple: 271 81% 56%;
-    --neon-blue: 217 91% 60%;
-    --cyber-green: 142 76% 36%;
-    --hot-pink: 330 81% 60%;
-    --golden-yellow: 48 96% 66%;
-    --orange-red: 14 91% 60%;
-
-    /* Gaming Theme Colors */
-    --neon-orange: 25 100% 60%;
-    --neon-purple: 270 100% 65%;
-    --neon-green: 120 100% 55%;
-    --neon-yellow: 50 100% 60%;
-    --surface: 240 10% 3.9%;
-    --surface-elevated: 240 3.7% 15.9%;
-    --danger: 0 100% 65%;
-    
-    /* Glass Effect Colors */
-    --glass-light: 240 15% 15%;
-    --glass-border: 240 8% 25%;
-    
-    /* Chicken Farm Colors - Modern Dark */
-    --chicken-orange: 25 100% 60%;
-    --egg-shell: 45 25% 25%;
-    --barn-brown: 25 60% 45%;
-    --feather-white: 45 15% 90%;
-    --corn-golden: 50 100% 65%;
-
-    /* Modern Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(var(--electric-purple)), hsl(var(--neon-blue)));
-    --gradient-secondary: linear-gradient(135deg, hsl(var(--cyber-green)), hsl(var(--neon-blue)));
-    --gradient-accent: linear-gradient(135deg, hsl(var(--hot-pink)), hsl(var(--golden-yellow)));
-    --gradient-dark: linear-gradient(135deg, hsl(240 10% 3.9%), hsl(240 8% 8%));
-    --gradient-sunrise: linear-gradient(135deg, hsl(25 100% 60% / 0.8), hsl(50 100% 60% / 0.6));
-    --gradient-barn: linear-gradient(180deg, hsl(270 100% 65% / 0.8), hsl(200 100% 60% / 0.6));
-    --gradient-grass: linear-gradient(180deg, hsl(120 100% 55% / 0.8), hsl(120 85% 50% / 0.6));
-    --gradient-sky: linear-gradient(180deg, hsl(200 100% 60% / 0.3), hsl(240 10% 3.9% / 0.1));
-
-    /* Glass Effects */
-    --glass-bg: rgba(255, 255, 255, 0.05);
-    --glass-border: rgba(255, 255, 255, 0.1);
-    --glass-hover: rgba(255, 255, 255, 0.1);
-
-    /* Shadows */
-    --shadow-glow: 0 0 40px hsl(var(--electric-purple) / 0.3);
-    --shadow-neon: 0 0 20px hsl(var(--neon-blue) / 0.5);
-    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.3);
-    --shadow-glass: 0 8px 32px hsl(0 0% 0% / 0.3);
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -95,89 +112,74 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', 'Poppins', system-ui, sans-serif;
-    font-feature-settings: "rlig" 1, "calt" 1;
-    line-height: 1.6;
-  }
-
-  html {
-    scroll-behavior: smooth;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Poppins', system-ui, sans-serif;
-    font-weight: 600;
-    line-height: 1.3;
   }
 }
 
-@layer utilities {
-  /* Modern Glass Morphism */
-  .glass-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid var(--glass-border);
-    box-shadow: var(--shadow-soft);
+@layer components {
+  /* Musical Components */
+  .gradient-primary {
+    background: var(--gradient-primary);
   }
 
-  .glass-button {
-    background: var(--glass-bg);
-    backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid var(--glass-border);
-    transition: var(--transition-smooth);
+  .gradient-secondary {
+    background: var(--gradient-secondary);
   }
 
-  .glass-button:hover {
-    background: var(--glass-hover);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-neon);
+  .gradient-success {
+    background: var(--gradient-success);
   }
 
-  /* Neon Effects */
-  .neon-glow {
+  .gradient-danger {
+    background: var(--gradient-danger);
+  }
+
+  .shadow-glow {
     box-shadow: var(--shadow-glow);
   }
 
-  .neon-border {
-    border: 1px solid;
-    border-image: var(--gradient-primary) 1;
+  .shadow-card {
+    box-shadow: var(--shadow-card);
   }
 
-  .text-gradient {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  .music-pulse {
+    animation: music-pulse 2s ease-in-out infinite;
   }
 
-  /* Interactive Elements */
-  .smooth-transition {
-    transition: var(--transition-smooth);
+  @keyframes music-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.05);
+      opacity: 0.8;
+    }
   }
 
-  .hover-lift {
-    transition: transform 0.3s ease;
+  .option-float {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .hover-lift:hover {
+  .option-float:hover {
     transform: translateY(-4px);
+    box-shadow: var(--shadow-glow);
   }
 
-  .interactive-card {
-    @apply glass-card smooth-transition hover-lift cursor-pointer;
+  .score-bounce {
+    animation: score-bounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
 
-  .interactive-card:hover {
-    @apply neon-glow;
-  }
-
-  .primary-button {
-    @apply glass-button text-white font-semibold py-3 px-6 rounded-xl;
-    background: var(--gradient-primary);
-  }
-
-  .primary-button:hover {
-    @apply neon-glow;
-    transform: translateY(-2px) scale(1.02);
+  @keyframes score-bounce {
+    0% {
+      transform: scale(0.3);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 }

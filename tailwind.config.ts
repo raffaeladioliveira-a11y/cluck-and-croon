@@ -133,56 +133,31 @@ export default {
 			},
 			keyframes: {
 				'accordion-down': {
-					from: {
-						height: '0'
-					},
-					to: {
-						height: 'var(--radix-accordion-content-height)'
-					}
+					'0%': { height: '0' },
+					'100%': { height: 'var(--radix-accordion-content-height)' },
 				},
 				'accordion-up': {
-					from: {
-						height: 'var(--radix-accordion-content-height)'
-					},
-					to: {
-						height: '0'
-					}
+					'0%': { height: 'var(--radix-accordion-content-height)' },
+					'100%': { height: '0' },
 				},
 				'chicken-walk': {
 					'0%': { transform: 'translateX(-10px) rotate(-2deg)' },
 					'25%': { transform: 'translateX(-5px) rotate(0deg)' },
 					'50%': { transform: 'translateX(0px) rotate(2deg)' },
 					'75%': { transform: 'translateX(5px) rotate(0deg)' },
-					'100%': { transform: 'translateX(10px) rotate(-2deg)' }
-				},
-				'egg-bounce': {
-					'0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
-					'50%': { transform: 'translateY(-10px) rotate(5deg)' }
-				},
-				'feather-float': {
-					'0%': { transform: 'translateY(0px) rotate(0deg)', opacity: '1' },
-					'50%': { transform: 'translateY(-20px) rotate(180deg)', opacity: '0.7' },
-					'100%': { transform: 'translateY(-40px) rotate(360deg)', opacity: '0' }
-				},
-				'barn-door-open': {
-					'0%': { transform: 'rotateY(0deg)' },
-					'100%': { transform: 'rotateY(-45deg)' }
-				},
-				'peck': {
-					'0%, 100%': { transform: 'translateY(0px)' },
-					'50%': { transform: 'translateY(5px)' }
-				}
+					'100%': { transform: 'translateX(10px) rotate(-2deg)' },
+				}, /* 👈 vírgula aqui */
 				'fade-in': {
-					"0%": { opacity: "0", transform: "translateY(10px)" },
-					"100%": { opacity: "1", transform: "translateY(0)" },
+					'0%': { opacity: '0', transform: 'translateY(10px)' },
+					'100%': { opacity: '1', transform: 'translateY(0)' },
 				},
 				'slide-up': {
-					"0%": { opacity: "0", transform: "translateY(20px)" },
-					"100%": { opacity: "1", transform: "translateY(0)" },
+					'0%': { opacity: '0', transform: 'translateY(20px)' },
+					'100%': { opacity: '1', transform: 'translateY(0)' },
 				},
 				'scale-in': {
-					"0%": { opacity: "0", transform: "scale(0.95)" },
-					"100%": { opacity: "1", transform: "scale(1)" },
+					'0%': { opacity: '0', transform: 'scale(0.95)' },
+					'100%': { opacity: '1', transform: 'scale(1)' },
 				},
 				'pulse-beat': {
 					'0%, 100%': { transform: 'scale(1)', opacity: '1' },
@@ -216,4 +191,4 @@ export default {
 		}
 	},
 	plugins: [require("tailwindcss-animate")],
-} satisfies Config;
+};

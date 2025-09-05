@@ -193,7 +193,7 @@ export function PlayerList({
   console.log("shouldShowMp3AlbumSelector:", shouldShowMp3AlbumSelector);
 
   return (
-      <BarnCard variant="coop" className="mb-4 sm:mb-8">
+      <BarnCard variant="coop" className="mb-4 sm:mb-8 bg-glass">
         <div className="px-2 sm:px-4">
           {/* Header com título responsivo */}
           <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
