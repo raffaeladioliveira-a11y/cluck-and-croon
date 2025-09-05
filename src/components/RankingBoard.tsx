@@ -30,9 +30,13 @@ export function RankingBoard({ roomCode, currentProfileId }:{
             .channel(`rank-${roomCode}`)
             .on("postgres_changes", {
                 event: "*", schema: "public", table: "room_participants", filter: `room_code=eq.${roomCode}`
-            }, load)
+            }, () => {
+                load();
+            })
             .subscribe();
-        return () => supabase.removeChannel(ch);
+        return () => {
+            supabase.removeChannel(ch);
+        };
     }, [roomCode]);
 
     return (

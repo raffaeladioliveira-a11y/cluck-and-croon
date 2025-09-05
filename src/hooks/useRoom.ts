@@ -23,9 +23,13 @@ export function useRoom(roomCode: string) {
             .channel(`room-${roomCode}`)
             .on("postgres_changes", {
                 event: "*", schema: "public", table: "game_rooms", filter: `code=eq.${roomCode}`
-            }, fetchRoom)
+            }, () => {
+                fetchRoom();
+            })
             .subscribe();
-        return () => supabase.removeChannel(ch);
+        return () => {
+            supabase.removeChannel(ch);
+        };
     }, [roomCode]);
 
     return { room, refetchRoom: fetchRoom };

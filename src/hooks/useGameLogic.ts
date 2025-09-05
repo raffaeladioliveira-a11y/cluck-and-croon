@@ -55,7 +55,7 @@ async function getGameMode(): Promise<'mp3' | 'spotify'> {
   const raw = data?.value;
   // value costuma vir como string JSON com aspas: "\"spotify\"" → normalizar
   const normalized =
-      typeof raw === 'string' ? raw.replaceAll('"', '') : 'mp3';
+      typeof raw === 'string' ? raw.replace(/"/g, '') : 'mp3';
 
   return normalized === 'spotify' ? 'spotify' : 'mp3';
 }
