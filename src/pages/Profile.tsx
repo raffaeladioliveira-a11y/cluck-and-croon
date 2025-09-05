@@ -87,7 +87,7 @@ export default function Profile() {
           const { error: profileError } = await supabase
               .from('profiles')
               .upsert({
-                id: user.id,
+                user_id: user.id,
                 display_name: displayName,
                 avatar_url: selectedAvatar,
                 updated_at: new Date().toISOString()

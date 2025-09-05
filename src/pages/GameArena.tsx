@@ -67,7 +67,7 @@ function GameArenaContent() {
         answersByOption,
         isHost,
         activeGenre,
-        gameMode: hookGameMode,
+        selectedAlbumInfo,
     } = useGameLogic(roomCode || "", sid);
 
     console.log("=== DEBUG COMPLETO ===");
@@ -124,7 +124,7 @@ function GameArenaContent() {
     const song = currentQuestion?.song ?? {};
 
     const rawSpotifyTrackId: string | undefined =
-        song.spotify_track_id ||
+        (song as any).spotify_track_id ||
         (song as any).spotifyTrackId ||
         (song as any).track_id ||
         extractSpotifyTrackIdFromUrl((song as any).embed_url || (song as any).spotify_embed_url);
@@ -135,7 +135,7 @@ function GameArenaContent() {
         (rawSpotifyTrackId ? `https://open.spotify.com/embed/track/${rawSpotifyTrackId}?utm_source=generator&theme=0` : undefined);
 
     const preferSpotify = !!rawSpotifyTrackId || !!spotifyEmbedUrl;
-    const finalGameMode: "mp3" | "spotify" = preferSpotify ? "spotify" : (hookGameMode === "spotify" ? "spotify" : "mp3");
+    const finalGameMode: "mp3" | "spotify" = preferSpotify ? "spotify" : "mp3";
 
     // ---------- LOADING ----------
     if (isLoading) {
@@ -211,7 +211,7 @@ function GameArenaContent() {
                             <div className="space-y-2 sm:space-y-3">
                                 {Array.isArray(players) && players.length > 0 ? (
                                     players
-                                        .sort((a, b) => (b.eggs || 0) - (a.eggs || 0))
+                                        .sort((a, b) => ((a as any).eggs || 0) - ((b as any).eggs || 0))
                                         .slice(0, 5) // Limita a 5 no mobile para economizar espaço
                                         .map((player, index) => (
                                             <div key={player.id} className="flex items-center gap-2 sm:gap-4">
@@ -230,7 +230,7 @@ function GameArenaContent() {
                                                 </span>
 
                                                 <EggCounter
-                                                    count={player.eggs || 0}
+                                                    count={(player as any).eggs || 0}
                                                     size="sm"
                                                     variant="golden"
                                                     className="flex-shrink-0"
@@ -327,7 +327,6 @@ function GameArenaContent() {
                                         duration={(song as any).duration_seconds || 15}
                                         gameMode={finalGameMode}
                                         spotifyTrackId={rawSpotifyTrackId}
-                                        spotifyEmbedUrl={spotifyEmbedUrl}
                                         audioUrl={finalGameMode === "mp3" ? (song as any).audioUrl : undefined}
                                         autoPlay={gameState === "playing"}
                                         muted={!audioUnlocked}

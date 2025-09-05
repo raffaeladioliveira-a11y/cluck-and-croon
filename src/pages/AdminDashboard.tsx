@@ -20,7 +20,6 @@ interface Song {
     id: string;
     title: string;
     artist: string;
-    genre: string;
     genre_id?: string;
     album_id?: string | null;
     album_name?: string;
@@ -33,10 +32,21 @@ interface Song {
     is_active?: boolean;
     difficulty_level?: number;
     play_count?: number;
-    source: 'spotify' | 'youtube' | 'manual';
-    url?: string;
     created_at?: string;
     updated_at?: string;
+    spotify_track_id?: string;
+    embed_url?: string;
+    // Relations from Supabase joins
+    albums?: {
+        name: string;
+        artist_name: string;
+        release_year: number | null;
+        cover_image_url: string;
+    };
+    genres?: {
+        name: string;
+        emoji: string;
+    };
 }
 
 interface Genre {
@@ -152,7 +162,7 @@ export default function AdminDashboard() {
             )
             }
 
-            setSearchResults(filtered);
+            setSearchResults(filtered as Song[]);
         } catch (error) {
             toast({
                 title: "Erro",
@@ -184,8 +194,8 @@ export default function AdminDashboard() {
                 .order('created_at', {ascending: false});
 
             if (error) throw error;
-            setAllSongs(data || []);
-            setFilteredSongs(data || []);
+            setAllSongs(data as Song[] || []);
+            setFilteredSongs(data as Song[] || []);
         } catch (error) {
             toast({
                 title: "Erro",
@@ -884,6 +894,10 @@ export default function AdminDashboard() {
             setNewSong({
                 title: '',
                 artist: '',
+                genre_id: '',
+                album_id: '',
+                album_name: '',
+                release_year: '',
                 duration_seconds: '10',
                 spotify_url: '',
                 youtube_url: '',
@@ -1551,7 +1565,7 @@ export default function AdminDashboard() {
                                             <div className="flex items-center gap-3 mb-2">
                                                 <h2 className="text-3xl font-bold text-primary">{selectedAlbum.name}</h2>
                                                 <Badge variant="secondary">
-                                                    {selectedAlbum.genre ?.emoji} {selectedAlbum.genre ?.name}
+                                                    {selectedAlbum.genres?.emoji} {selectedAlbum.genres?.name}
                                                 </Badge>
                                             </div>
                                             <p className="text-xl text-muted-foreground mb-2">{selectedAlbum.artist_name}</p>

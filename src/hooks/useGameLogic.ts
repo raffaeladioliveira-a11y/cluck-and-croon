@@ -360,8 +360,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             audio_file_url: song.audio_file_url,
             preview_url: song.preview_url,
             duration_seconds: song.duration_seconds || 15,
-            spotify_track_id: song.spotify_track_id,
-            embed_url: song.embed_url,
+            spotify_track_id: song.spotify_track_id || undefined,
+            embed_url: song.embed_url || undefined,
           }));
         }
       }

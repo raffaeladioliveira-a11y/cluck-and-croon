@@ -420,6 +420,7 @@ export type Database = {
           games_played: number | null
           games_won: number | null
           id: string
+          is_admin: boolean | null
           total_eggs: number | null
           updated_at: string
           user_id: string
@@ -432,6 +433,7 @@ export type Database = {
           games_played?: number | null
           games_won?: number | null
           id?: string
+          is_admin?: boolean | null
           total_eggs?: number | null
           updated_at?: string
           user_id: string
@@ -444,6 +446,7 @@ export type Database = {
           games_played?: number | null
           games_won?: number | null
           id?: string
+          is_admin?: boolean | null
           total_eggs?: number | null
           updated_at?: string
           user_id?: string
@@ -527,12 +530,14 @@ export type Database = {
           created_at: string
           difficulty_level: number | null
           duration_seconds: number | null
+          embed_url: string | null
           genre_id: string | null
           id: string
           is_active: boolean | null
           play_count: number | null
           preview_url: string | null
           release_year: number | null
+          spotify_track_id: string | null
           spotify_url: string | null
           title: string
           updated_at: string
@@ -546,12 +551,14 @@ export type Database = {
           created_at?: string
           difficulty_level?: number | null
           duration_seconds?: number | null
+          embed_url?: string | null
           genre_id?: string | null
           id?: string
           is_active?: boolean | null
           play_count?: number | null
           preview_url?: string | null
           release_year?: number | null
+          spotify_track_id?: string | null
           spotify_url?: string | null
           title: string
           updated_at?: string
@@ -565,12 +572,14 @@ export type Database = {
           created_at?: string
           difficulty_level?: number | null
           duration_seconds?: number | null
+          embed_url?: string | null
           genre_id?: string | null
           id?: string
           is_active?: boolean | null
           play_count?: number | null
           preview_url?: string | null
           release_year?: number | null
+          spotify_track_id?: string | null
           spotify_url?: string | null
           title?: string
           updated_at?: string

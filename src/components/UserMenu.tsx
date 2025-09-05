@@ -31,13 +31,17 @@ export function UserMenu() {
             if (!user) return;
 
             try {
-                const { data: profile } = await supabase
+                const { data: profile, error } = await supabase
                     .from('profiles')
                     .select('is_admin')
                     .eq('user_id', user.id)
-                    .single();
+                    .maybeSingle();
 
-                setIsAdmin(profile?.is_admin || false);
+                if (!error && profile) {
+                    setIsAdmin(profile.is_admin || false);
+                } else {
+                    setIsAdmin(false);
+                }
             } catch (error) {
                 console.error('Erro ao verificar status admin:', error);
                 setIsAdmin(false);
