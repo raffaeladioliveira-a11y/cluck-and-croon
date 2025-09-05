@@ -20,7 +20,6 @@ function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
 }
 
 function GameArenaContent() {
-
     const { roomCode } = useParams<{ roomCode: string }>();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -68,11 +67,9 @@ function GameArenaContent() {
         answersByOption,
         isHost,
         activeGenre,
-        // se seu hook expõe gameMode, ele é usado como pista inicial:
-        gameMode: hookGameMode, // pode vir undefined em versões antigas
+        gameMode: hookGameMode,
     } = useGameLogic(roomCode || "", sid);
 
-    // ADICIONE ESTES LOGS PARA DEBUG:
     console.log("=== DEBUG COMPLETO ===");
     console.log("1. clientId.current:", clientId.current);
     console.log("2. players array completo:", players);
@@ -81,35 +78,27 @@ function GameArenaContent() {
     console.log("5. user.user_metadata:", user?.user_metadata);
     console.log("6. answersByOption:", answersByOption);
 
-    // Verifique especificamente o que está sendo renderizado
     const debugPlayer = players?.find((p) => p.id === clientId.current);
-    // console.log("7. Avatar do jogador logado:", debugPlayer?.avatar);
-    // console.log("8. Tipo do avatar:", typeof debugPlayer?.avatar);
-    // console.log("9. Começa com '/'?", debugPlayer?.avatar?.startsWith("/"));
 
     // ---------- helpers ----------
-    // CORREÇÃO: Usar o avatar real do jogador logado
     const currentPlayer = (() => {
         const loggedPlayer = players?.find((p) => p.id === clientId.current);
         return {
             id: "current",
             name: loggedPlayer?.name || user?.user_metadata?.display_name || "Você",
-            avatar: loggedPlayer?.avatar || "🐔", // Usa o avatar real
+            avatar: loggedPlayer?.avatar || "🐔",
             eggs: playerEggs,
             selectedAnswer: selectedAnswer,
     };
     })();
 
-    // CORREÇÃO: Incluir o jogador atual na lista quando ele seleciona uma opção
     const playersOnOption = (optionIndex: number) => {
         const playersOnThisOption = answersByOption?.[optionIndex] || [];
 
-        // Se o jogador atual selecionou esta opção, verifica se já está na lista
         if (selectedAnswer === optionIndex) {
             const loggedPlayer = players?.find((p) => p.id === clientId.current);
             const isAlreadyInList = playersOnThisOption.some(p => p.id === clientId.current);
 
-            // Se não estiver na lista, adiciona
             if (!isAlreadyInList && loggedPlayer?.avatar?.startsWith("/")) {
                 return [...playersOnThisOption, {
                     id: clientId.current,
@@ -134,7 +123,6 @@ function GameArenaContent() {
     // ---------- DECISÃO: Spotify vs MP3 para a música atual ----------
     const song = currentQuestion?.song ?? {};
 
-    // pega possíveis campos vindos do backend
     const rawSpotifyTrackId: string | undefined =
         song.spotify_track_id ||
         (song as any).spotifyTrackId ||
@@ -146,43 +134,17 @@ function GameArenaContent() {
         (song as any).spotify_embed_url ||
         (rawSpotifyTrackId ? `https://open.spotify.com/embed/track/${rawSpotifyTrackId}?utm_source=generator&theme=0` : undefined);
 
-    // regra: priorizamos Spotify SE houver identificador de faixa OU embed_url válido
     const preferSpotify = !!rawSpotifyTrackId || !!spotifyEmbedUrl;
-
-    // modo final: se preferSpotify true => spotify; senão usamos o modo do hook; senão mp3
     const finalGameMode: "mp3" | "spotify" = preferSpotify ? "spotify" : (hookGameMode === "spotify" ? "spotify" : "mp3");
-
-    // log de depuração por música/rodada
-    // if (currentQuestion?.song?.id) {
-    //     // eslint-disable-next-line no-console
-    //     console.log("[GameArena] track decision", {
-    //         round: currentRound,
-    //         gameState,
-    //         hookGameMode,
-    //         preferSpotify,
-    //         reason: preferSpotify ? "spotify data present" : "no spotify fields on this song",
-    //         song: {
-    //             id: (song as any).id,
-    //             title: (song as any).title,
-    //             artist: (song as any).artist,
-    //             audioUrl: (song as any).audioUrl,
-    //             spotify_track_id: (song as any).spotify_track_id || (song as any).spotifyTrackId || (song as any).track_id,
-    //             embed_url: (song as any).embed_url || (song as any).spotify_embed_url,
-    //         },
-    //         finalGameMode,
-    //         rawSpotifyTrackId,
-    //         spotifyEmbedUrl,
-    //     });
-    // }
 
     // ---------- LOADING ----------
     if (isLoading) {
         return (
-            <div className="min-h-screen bg-gradient-sky flex items-center justify-center">
-                <BarnCard variant="golden" className="text-center p-8">
-                    <div className="text-6xl mb-4 animate-chicken-walk">🐔</div>
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-white" />
-                    <p className="text-white text-lg">Preparando o galinheiro musical...</p>
+            <div className="min-h-screen bg-gradient-sky flex items-center justify-center p-4">
+                <BarnCard variant="golden" className="text-center p-6 sm:p-8 w-full max-w-md">
+                    <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🐔</div>
+                    <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-4 text-white" />
+                    <p className="text-white text-sm sm:text-lg">Preparando o galinheiro musical...</p>
                 </BarnCard>
             </div>
         );
@@ -190,250 +152,333 @@ function GameArenaContent() {
 
     // ---------- RENDER ----------
     return (
-        <div className="min-h-screen bg-gradient-sky p-4">
+        <div className="min-h-screen bg-gradient-sky p-2 sm:p-4">
             <GameNavigation showLeaveRoom={true} />
             <div className="max-w-6xl mx-auto">
-                {/* Header com rodada/tempo/valor + gênero ativo */}
-                <div className="grid md:grid-cols-4 gap-4 mb-6">
-                    <BarnCard variant="nest" className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <span className="text-2xl">🔢</span>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Rodada</p>
-                                <p className="text-xl font-bold text-primary">{currentRound}/10</p>
+                {/* Header consolidado - Mobile First */}
+                <div className="mb-4 sm:mb-6">
+                    {/* Card principal com todas as informações */}
+                    <BarnCard variant="golden" className="mb-3 sm:mb-4">
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
+                            {/* Rodada */}
+                            <div className="flex flex-col items-center">
+                                <span className="text-lg sm:text-2xl mb-1">🔢</span>
+                                <p className="text-xs sm:text-sm text-white/80">Rodada</p>
+                                <p className="text-sm sm:text-xl font-bold text-white">{currentRound}/10</p>
+                            </div>
+
+                            {/* Tempo */}
+                            <div className="flex flex-col items-center">
+                                <span className="text-xl sm:text-3xl mb-1 animate-chicken-walk">🐓</span>
+                                <p className="text-xs sm:text-sm text-white/80">Tempo</p>
+                                <p className="text-lg sm:text-2xl font-bold text-white">{timeLeft}s</p>
+                            </div>
+
+                            {/* Valendo */}
+                            <div className="flex flex-col items-center">
+                                <span className="text-lg sm:text-2xl mb-1 animate-egg-bounce">🥚</span>
+                                <p className="text-xs sm:text-sm text-white/80">Valendo</p>
+                                <p className="text-sm sm:text-xl font-bold text-white">{currentSettings?.eggs_per_correct || 10}</p>
+                                <p className="text-xs text-white/60 hidden sm:block">+{currentSettings?.speed_bonus || 5} bônus</p>
                             </div>
                         </div>
                     </BarnCard>
-                    <BarnCard variant="golden" className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <span className="text-3xl animate-chicken-walk">🐓</span>
-                            <div>
-                                <p className="text-sm text-white/80">Tempo</p>
-                                <p className="text-2xl font-bold text-white">{timeLeft}s</p>
-                            </div>
-                        </div>
-                    </BarnCard>
-                    <BarnCard variant="coop" className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                            <span className="text-2xl animate-egg-bounce">🥚</span>
-                            <div>
-                                <p className="text-sm text-muted-foreground">Valendo</p>
-                                <p className="text-xl font-bold text-barn-brown">{currentSettings?.eggs_per_correct || 10} ovos</p>
-                                <p className="text-xs text-muted-foreground">+{currentSettings?.speed_bonus || 5} bônus velocidade</p>
-                            </div>
-                        </div>
-                    </BarnCard>
+
+                    {/* Gênero ativo - Separado para mobile */}
                     {activeGenre && (
-                        <BarnCard variant="nest" className="text-center">
+                        <BarnCard variant="nest" className="text-center py-2 sm:py-3">
                             <div className="flex items-center justify-center gap-2">
-                                <span className="text-2xl">{activeGenre.emoji}</span>
+                                <span className="text-lg sm:text-2xl">{activeGenre.emoji}</span>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Estilo</p>
-                                    <p className="text-lg font-bold text-primary">{activeGenre.name}</p>
+                                    <p className="text-xs sm:text-sm text-muted-foreground">Estilo</p>
+                                    <p className="text-sm sm:text-lg font-bold text-primary">{activeGenre.name}</p>
                                 </div>
                             </div>
                         </BarnCard>
                     )}
                 </div>
 
-                {/* GRID PRINCIPAL: ESQUERDA = RANKING (3 col) | DIREITA = JOGO (9 col) */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                    {/* Ranking – ESQUERDA */}
-                    <div className="md:col-span-4">
-                        <BarnCard variant="coop" className="text-center">
-                            <div className="mb-4">
-                                <h3 className="text-xl font-bold text-barn-brown mb-2">🏆 Ranking da Partida</h3>
-                                <div className="flex flex-col gap-2 items-center">
-                                    {Array.isArray(players) && players.length > 0 ? (
-                                        players
-                                            .sort((a, b) => (b.eggs || 0) - (a.eggs || 0))
-                                            .map((player, index) => (
-                                                <div key={player.id} className="flex items-center gap-4">
-                                                    <span className="text-lg font-bold w-6 text-right">{index + 1}º</span>
-                                                    {/* APENAS renderiza se tiver avatar válido (URL) */}
-                                                    {player.avatar?.startsWith("/") && (
-                                                    <img
-                                                        src={player.avatar}
-                                                        alt={player.name}
-                                                        className="w-16 h-16 rounded-full object-cover border-2 border-white"
-                                                    />
-                                                    )}
-                                                    <span className="text-md font-semibold">{player.name || "Jogador"}</span>
-                                                    <EggCounter count={player.eggs || 0} size="sm" variant="golden" />
-                                                </div>
-                                            ))
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">Ranking ainda não disponível...</p>
-                                    )}
-                                </div>
+                {/* Layout principal responsivo */}
+                <div className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-6 lg:space-y-0">
+                    {/* Ranking - Mobile: acima | Desktop: esquerda */}
+                    <div className="lg:col-span-4 lg:order-1">
+                        <BarnCard variant="coop" className="p-3 sm:p-4">
+                            <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
+                                <span className="sm:hidden">🏆 Ranking</span>
+                                <span className="hidden sm:inline">🏆 Ranking da Partida</span>
+                            </h3>
+
+                            <div className="space-y-2 sm:space-y-3">
+                                {Array.isArray(players) && players.length > 0 ? (
+                                    players
+                                        .sort((a, b) => (b.eggs || 0) - (a.eggs || 0))
+                                        .slice(0, 5) // Limita a 5 no mobile para economizar espaço
+                                        .map((player, index) => (
+                                            <div key={player.id} className="flex items-center gap-2 sm:gap-4">
+                                                <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">{index + 1}º</span>
+
+                                                {player.avatar?.startsWith("/") && (
+                                                <img
+                                                    src={player.avatar}
+                                                    alt={player.name}
+                                                    className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white flex-shrink-0"
+                                                />
+                                                )}
+
+                                                <span className="text-xs sm:text-md font-semibold truncate flex-1 min-w-0">
+                                                    {player.name || "Jogador"}
+                                                </span>
+
+                                                <EggCounter
+                                                    count={player.eggs || 0}
+                                                    size="sm"
+                                                    variant="golden"
+                                                    className="flex-shrink-0"
+                                                />
+                                            </div>
+                                        ))
+                                ) : (
+                                    <p className="text-xs sm:text-sm text-muted-foreground text-center">
+                                        Ranking ainda não disponível...
+                                    </p>
+                                )}
                             </div>
                         </BarnCard>
                     </div>
 
-                    {/* Conteúdo do jogo – DIREITA */}
-                    <div className="md:col-span-8">
+                    {/* Conteúdo do jogo - Mobile: abaixo | Desktop: direita */}
+                    <div className="lg:col-span-8 lg:order-2">
                         {/* Estado IDLE */}
                         {gameState === "idle" && (
-                            <div className="mb-6">
-                                <BarnCard variant="golden" className="text-center">
-                                    <div className="text-6xl mb-4 animate-chicken-walk">🎵</div>
-                                    <h3 className="text-2xl font-bold text-white mb-2">
-                                        {isHost ? "Pronto para começar?" : (sid ? "A partida já foi iniciada!" : "Aguardando o host...")}
+                            <div className="mb-4 sm:mb-6">
+                                <BarnCard variant="golden" className="text-center p-4 sm:p-6">
+                                    <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🎵</div>
+                                    <h3 className="text-lg sm:text-2xl font-bold text-white mb-2">
+                                        {isHost ? (
+                                            <>
+                                            <span className="sm:hidden">Pronto?</span>
+                                            <span className="hidden sm:inline">Pronto para começar?</span>
+                                            </>
+                                        ) : (sid ? (
+                                            <>
+                                            <span className="sm:hidden">Partida iniciada!</span>
+                                            <span className="hidden sm:inline">A partida já foi iniciada!</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                            <span className="sm:hidden">Aguardando...</span>
+                                            <span className="hidden sm:inline">Aguardando o host...</span>
+                                            </>
+                                        ))}
                                     </h3>
-                                    <p className="text-white/80 mb-6">
+
+                                    <p className="text-white/80 mb-4 sm:mb-6 text-sm sm:text-base px-2">
                                         {isHost
-                                            ? "Clique para iniciar e sincronizar todos os jogadores."
-                                            : (sid ? "Clique para entrar na partida que o host iniciou." : "Quando o host iniciar, você entra automaticamente.")}
+                                            ? (
+                                            <>
+                                            <span className="sm:hidden">Clique para iniciar.</span>
+                                            <span className="hidden sm:inline">Clique para iniciar e sincronizar todos os jogadores.</span>
+                                            </>
+                                        )
+                                            : (sid ? (
+                                            <>
+                                            <span className="sm:hidden">Clique para entrar.</span>
+                                            <span className="hidden sm:inline">Clique para entrar na partida que o host iniciou.</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                            <span className="sm:hidden">Quando o host iniciar, você entra automaticamente.</span>
+                                            <span className="hidden sm:inline">Quando o host iniciar, você entra automaticamente.</span>
+                                            </>
+                                        ))}
                                     </p>
 
                                     <ChickenButton
                                         variant="feather"
                                         size="lg"
-                                        className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                                        className="bg-white/20 hover:bg-white/30 text-white border-white/30 w-full sm:w-auto"
                                         chickenStyle="bounce"
                                         onClick={startFirstRound}
                                     >
-                                        {isHost ? "🎵 Iniciar Jogo" : (sid ? "🎵 Entrar na partida" : "🔊 Liberar áudio")}
+                                        <span className="sm:hidden">
+                                            {isHost ? "🎵 Iniciar" : (sid ? "🎵 Entrar" : "🔊 Liberar áudio")}
+                                        </span>
+                                        <span className="hidden sm:inline">
+                                            {isHost ? "🎵 Iniciar Jogo" : (sid ? "🎵 Entrar na partida" : "🔊 Liberar áudio")}
+                                        </span>
                                     </ChickenButton>
 
-                                    <p className="text-white/70 text-xs mt-3">
-                                        Dica: se o áudio não tocar quando o jogo começar, clique uma vez no player acima para liberar o som.
+                                    <p className="text-white/70 text-xs mt-3 px-2">
+                                        <span className="sm:hidden">Dica: clique no player para liberar o som.</span>
+                                        <span className="hidden sm:inline">Dica: se o áudio não tocar quando o jogo começar, clique uma vez no player acima para liberar o som.</span>
                                     </p>
                                 </BarnCard>
                             </div>
                         )}
 
-                        {/* Arena */}
+                        {/* Arena do jogo */}
                         {gameState !== "idle" && currentQuestion && (
-                            <>
-                            <BarnCard variant="golden" className="mb-6">
-                                <MusicPlayer
-                                    // identificação da música
-                                    songTitle={(song as any).title}
-                                    artist={(song as any).artist}
-                                    duration={(song as any).duration_seconds || 15}
-                                    // modo + fontes
-                                    gameMode={finalGameMode}
-                                    spotifyTrackId={rawSpotifyTrackId}
-                                    spotifyEmbedUrl={spotifyEmbedUrl}
-                                    audioUrl={finalGameMode === "mp3" ? (song as any).audioUrl : undefined}
-                                    // controle
-                                    autoPlay={gameState === "playing"}
-                                    muted={!audioUnlocked}
-                                    gameState={gameState}
-                                    roundKey={`${currentRound}-${(song as any).id || rawSpotifyTrackId || (song as any).title || "unk"}`}
-                                    onTimeUpdate={() => {}}
-                                    onEnded={() => {}}
-                                />
-                            </BarnCard>
+                            <div className="space-y-4 sm:space-y-6">
+                                {/* Player de música */}
+                                <BarnCard variant="golden" className="p-3 sm:p-4">
+                                    <MusicPlayer
+                                        songTitle={(song as any).title}
+                                        artist={(song as any).artist}
+                                        duration={(song as any).duration_seconds || 15}
+                                        gameMode={finalGameMode}
+                                        spotifyTrackId={rawSpotifyTrackId}
+                                        spotifyEmbedUrl={spotifyEmbedUrl}
+                                        audioUrl={finalGameMode === "mp3" ? (song as any).audioUrl : undefined}
+                                        autoPlay={gameState === "playing"}
+                                        muted={!audioUnlocked}
+                                        gameState={gameState}
+                                        roundKey={`${currentRound}-${(song as any).id || rawSpotifyTrackId || (song as any).title || "unk"}`}
+                                        onTimeUpdate={() => {}}
+                                        onEnded={() => {}}
+                                    />
+                                </BarnCard>
 
-                            <div className="grid md:grid-cols-2 gap-4 mb-6">
-                                {currentQuestion.options.map((option: string, index: number) => (
-                                    <BarnCard
-                                        key={index}
-                                        variant="default"
-                                        className={`cursor-pointer transition-all duration-300 ${getAnswerColor(index)}`}
-                                        onClick={() => handleAnswerSelect(index)}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-lg">
-                                                    {String.fromCharCode(65 + index)}
-                                                </div>
-                                                <span className="font-semibold text-lg">{option}</span>
-                                            </div>
-                                            {/* CORREÇÃO: Usar a função corrigida playersOnOption */}
-                                            <div className="flex -space-x-1">
-                                                {playersOnOption(index).map((p: any) => (
-                                                    <div key={p.id} className="relative">
-                                                        {/* APENAS renderiza se tiver avatar válido (URL) */}
-                                                        {p.avatar?.startsWith("/") && (
-                                                        <img
-                                                            src={p.avatar}
-                                                            alt={p.name}
-                                                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                                                            title={p.name}
-                                                        />
-                                                        )}
+                                {/* Opções de resposta */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                    {currentQuestion.options.map((option: string, index: number) => (
+                                        <BarnCard
+                                            key={index}
+                                            variant="default"
+                                            className={`cursor-pointer transition-all duration-300 p-3 sm:p-4 ${getAnswerColor(index)}`}
+                                            onClick={() => handleAnswerSelect(index)}
+                                        >
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                                                    <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-sm sm:text-lg flex-shrink-0">
+                                                        {String.fromCharCode(65 + index)}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </BarnCard>
-                                ))}
-                            </div>
+                                                    <span className="font-semibold text-sm sm:text-lg truncate">{option}</span>
+                                                </div>
 
-                            <BarnCard variant="coop">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <span className="text-xl">🏆</span>
-                                    <h3 className="text-xl font-bold text-barn-brown">Sua Pontuação - Rodada {currentRound}</h3>
+                                                {/* Avatares dos jogadores que escolheram esta opção */}
+                                                <div className="flex -space-x-1 flex-shrink-0">
+                                                    {playersOnOption(index).slice(0, 3).map((p: any) => (
+                                                        <div key={p.id} className="relative">
+                                                            {p.avatar?.startsWith("/") && (
+                                                            <img
+                                                                src={p.avatar}
+                                                                alt={p.name}
+                                                                className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-white"
+                                                                title={p.name}
+                                                            />
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {playersOnOption(index).length > 3 && (
+                                                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-400 border-2 border-white flex items-center justify-center">
+                                                            <span className="text-xs font-bold text-white">+{playersOnOption(index).length - 3}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </BarnCard>
+                                    ))}
                                 </div>
 
-                                {/* CORREÇÃO: Avatar + Nome alinhados usando currentPlayer corrigido */}
-                                <div className="flex flex-col items-center text-center">
-                                    {currentPlayer.avatar?.startsWith("/") ? (
-                                    <img
-                                        src={currentPlayer.avatar}
-                                        alt={currentPlayer.name}
-                                        className="w-16 h-16 rounded-full object-cover border-2 border-white mb-2"
-                                    />
-                                    ) : (
-                                    <ChickenAvatar
-                                        emoji={currentPlayer.avatar || "🐔"}
-                                        size="lg"
-                                        animated
-                                        className="mb-2 border-2 border-white"
-                                    />
-                                    )}
+                                {/* Sua pontuação */}
+                                <BarnCard variant="coop" className="p-3 sm:p-4">
+                                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                                        <span className="text-lg sm:text-xl">🏆</span>
+                                        <h3 className="text-sm sm:text-xl font-bold text-barn-brown">
+                                            <span className="sm:hidden">Sua Pontuação</span>
+                                            <span className="hidden sm:inline">Sua Pontuação - Rodada {currentRound}</span>
+                                        </h3>
+                                    </div>
 
-                                    <p className="font-semibold text-lg mb-2">{currentPlayer.name}</p>
-                                    <EggCounter count={playerEggs} size="lg" variant="golden" />
+                                    <div className="flex flex-col items-center text-center">
+                                        {currentPlayer.avatar?.startsWith("/") ? (
+                                        <img
+                                            src={currentPlayer.avatar}
+                                            alt={currentPlayer.name}
+                                            className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white mb-2"
+                                        />
+                                        ) : (
+                                        <ChickenAvatar
+                                            emoji={currentPlayer.avatar || "🐔"}
+                                            size="lg"
+                                            animated
+                                            className="mb-2 border-2 border-white"
+                                        />
+                                        )}
 
-                                    {selectedAnswer !== null && (
-                                        <div className="mt-4 p-3 bg-muted/50 rounded-lg">
-                                            <p className="text-sm font-medium">
-                                                Sua resposta: <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
-                                            </p>
-                                            {answerTime && (
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    Tempo de resposta: {answerTime.toFixed(1)}s
+                                        <p className="font-semibold text-sm sm:text-lg mb-2">{currentPlayer.name}</p>
+                                        <EggCounter count={playerEggs} size="lg" variant="golden" />
+
+                                        {selectedAnswer !== null && (
+                                            <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-muted/50 rounded-lg w-full">
+                                                <p className="text-xs sm:text-sm font-medium">
+                                                    <span className="sm:hidden">Resposta: </span>
+                                                    <span className="hidden sm:inline">Sua resposta: </span>
+                                                    <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
                                                 </p>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </BarnCard>
-
-                            {showResults && (
-                                <div className="mt-6">
-                                    <BarnCard variant="golden" className="text-center">
-                                        <div className="mb-4">
-                                            <div className="text-6xl mb-4">
-                                                {selectedAnswer === currentQuestion.correctAnswer ? "🎉" : "😅"}
+                                                {answerTime && (
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Tempo: {answerTime.toFixed(1)}s
+                                                    </p>
+                                                )}
                                             </div>
-                                            <h3 className="text-2xl font-bold text-white mb-2">
-                                                {selectedAnswer === currentQuestion.correctAnswer
-                                                    ? `🥚 Parabéns! Você ganhou ${currentSettings.eggs_per_correct || 10} ovos${
-                                                    timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
+                                        )}
+                                    </div>
+                                </BarnCard>
+
+                                {/* Resultados */}
+                                {showResults && (
+                                    <BarnCard variant="golden" className="text-center p-4 sm:p-6">
+                                        <div className="text-4xl sm:text-6xl mb-4">
+                                            {selectedAnswer === currentQuestion.correctAnswer ? "🎉" : "😅"}
+                                        </div>
+                                        <h3 className="text-lg sm:text-2xl font-bold text-white mb-2">
+                                            {selectedAnswer === currentQuestion.correctAnswer
+                                                ? (
+                                                <>
+                                                <span className="sm:hidden">
+                                                            🥚 Parabéns! +{currentSettings.eggs_per_correct || 10} ovos
+                                                    {timeLeft > ((currentSettings.time_per_question || 15) * 0.8) && ` +${currentSettings.speed_bonus || 5}!`}
+                                                        </span>
+                                                <span className="hidden sm:inline">
+                                                            🥚 Parabéns! Você ganhou {currentSettings.eggs_per_correct || 10} ovos
+                                                    {timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
                                                         ? ` + ${currentSettings.speed_bonus || 5} bônus velocidade!`
                                                         : "!"
-                                                    }`
-                                                    : "💔 Que pena! A resposta correta era: " + currentQuestion.options[currentQuestion.correctAnswer]}
-                                            </h3>
-                                            <p className="text-white/80 text-lg">
-                                                {currentRound < 10 ? "Próxima música em instantes..." : "Fim do jogo! Parabéns!"}
-                                            </p>
-                                        </div>
+                                                    }
+                                                        </span>
+                                                </>
+                                            )
+                                                : (
+                                                <>
+                                                <span className="sm:hidden">
+                                                            💔 Resposta: {currentQuestion.options[currentQuestion.correctAnswer]}
+                                                        </span>
+                                                <span className="hidden sm:inline">
+                                                            💔 Que pena! A resposta correta era: {currentQuestion.options[currentQuestion.correctAnswer]}
+                                                        </span>
+                                                </>
+                                            )}
+                                        </h3>
+                                        <p className="text-white/80 text-sm sm:text-lg">
+                                            {currentRound < 10 ? (
+                                                <>
+                                                <span className="sm:hidden">Próxima música...</span>
+                                                <span className="hidden sm:inline">Próxima música em instantes...</span>
+                                                </>
+                                            ) : (
+                                                "Fim do jogo! Parabéns!"
+                                            )}
+                                        </p>
                                     </BarnCard>
-                                </div>
-                            )}
-                            </>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
 
-                {/* enfeites */}
-                <div className="fixed inset-0 pointer-events-none z-0">
+                {/* Enfeites decorativos - apenas desktop */}
+                <div className="fixed inset-0 pointer-events-none z-0 hidden lg:block">
                     <div className="absolute top-20 right-10 animate-feather-float text-xl opacity-20">🪶</div>
                     <div className="absolute bottom-40 left-10 animate-egg-bounce text-2xl opacity-10">🌽</div>
                 </div>
@@ -441,10 +486,11 @@ function GameArenaContent() {
         </div>
     );
 }
+
 export default function GameArena() {
-  return (
-      <GameArenaGuard>
-        <GameArenaContent />
-      </GameArenaGuard>
-  );
+    return (
+        <GameArenaGuard>
+            <GameArenaContent />
+        </GameArenaGuard>
+    );
 }

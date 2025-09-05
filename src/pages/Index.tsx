@@ -387,20 +387,20 @@ const Index = () => {
               <img
                   src={heroImagelogo}
                   alt="Galinheiro Musical"
-                  className="mx-auto w-48 md:w-84"
+                  className="mx-auto w-40 md:w-40"
               />
             </div>
-            <div className="mb-8 animate-barn-door-open">
-              <h1 className="text-6xl md:text-8xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">
-                🎵Galinheiro Musical 🎵
+            <div className="mb-6 animate-barn-door-open">
+              <h1 className="text-3xl md:text-6xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">
+                🎵 Galinheiro Musical
               </h1>
 
-              <p className="text-xl md:text-4xl text-muted-foreground font-medium mb-2">
+              <p className="text-xl md:text-4xl font-medium mb-2">
                 Onde o carro da rua passa no seu ovo e as galinhas choram!
               </p>
-              <p className="text-lg text-muted-foreground">
-                Teste seus conhecimentos musicais em um quiz multiplayer cheio de diversão
-              </p>
+              {/*<p className="text-lg text-muted-foreground">*/}
+                {/*Teste seus conhecimentos musicais em um quiz multiplayer cheio de diversão*/}
+              {/*</p>*/}
             </div>
 
             {/* NOVA: Banner de auto-join para usuários não logados */}
@@ -420,36 +420,36 @@ const Index = () => {
                 </BarnCard>
             )}
 
-            {/* Action Cards - Para usuários logados (LÓGICA ORIGINAL) */}
+            {/* Action Cards - Para usuários logados */}
             {user && (
-                <div className="grid md:grid-cols-2 gap-6 mb-8">
-                  {/* Create Room Card - Só aparece para logados */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 max-w-5xl mx-auto">
                   <CreateRoom
                       playerName={user.user_metadata?.display_name || user.email || "Galinha"}
-                selectedAvatar="🐔"
-                onPlayerNameChange={() => {}}
+      selectedAvatar="🐔"
+      onPlayerNameChange={() => {}}
                     onAvatarChange={() => {}}
                     />
 
-                      {/* Join Room Card */}
                   <JoinRoom
                       playerName={user.user_metadata?.display_name || user.email || "Galinha"}
-                selectedAvatar="🐔"
-                onPlayerNameChange={() => {}}
+      selectedAvatar="🐔"
+      onPlayerNameChange={() => {}}
                     onAvatarChange={() => {}}
                     />
                 </div>
             )}
 
-            {/* Player Setup - Só para não logados (LÓGICA ORIGINAL) */}
+            {/* Player Setup - Só para não logados */}
             {!user && (
-                <BarnCard variant="golden" className="max-w-2xl mx-auto">
+                <BarnCard variant="golden" className="max-w-2xl mx-auto mb-8">
                   <div className="text-center">
                     <h3 className="text-2xl font-bold mb-6">Escolha sua Galinha</h3>
 
                     {/* Name Input */}
                     <div className="mb-6">
-                      <Label htmlFor="player-name" className="text-white/90">Nome da sua galinha</Label>
+                      <Label htmlFor="player-name" className="text-white/90">
+                        Nome da sua galinha
+                      </Label>
                       <Input
                           id="player-name"
                           placeholder="Ex: Galinha Pititica"
@@ -461,26 +461,26 @@ const Index = () => {
                     </div>
 
                     {/* Avatar Selection */}
-                    <div className="mb-6">
+                    <div className="mb-8">
                       <Label className="text-white/90 block mb-4">Escolha seu avatar</Label>
-                      <div className="grid grid-cols-5 md:grid-cols-10 gap-2 justify-center">
+                      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 justify-center">
                         {chickenAvatars.map((gifUrl) => (
                             <img
                                 key={gifUrl}
                                 src={gifUrl}
                                 alt="Avatar"
-                                className={`w-16 h-16 rounded-full object-cover cursor-pointer transition-all duration-200 ${
-                          selectedAvatar === gifUrl
-                            ? "transform scale-125 ring-2 ring-white/50 ring-offset-2 ring-offset-transparent"
-                            : "hover:scale-110 opacity-70"
-                        }`}
+                                className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover cursor-pointer transition-all duration-200 ${
+                selectedAvatar === gifUrl
+                  ? "transform scale-125 ring-2 ring-white/50 ring-offset-2"
+                  : "hover:scale-110 opacity-70"
+              }`}
                                 onClick={() => setSelectedAvatar(gifUrl)}
                             />
                         ))}
                       </div>
                     </div>
 
-                    {/* NOVO: Botão auto-join - aparece quando há código pendente */}
+                    {/* NOVO: Botão auto-join */}
                     {showAutoJoinForm && pendingRoomCode && playerName.trim() && (
                         <div className="mb-6">
                           <ChickenButton
@@ -493,9 +493,9 @@ const Index = () => {
                           </ChickenButton>
                           <button
                               onClick={() => {
-                        setPendingRoomCode(null);
-                        setShowAutoJoinForm(false);
-                      }}
+              setPendingRoomCode(null);
+              setShowAutoJoinForm(false);
+            }}
                               className="text-white/60 hover:text-white/80 text-sm mt-2 underline"
                           >
                             Cancelar e usar interface normal
@@ -524,7 +524,7 @@ const Index = () => {
                 </BarnCard>
             )}
 
-            {/* Join Room - Para usuários NÃO logados (LÓGICA ORIGINAL) */}
+            {/* Join Room - Para não logados */}
             {!user && !showAutoJoinForm && (
                 <div className="max-w-md mx-auto mb-8">
                   <JoinRoom

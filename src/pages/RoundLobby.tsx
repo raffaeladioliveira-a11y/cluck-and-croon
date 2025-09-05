@@ -10,8 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getOrCreateClientId, loadProfile } from "@/utils/clientId";
 import { Loader2, Crown, Trophy, Music } from "lucide-react";
 import { useAuthSession } from "@/hooks/useAuthSession";
-import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector"; // Novo import
-// import { getDisplayNameOrDefault, getAvatarOrDefault, loadProfile } from "@/utils/clientId";
+import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector";
 
 interface PlayerRanking {
   id: string;
@@ -34,6 +33,7 @@ export default function RoundLobby() {
   const isImageUrl = (url: string): boolean => {
     return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
   };
+
   const { roomCode } = useParams<{ roomCode: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -65,7 +65,6 @@ export default function RoundLobby() {
     genre: string;
   } | null>(null);
 
-
   const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Calcular ranking baseado nos dados reais dos participantes
@@ -74,14 +73,11 @@ export default function RoundLobby() {
       id: p.client_id || p.id,
       name: p.display_name || 'Jogador Anônimo',
       avatar: p.avatar,
-      // avatar_url: p.avatar_url || null,
-      eggs: p.current_eggs || 0, // Dados reais dos ovos acumulados
-      correct_answers: p.correct_answers || 0, // Dados reais de acertos
-      avg_response_time: p.avg_response_time || 0, // Tempo médio real de resposta
+      eggs: p.current_eggs || 0,
+      correct_answers: p.correct_answers || 0,
+      avg_response_time: p.avg_response_time || 0,
       position: 0
     }));
-
-
 
     // Ordenar por critérios: eggs > correct_answers > menor avg_response_time > nome
     const sorted = rankingData.sort((a, b) => {
@@ -163,7 +159,6 @@ export default function RoundLobby() {
     loadInitialData();
   }, [roomCode, calculateRanking, toast]);
 
-
   // Listener para evento de álbum selecionado
   useEffect(() => {
     const handleAlbumSelected = async (event: any) => {
@@ -221,25 +216,25 @@ export default function RoundLobby() {
       const { genreId, genreName } = msg.payload;
       setSelectedGenre(genreId);
       toast({
-        title: '🎵 Estilo Musical Selecionado',
+        title: 'Estilo Musical Selecionado',
         description: `Próxima rodada será de: ${genreName}`
       });
     });
 
-    // NOVO: Listener para álbum selecionado
+    // Listener para álbum selecionado
     channel.on('broadcast', { event: 'ALBUM_SELECTED' }, (msg) => {
       const { albumInfo } = msg.payload;
       setSelectedAlbumInfo(albumInfo);
       setAlbumSelected(true);
       toast({
-        title: '🎵 Álbum Selecionado',
+        title: 'Álbum Selecionado',
         description: `Próxima rodada: ${albumInfo.name} - ${albumInfo.artist}`
       });
     });
 
     channel.on('broadcast', { event: 'NEW_ROUND_STARTING' }, () => {
       toast({
-        title: '🎮 Nova Rodada Iniciando',
+        title: 'Nova Rodada Iniciando',
         description: 'Redirecionando para a arena...'
       });
       setTimeout(() => {
@@ -280,7 +275,7 @@ export default function RoundLobby() {
       });
 
       toast({
-        title: '✅ Estilo Selecionado',
+        title: 'Estilo Selecionado',
         description: `Próxima rodada será de: ${genreName}`
       });
     } catch (error) {
@@ -347,10 +342,10 @@ export default function RoundLobby() {
 
   const getPositionIcon = (position: number) => {
     switch (position) {
-      case 1: return <Crown className="h-6 w-6 text-yellow-500" />;
-      case 2: return <Trophy className="h-5 w-5 text-gray-400" />;
-      case 3: return <Trophy className="h-5 w-5 text-orange-600" />;
-      default: return <span className="text-2xl font-bold text-muted-foreground">#{position}</span>;
+      case 1: return <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500" />;
+      case 2: return <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />;
+      case 3: return <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" />;
+      default: return <span className="text-lg sm:text-2xl font-bold text-muted-foreground">#{position}</span>;
     }
   };
 
@@ -366,86 +361,95 @@ export default function RoundLobby() {
   if (isLoading) {
     return (
         <div className="min-h-screen bg-gradient-sky flex items-center justify-center p-4">
-          <BarnCard variant="golden" className="text-center p-8">
-            <div className="text-6xl mb-4 animate-chicken-walk">🏆</div>
-            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-white" />
-            <p className="text-white text-lg">Calculando o ranking...</p>
+          <BarnCard variant="golden" className="text-center p-6 sm:p-8 w-full max-w-md">
+            <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🏆</div>
+            <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-4 text-white" />
+            <p className="text-white text-sm sm:text-lg">Calculando o ranking...</p>
           </BarnCard>
         </div>
     );
   }
 
   return (
-      <div className="min-h-screen bg-gradient-sky p-4">
+      <div className="min-h-screen bg-gradient-sky p-2 sm:p-4">
         {/* Navigation */}
         <GameNavigation showLeaveRoom={true} />
 
         <div className="max-w-6xl mx-auto">
-
-          {/* Header */}
-          <div className="text-center mb-6">
-            <BarnCard variant="golden" className="p-6">
-              <div className="text-6xl mb-4 animate-chicken-walk">🏆</div>
-              <h1 className="text-3xl font-bold text-white mb-2">
-                Ranking da Rodada - Sala {roomCode}
+          {/* Header responsivo */}
+          <div className="text-center mb-2 sm:mb-3">
+            <BarnCard variant="golden" className="p-2 sm:p-3">
+              <div className="text-2xl sm:text-4xl mb-2 animate-chicken-walk">🏆</div>
+              <h1 className="text-lg sm:text-xl font-bold text-white mb-1">
+                <span className="sm:hidden">Ranking - {roomCode}</span>
+                <span className="hidden sm:inline">Ranking da Rodada - Sala {roomCode}</span>
               </h1>
-              <p className="text-white/80 text-lg">
-                Parabéns a todas as cocós! 🎉Muito milho pra vocês!!!
+              <p className="text-white/80 text-sm sm:text-lg px-2">
+                <span className="sm:hidden">Parabéns a todas as cocós!!!</span>
               </p>
             </BarnCard>
           </div>
 
-          {/* Ranking */}
-          <div className="grid gap-4 mb-6">
+          {/* Ranking responsivo */}
+          <div className="space-y-2 sm:space-y-4 mb-4 sm:mb-6">
             {ranking.map((player) => (
                 <BarnCard
                     key={player.id}
                     variant={getPositionVariant(player.position)}
-                    className="p-4"
+                    className="p-3 sm:p-4"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center w-12 h-12">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                      {/* Posição */}
+                      <div className="flex items-center justify-center w-8 h-8 sm:w-12 sm:h-12 flex-shrink-0">
                         {getPositionIcon(player.position)}
                       </div>
-                      {(() => {
-                        const isCurrentUser  = player.id === clientId.current;
+
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        {(() => {
+                          const isCurrentUser = player.id === clientId.current;
                           if (user && isCurrentUser && avatarUrl) {
-                              return (
-                                  <img
-                                      src={avatarUrl}
-                                      alt="Seu Avatar"
-                                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                                  />
-                              );
+                            return (
+                                <img
+                                    src={avatarUrl}
+                                    alt="Seu Avatar"
+                                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white"
+                                />
+                            );
                           }
 
                           // Avatar do player (URL)
                           if (player.avatar && isImageUrl(player.avatar)) {
-                              return (
-                                  <img
-                                      src={player.avatar}
-                                      alt={player.name}
-                                      className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                                  />
-                              );
+                            return (
+                                <img
+                                    src={player.avatar}
+                                    alt={player.name}
+                                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white"
+                                />
+                            );
                           }
 
                           // SEM fallback - não mostra nada se não tiver avatar válido
                           return null;
-                      })()}
-                      <div>
-                        <h3 className="text-xl font-bold">{player.name}</h3>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        })()}
+                      </div>
+
+                      {/* Informações do jogador */}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm sm:text-xl font-bold truncate">{player.name}</h3>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                           <span>✅ {player.correct_answers} acertos</span>
-                          <span>⚡ {player.avg_response_time.toFixed(1)}s médio</span>
+                          <span>⚡ {player.avg_response_time.toFixed(1)}s</span>
                         </div>
                       </div>
                     </div>
-                    <div className="text-right">
+
+                    {/* Contador de ovos */}
+                    <div className="flex-shrink-0">
                       <EggCounter
                           count={player.eggs}
-                          size="lg"
+                          size={player.position === 1 ? "sm" : "sm"}
                           variant={player.position === 1 ? "golden" : "default"}
                       />
                     </div>
@@ -454,17 +458,19 @@ export default function RoundLobby() {
             ))}
           </div>
 
-          {/* Seleção de Estilo Musical - apenas para o 1º colocado */}
+          {/* Seleção de álbum - apenas para o 1º colocado */}
           {topPlayer && topPlayer.id === clientId.current && !albumSelected && (
-              <div className="mb-6">
-                <BarnCard variant="golden" className="p-6">
+              <div className="mb-4 sm:mb-6">
+                <BarnCard variant="golden" className="p-4 sm:p-6">
                   <div className="text-center mb-4">
-                    <div className="text-4xl mb-2">👑</div>
-                    <h2 className="text-2xl font-bold text-white mb-2">
-                      Você está no topo! Escolha o álbum da próxima rodada
+                    <div className="text-3xl sm:text-4xl mb-2">👑</div>
+                    <h2 className="text-lg sm:text-2xl font-bold text-white mb-2">
+                      <span className="sm:hidden">Você está no topo!</span>
+                      <span className="hidden sm:inline">Você está no topo! Escolha o álbum da próxima rodada</span>
                     </h2>
-                    <p className="text-white/80">
-                      Como campeão desta rodada, você tem o privilégio de escolher o álbum musical
+                    <p className="text-white/80 text-sm sm:text-base px-2">
+                      <span className="sm:hidden">Escolha o álbum da próxima rodada</span>
+                      <span className="hidden sm:inline">Como campeão desta rodada, você tem o privilégio de escolher o álbum musical</span>
                     </p>
                   </div>
 
@@ -475,97 +481,124 @@ export default function RoundLobby() {
 
           {/* Álbum selecionado - mostrar para todos */}
           {albumSelected && selectedAlbumInfo && (
-              <div className="mb-6">
-                <BarnCard variant="golden" className="p-6 text-center">
-                  <div className="text-4xl mb-4">🎵</div>
-                  <h3 className="text-xl font-bold text-white mb-2">Álbum Selecionado</h3>
-                  <p className="text-white/80 mb-4">
-                    {topPlayer?.id === clientId.current ? 'Você escolheu:' : `${topPlayer?.name} escolheu:`}
-                  </p>
-                  <div className="bg-white/20 rounded-lg p-4">
-                    <h4 className="text-lg font-bold text-white">{selectedAlbumInfo.name}</h4>
-                    <p className="text-white/80">{selectedAlbumInfo.artist}</p>
-                    <p className="text-white/70 text-sm">{selectedAlbumInfo.genre}</p>
-                  </div>
-                </BarnCard>
-              </div>
-          )}
-
-          {/* Estilo selecionado (para todos os outros jogadores) */}
-          {topPlayer && topPlayer.id !== clientId.current && selectedGenre && (
-              <div className="mb-6">
-                <BarnCard variant="nest" className="p-6 text-center">
-                  <Music className="h-12 w-12 mx-auto mb-4 text-primary" />
-                  <h3 className="text-xl font-bold mb-2">Estilo Musical Escolhido</h3>
-                  <p className="text-muted-foreground">
-                    {topPlayer.name} escolheu o estilo para a próxima rodada
-                  </p>
-                  {genres.find(g => g.id === selectedGenre) && (
-                      <div className="mt-4 p-4 bg-primary/10 rounded-lg">
-                        <div className="text-3xl mb-2">
-                          {genres.find(g => g.id === selectedGenre)?.emoji}
-                        </div>
-                        <div className="font-bold text-lg">
-                          {genres.find(g => g.id === selectedGenre)?.name}
-                        </div>
-                      </div>
-                  )}
-                </BarnCard>
-              </div>
-          )}
-
-          {/* Ações do Host */}
-          {isHost && (
-              <div className="text-center">
-                <BarnCard variant="coop" className="p-6">
-                  <div className="text-4xl mb-4">🎮</div>
-                  <h3 className="text-2xl font-bold mb-4">Comandos do Host</h3>
-                  <p className="text-muted-foreground mb-6">
-                    Quando estiver pronto, inicie a próxima rodada. Os pontos serão zerados e uma nova rodada começará.
-                  </p>
-
-                  <ChickenButton
-                      variant="feather"
-                      size="lg"
-                      onClick={handleStartNewRound}
-                      disabled={isStartingNewRound || !albumSelected}
-                      className="bg-primary hover:bg-primary/90"
-                  >
-                    {isStartingNewRound ? (
-                        <>
-                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                        Iniciando Nova Rodada...
-                        </>
-                    ) : (
-                        <>
-                        🚀 Iniciar Próxima Rodada
-                        </>
-                    )}
-                  </ChickenButton>
-
-                  {!albumSelected && (
-                      <p className="text-sm text-destructive/80 mt-2">
-                        ⚠️ Aguardando o campeão escolher o álbum
-                      </p>
-                  )}
-                </BarnCard>
-              </div>
-          )}
-
-          {/* Informação para não-hosts */}
-          {!isHost && (
-              <div className="text-center">
-                <BarnCard variant="default" className="p-6">
-                  <div className="text-4xl mb-4">⏳</div>
-                  <h3 className="text-xl font-bold mb-2">Aguardando o Host</h3>
-                  <p className="text-muted-foreground">
-                    O host da sala iniciará a próxima rodada em breve...
-                  </p>
-                </BarnCard>
-              </div>
-          )}
-
+          <div className="mb-4 sm:mb-6">
+            <BarnCard variant="golden" className="p-4 sm:p-6 text-center">
+              <div className="text-3xl sm:text-4xl mb-4">🎵</div>
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-2">
+                <span className="sm:hidden">Álbum Escolhido</span>
+                <span className="hidden sm:inline">Álbum Selecionado</span>
+              </h3>
+              <p className="text-white/80 mb-4 text-sm sm:text-base">
+                {topPlayer?.id === clientId.current ? (
+                      <>
+                <span className="sm:hidden">Você escolheu:</span>
+                <span className="hidden sm:inline">Você escolheu:</span>
+              </>
+              ) : (
+                <>
+              <span className="sm:hidden">{topPlayer?.name} escolheu:</span>
+              <span className="hidden sm:inline">{topPlayer?.name} escolheu:</span>
+            </>
+            )}
+          </p>
+          <div className="bg-white/20 rounded-lg p-3 sm:p-4">
+          <h4 className="text-base sm:text-lg font-bold text-white">{selectedAlbumInfo.name}</h4>
+          <p className="text-white/80 text-sm sm:text-base">{selectedAlbumInfo.artist}</p>
+          <p className="text-white/70 text-xs sm:text-sm">{selectedAlbumInfo.genre}</p>
         </div>
+      </BarnCard>
       </div>
+  )}
+
+  {/* Estilo selecionado (para todos os outros jogadores) */}
+  {topPlayer && topPlayer.id !== clientId.current && selectedGenre && (
+      <div className="mb-4 sm:mb-6">
+        <BarnCard variant="nest" className="p-4 sm:p-6 text-center">
+          <Music className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-4 text-primary" />
+          <h3 className="text-lg sm:text-xl font-bold mb-2">
+            <span className="sm:hidden">Estilo Escolhido</span>
+            <span className="hidden sm:inline">Estilo Musical Escolhido</span>
+          </h3>
+          <p className="text-muted-foreground text-sm sm:text-base px-2">
+            <span className="sm:hidden">{topPlayer.name} escolheu</span>
+            <span className="hidden sm:inline">{topPlayer.name} escolheu o estilo para a próxima rodada</span>
+          </p>
+          {genres.find(g => g.id === selectedGenre) && (
+              <div className="mt-4 p-3 sm:p-4 bg-primary/10 rounded-lg">
+                <div className="text-2xl sm:text-3xl mb-2">
+                  {genres.find(g => g.id === selectedGenre)?.emoji}
+                </div>
+                <div className="font-bold text-base sm:text-lg">
+                  {genres.find(g => g.id === selectedGenre)?.name}
+                </div>
+              </div>
+          )}
+        </BarnCard>
+      </div>
+  )}
+
+  {/* Ações do Host */}
+  {isHost && (
+      <div className="text-center">
+        <BarnCard variant="coop" className="p-4 sm:p-6">
+          <div className="text-3xl sm:text-4xl mb-4">🎮</div>
+          <h3 className="text-lg sm:text-2xl font-bold mb-4">
+            <span className="sm:hidden">Comandos do Host</span>
+            <span className="hidden sm:inline">Comandos do Host</span>
+          </h3>
+          <p className="text-muted-foreground mb-4 sm:mb-6 text-sm sm:text-base px-2">
+            <span className="sm:hidden">Quando estiver pronto, inicie a próxima rodada.</span>
+            <span className="hidden sm:inline">Quando estiver pronto, inicie a próxima rodada. Os pontos serão zerados e uma nova rodada começará.</span>
+          </p>
+
+          <ChickenButton
+              variant="feather"
+              size="lg"
+              onClick={handleStartNewRound}
+              disabled={isStartingNewRound || !albumSelected}
+              className="bg-primary hover:bg-primary/90 w-full sm:w-auto"
+          >
+            {isStartingNewRound ? (
+                <>
+                <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin mr-2" />
+                <span className="sm:hidden">Iniciando...</span>
+                <span className="hidden sm:inline">Iniciando Nova Rodada...</span>
+                </>
+            ) : (
+                <>
+                <span className="sm:hidden">🚀 Próxima Rodada</span>
+                <span className="hidden sm:inline">🚀 Iniciar Próxima Rodada</span>
+                </>
+            )}
+          </ChickenButton>
+
+          {!albumSelected && (
+              <p className="text-xs sm:text-sm text-destructive/80 mt-2 px-2">
+                <span className="sm:hidden">⚠️ Aguardando escolha do álbum</span>
+                <span className="hidden sm:inline">⚠️ Aguardando o campeão escolher o álbum</span>
+              </p>
+          )}
+        </BarnCard>
+      </div>
+  )}
+
+  {/* Informação para não-hosts */}
+  {!isHost && (
+      <div className="text-center">
+        <BarnCard variant="default" className="p-4 sm:p-6">
+          <div className="text-3xl sm:text-4xl mb-4">⏳</div>
+          <h3 className="text-lg sm:text-xl font-bold mb-2">
+            <span className="sm:hidden">Aguardando...</span>
+            <span className="hidden sm:inline">Aguardando o Host</span>
+          </h3>
+          <p className="text-muted-foreground text-sm sm:text-base px-2">
+            <span className="sm:hidden">O host iniciará a próxima rodada em breve.</span>
+            <span className="hidden sm:inline">O host da sala iniciará a próxima rodada em breve...</span>
+          </p>
+        </BarnCard>
+      </div>
+  )}
+  </div>
+  </div>
   );
 }

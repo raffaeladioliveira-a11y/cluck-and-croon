@@ -7,7 +7,7 @@ import { loadProfile } from "@/utils/clientId";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { getOrCreateClientId } from "@/utils/clientId";
 import { HostAlbumSelector } from "@/components/HostAlbumSelector";
-import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector"; // Novo import
+import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Player {
@@ -24,13 +24,11 @@ interface PlayerListProps {
   players: Player[];
   currentClientId: string;
   onToggleReady?: () => void;
-
-  /** Dados da sala (se o pai não passar, este componente busca sozinho) */
   roomCode: string;
   gameMode?: "mp3" | "spotify";
   selectedSpotifyAlbumId?: string | null;
-  selectedMp3AlbumId?: string | null; // Novo campo para álbum MP3
-  roomStatus?: string; // "lobby" | "playing" | "album_selection" ...
+  selectedMp3AlbumId?: string | null;
+  roomStatus?: string;
   showAlbumSelectorForHost?: boolean;
 }
 
@@ -52,7 +50,7 @@ async function fetchGameModeKV(): Promise<"mp3" | "spotify"> {
 
   try {
     if (typeof raw === "string" && /^".*"$/.test(raw)) {
-      parsed = JSON.parse(raw); // '"spotify"' -> spotify
+      parsed = JSON.parse(raw);
     }
   } catch {
       /* ignore */
@@ -85,7 +83,7 @@ export function PlayerList({
     roomCode,
     gameMode: gameModeProp,
     selectedSpotifyAlbumId: selectedSpotifyFromProp,
-    selectedMp3AlbumId: selectedMp3FromProp, // Nova prop
+    selectedMp3AlbumId: selectedMp3FromProp,
     roomStatus: roomStatusProp,
     showAlbumSelectorForHost = true,
 }: PlayerListProps) {
@@ -166,9 +164,11 @@ export function PlayerList({
   if (players.length === 0) {
     return (
         <BarnCard variant="nest" className="text-center">
-          <div className="text-6xl mb-4 animate-chicken-walk">🐔</div>
-          <h3 className="text-xl font-semibold mb-2">Aguardando Galinhas...</h3>
-          <p className="text-muted-foreground">Compartilhe o código para que outros jogadores se juntem!</p>
+          <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🐔</div>
+          <h3 className="text-lg sm:text-xl font-semibold mb-2">Aguardando Galinhas...</h3>
+          <p className="text-sm sm:text-base text-muted-foreground px-2">
+            Compartilhe o código para que outros jogadores se juntem!
+          </p>
         </BarnCard>
     );
   }
@@ -193,75 +193,101 @@ export function PlayerList({
   console.log("shouldShowMp3AlbumSelector:", shouldShowMp3AlbumSelector);
 
   return (
-      <BarnCard variant="coop" className="mb-8">
-        <div>
-          <div className="flex items-center gap-3 mb-6">
-            <Users className="w-6 h-6 text-barn-brown" />
-            <h3 className="text-2xl font-bold text-barn-brown">
-              Galinhas no Galinheiro ({players.length})
+      <BarnCard variant="coop" className="mb-4 sm:mb-8">
+        <div className="px-2 sm:px-4">
+          {/* Header com título responsivo */}
+          <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-barn-brown flex-shrink-0" />
+            <h3 className="text-lg sm:text-2xl font-bold text-barn-brown leading-tight">
+              <span className="block sm:hidden">Galinhas ({players.length})</span>
+              <span className="hidden sm:block">Galinhas no Galinheiro ({players.length})</span>
             </h3>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-4">
+          {/* Grid de jogadores - responsivo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {players.map((player) => {
               const isCurrentPlayer = player.client_id === currentClientId;
 
               return (
                   <div key={player.id}>
                     <div
-                        className={`p-4 rounded-lg transition-all ${
+                        className={`p-3 sm:p-4 rounded-lg transition-all ${
                     player.isHost
                       ? "bg-gradient-sunrise border-2 border-yellow-400"
                       : "bg-barn-wood/20"
                   }`}
                     >
-                      <div className="flex items-center gap-3">
-                        {user && player.client_id === clientId.current ? (
-                            avatarUrl ? (
-                                <img
-                                    src={avatarUrl}
-                                    alt="Seu Avatar"
-                                    className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                                />
-                            ) : player.avatar?.startsWith("/") ? (
-                            <img
-                                src={player.avatar}
-                                alt="Seu Avatar"
-                                className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                            />
-                        ) : (
-                            <ChickenAvatar emoji={player.avatar} size="sm" className="border-2 border-white" />
-                        )
-                        ) : player.avatar?.startsWith("/") ? (
-                        <img
-                            src={player.avatar}
-                            alt={player.name}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-white"
-                        />
-                        ) : (
-                        <ChickenAvatar emoji={player.avatar} size="sm" className="border-2 border-white" />
-                        )}
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Avatar responsivo */}
+                        <div className="flex-shrink-0">
+                          {user && player.client_id === clientId.current ? (
+                              avatarUrl ? (
+                                  <img
+                                      src={avatarUrl}
+                                      alt="Seu Avatar"
+                                      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white"
+                                  />
+                              ) : player.avatar?.startsWith("/") ? (
+                              <img
+                                  src={player.avatar}
+                                  alt="Seu Avatar"
+                                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white"
+                              />
+                          ) : (
+                              <ChickenAvatar emoji={player.avatar} size="sm" className="border-2 border-white" />
+                          )
+                          ) : player.avatar?.startsWith("/") ? (
+                          <img
+                              src={player.avatar}
+                              alt={player.name}
+                              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white"
+                          />
+                          ) : (
+                          <ChickenAvatar emoji={player.avatar} size="sm" className="border-2 border-white" />
+                          )}
+                        </div>
 
-                        <div className="flex-grow">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-lg">{player.name}</span>
+                        {/* Info do jogador */}
+                        <div className="flex-grow min-w-0">
+                          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                            <span className="font-medium text-base sm:text-lg truncate max-w-[120px] sm:max-w-none">
+                              {player.name}
+                            </span>
+
+                            {/* Badges responsivas */}
                             {player.isHost && (
-                                <span className="text-sm px-2 py-1 bg-yellow-400 text-yellow-900 rounded-full font-bold">
-                            👑 HOST
-                          </span>
+                                <span className="text-xs sm:text-sm px-1.5 sm:px-2 py-0.5 sm:py-1 bg-yellow-400 text-yellow-900 rounded-full font-bold whitespace-nowrap">
+                              <span className="sm:hidden">👑</span>
+                              <span className="hidden sm:inline">👑 HOST</span>
+                            </span>
                             )}
+
                             {!player.isHost && (
                                 <span
-                                    className={`text-sm px-2 py-1 rounded-full font-bold ${
+                                    className={`text-xs sm:text-sm px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-bold whitespace-nowrap ${
                               player.isReady ? "bg-green-400 text-green-900" : "bg-orange-400 text-orange-900"
                             }`}
                                 >
-                            {player.isReady ? "✅ PRONTA" : "⏳ AGUARDANDO"}
-                          </span>
+                              <span className="sm:hidden">
+                                {player.isReady ? "✅" : "⏳"}
+                              </span>
+                              <span className="hidden sm:inline">
+                                {player.isReady ? "✅ PRONTA" : "⏳ AGUARDANDO"}
+                              </span>
+                            </span>
                             )}
-                            {isCurrentPlayer && <span className="text-primary font-bold text-sm">VOCÊ</span>}
+
+                            {isCurrentPlayer && (
+                                <span className="text-primary font-bold text-xs sm:text-sm whitespace-nowrap">
+                                VOCÊ
+                              </span>
+                            )}
                           </div>
-                          <p className="text-sm text-muted-foreground">{player.eggs || 0} 🥚 ovos coletados</p>
+
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                            {player.eggs || 0} 🥚 ovos
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -270,36 +296,45 @@ export function PlayerList({
             })}
           </div>
 
-          {/* Botão Ready para não-hosts */}
+          {/* Botão Ready para não-hosts - responsivo */}
           {!isCurrentPlayerHost && onToggleReady && (
-              <div className="mt-6 text-center">
+              <div className="mt-4 sm:mt-6 text-center">
                 <ChickenButton
                     variant={isCurrentPlayerReady ? "feather" : "corn"}
                     size="md"
                     onClick={onToggleReady}
-                    className="min-w-[200px]"
+                    className="w-full sm:w-auto sm:min-w-[200px] px-4 py-3 text-sm sm:text-base"
                 >
-                  {isCurrentPlayerReady ? "⏳ Marcar como Não Pronta" : "✅ Marcar como Pronta"}
+                  <span className="sm:hidden">
+                    {isCurrentPlayerReady ? "⏳ Não Pronta" : "✅ Pronta"}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {isCurrentPlayerReady ? "⏳ Marcar como Não Pronta" : "✅ Marcar como Pronta"}
+                  </span>
                 </ChickenButton>
               </div>
           )}
 
+          {/* Info sobre limite de jogadores */}
           {players.length < 10 && (
-              <div className="mt-6 text-center p-4 bg-white/30 rounded-lg">
-                <p className="text-sm text-muted-foreground">💡 Podem participar até 10 galinhas neste galinheiro!</p>
+              <div className="mt-4 sm:mt-6 text-center p-3 sm:p-4 bg-white/30 rounded-lg">
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  <span className="sm:hidden">💡 Até 10 galinhas!</span>
+                  <span className="hidden sm:inline">💡 Podem participar até 10 galinhas neste galinheiro!</span>
+                </p>
               </div>
           )}
 
           {/* SELETOR DE ÁLBUM PARA HOST - SPOTIFY */}
           {shouldShowSpotifyAlbumSelector && (
-              <div className="mt-8">
+              <div className="mt-6 sm:mt-8">
                 <HostAlbumSelector roomCode={roomCode} />
               </div>
           )}
 
           {/* SELETOR DE ÁLBUM PARA HOST - MP3 */}
           {shouldShowMp3AlbumSelector && (
-              <div className="mt-8">
+              <div className="mt-6 sm:mt-8">
                 <HostMp3AlbumSelector roomCode={roomCode} />
               </div>
           )}
