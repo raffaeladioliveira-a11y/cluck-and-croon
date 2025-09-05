@@ -90,8 +90,7 @@ export default function AdminDashboard() {
         speed_bonus: 5,
         time_per_question: 10,
         max_players: 10,
-        song_duration: 10,
-        countdown_duration: 3
+        song_duration: 10
     });
 
     // Estados para filtros
@@ -1922,23 +1921,6 @@ export default function AdminDashboard() {
                                         />
                                     </div>
                                 </div>
-
-                                <div>
-                                    <Label className="text-white/90">Tempo do cronômetro (segundos)</Label>
-                                    <Input
-                                        type="number"
-                                        min="1"
-                                        max="10"
-                                        value={gameSettings.countdown_duration}
-                                        onChange={(e) => handleSettingChange('countdown_duration', e.target.value)}
-                                        className="bg-white/20 border-white/30 text-white"
-                                        placeholder="3"
-                                    />
-                                    <p className="text-xs text-white/70 mt-1">
-                                        Tempo de contagem regressiva antes da música começar (1-10 segundos)
-                                    </p>
-                                </div>
-
 
                                 <div className="space-y-4">
                                     <h4 className="font-semibold text-lg">Configurações Avançadas</h4>
