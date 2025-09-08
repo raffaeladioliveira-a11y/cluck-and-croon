@@ -39,10 +39,14 @@ export function RoomLobby() {
         }
     }, [roomCode, navigate]);
 
+
+
     const [players, setPlayers] = useState<Player[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [room, setRoom] = useState<Room | null>(null);
-    const [gameMode, setGameMode] = useState<'solo' | 'multiplayer'>('multiplayer');
+    const [gameMode, setGameMode] = useState<'solo' | 'multiplayer'>('solo');
+
+
 
     const clientId = useMemo(getOrCreateClientId, []);
     const navigatedRef = useRef(false);
@@ -50,6 +54,7 @@ export function RoomLobby() {
     // Load user profile
     const userProfile = useMemo(() => loadProfile(), []);
     const { user, loading } = useAuthSession();
+    const gameModeRef = useRef(gameMode);
 
     // DEBUG:
     console.log('AUTH STATUS:', {
@@ -178,6 +183,14 @@ export function RoomLobby() {
                     filter: `id=eq.${roomData.id}`
                 }, (payload: any) => {
                     console.log('🏠 Room status changed:', payload.new);
+                    console.log('🎯 Navigation check:', {
+                        navigatedRef: navigatedRef.current,
+                        status: payload.new.status,
+                        sessionId: payload.new.game_session_id,
+                        gameMode,
+                        gameModeRef: gameModeRef.current
+                    });
+
                     const updatedRoom = payload.new;
                     setRoom(prev => ({
                         ...prev,
@@ -188,7 +201,8 @@ export function RoomLobby() {
                     // Navigate to game when it starts
                     if (!navigatedRef.current && updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
                         navigatedRef.current = true;
-                        const mode = gameMode === 'solo' ? 'solo' : 'multiplayer';
+                        const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
+                        console.log('🔗 Navigating to:', `/game/${roomCode}?sid=${updatedRoom.game_session_id}&mode=${mode}`);
                         navigate(`/game/${roomCode}?sid=${updatedRoom.game_session_id}&mode=${mode}`);
                     }
                 })
@@ -234,6 +248,11 @@ export function RoomLobby() {
         }
     };
 
+    useEffect(() => {
+        gameModeRef.current = gameMode;
+    }, [gameMode]);
+
+    const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
     const loadParticipants = async (roomId: string) => {
         try {
             const { data, error } = await supabase
@@ -340,71 +359,84 @@ export function RoomLobby() {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-sky p-4">
+        <div className="min-h-screen bg-gradient-sky p-4 relative">
+            {/* Botão Sair - Canto Superior Direito */}
+            <div className="absolute top-4 right-4 z-10">
+                <ChickenButton
+                    variant="feather"
+                    size="sm"
+                    onClick={handleLeaveRoom}
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                >
+                    🚪 Sair
+                </ChickenButton>
+            </div>
+
             <div className="max-w-4xl mx-auto">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl md:text-6xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">
-                        🏠 Galinheiro Musical
-                    </h1>
-                    <p className="text-xl text-muted-foreground">
-                        Aguardando mais galinhas se juntarem à cantoria!
-                    </p>
-                </div>
+                {/*<div className="text-center mb-8">*/}
+                    {/*<h1 className="text-4xl md:text-6xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">*/}
+                        {/*🏠 Galinheiro Musical*/}
+                    {/*</h1>*/}
+                    {/*<p className="text-xl text-muted-foreground">*/}
+                        {/*Aguardando mais galinhas se juntarem à cantoria!*/}
+                    {/*</p>*/}
+                {/*</div>*/}
+
+                {/* Seletor de Modo de Jogo - MOVIDO PARA O INÍCIO */}
+                {isHost && (
+                    <div className="mb-8 text-center">
+                        <h3 className="text-lg font-bold mb-4 text-white">Escolha o modo de jogo:</h3>
+                        <div className="flex gap-4 justify-center mb-4">
+                            <ChickenButton
+                                variant={gameMode === 'solo' ? 'corn' : 'feather'}
+                                size="lg"
+                                onClick={() => setGameMode('solo')}
+                                className={`min-w-[180px] ${gameMode === 'solo' ? 'ring-2 ring-yellow-400' : ''}`}
+                            >
+                                🐔 Jogar Sozinho
+                            </ChickenButton>
+
+                            <ChickenButton
+                                variant={gameMode === 'multiplayer' ? 'corn' : 'feather'}
+                                size="lg"
+                                onClick={() => setGameMode('multiplayer')}
+                                className={`min-w-[180px] ${gameMode === 'multiplayer' ? 'ring-2 ring-yellow-400' : ''}`}
+                            >
+                                👥 Multiplayer
+                            </ChickenButton>
+                        </div>
+
+                        {gameMode === 'solo' && (
+                            <p className="text-sm text-white/80">
+                                Teste seus conhecimentos musicais no seu próprio ritmo!
+                            </p>
+                        )}
+
+                        {gameMode === 'multiplayer' && (
+                            <p className="text-sm text-white/80">
+                                Todos os jogadores estão automaticamente prontos!
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 {/* Room Code Display */}
                 <RoomCode roomCode={roomCode} />
 
-                {/* Players List */}
+                {/* Players List com seleção de álbum habilitada para ambos os modos */}
                 <PlayerList
                     players={players}
                     currentClientId={clientId}
                     onToggleReady={undefined} // Removido completamente - nenhum botão de ready
                     roomCode={roomCode}
-                    gameMode={gameMode === 'solo' ? 'mp3' : undefined}
+                    gameMode="mp3" // Sempre habilita seleção de álbum para o host
                     showAlbumSelectorForHost={true}
                 />
 
                 {/* Action Buttons */}
                 <div className="flex flex-col gap-4 items-center">
                     {isHost && (
-                        <>
-                        {/* Seletor de Modo de Jogo */}
-                        <div className="mb-6 text-center">
-                            <h3 className="text-lg font-bold mb-4 text-white">Escolha o modo de jogo:</h3>
-                            <div className="flex gap-4 justify-center">
-                                <ChickenButton
-                                    variant={gameMode === 'solo' ? 'corn' : 'feather'}
-                                    size="lg"
-                                    onClick={() => setGameMode('solo')}
-                                    className={`min-w-[180px] ${gameMode === 'solo' ? 'ring-2 ring-yellow-400' : ''}`}
-                                >
-                                    🐔 Jogar Sozinho
-                                </ChickenButton>
-
-                                <ChickenButton
-                                    variant={gameMode === 'multiplayer' ? 'corn' : 'feather'}
-                                    size="lg"
-                                    onClick={() => setGameMode('multiplayer')}
-                                    className={`min-w-[180px] ${gameMode === 'multiplayer' ? 'ring-2 ring-yellow-400' : ''}`}
-                                >
-                                    👥 Multiplayer
-                                </ChickenButton>
-                            </div>
-
-                            {gameMode === 'solo' && (
-                                <p className="text-sm text-white/80 mt-2">
-                                    Teste seus conhecimentos musicais no seu próprio ritmo!
-                                </p>
-                            )}
-
-                            {gameMode === 'multiplayer' && (
-                                <p className="text-sm text-white/80 mt-2">
-                                    Todos os jogadores estão automaticamente prontos!
-                                </p>
-                            )}
-                        </div>
-
                         <ChickenButton
                             variant="corn"
                             size="lg"
@@ -419,16 +451,7 @@ export function RoomLobby() {
                                 : `🎵 Iniciar Multiplayer (${players.length}/10)`
                             }
                         </ChickenButton>
-                        </>
                     )}
-
-                    <ChickenButton
-                        variant="feather"
-                        size="lg"
-                        onClick={handleLeaveRoom}
-                    >
-                        🚪 Sair do Galinheiro
-                    </ChickenButton>
                 </div>
 
                 {/* Game Info */}
