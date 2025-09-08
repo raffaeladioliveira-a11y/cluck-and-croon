@@ -15,6 +15,9 @@ import {Music, Users, Egg, Settings, Plus, Trash2, Edit, LogOut} from "lucide-re
 import {toast} from "@/hooks/use-toast";
 import {supabase} from "@/integrations/supabase/client";
 import {ArrowLeft, FolderOpen} from "lucide-react";
+import {Switch} from "@/components/ui/switch";
+import {Separator} from "@/components/ui/separator";
+import {Music2, Disc3} from "lucide-react";
 
 interface Song {
     id: string;
@@ -93,6 +96,8 @@ export default function AdminDashboard() {
     const [isEditAlbumModalOpen, setIsEditAlbumModalOpen] = useState(false);
     const [isUploadingCover, setIsUploadingCover] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
+    const [gameMode, setGameMode] = useState<"mp3" | "spotify">("mp3");
+    const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
     // Estados para configurações
     const [gameSettings, setGameSettings] = useState({
@@ -112,6 +117,7 @@ export default function AdminDashboard() {
 
     const [searchResults, setSearchResults] = useState<Song[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+
 
 
     // Estado para músicas filtradas
@@ -309,6 +315,57 @@ export default function AdminDashboard() {
         activeRooms: 23
     });
 
+    // NOVA FUNCIONALIDADE: Carregar configurações de modalidade
+    const loadGameMode = async() => {
+        try {
+            const {data, error} = await supabase
+                .from("game_settings")
+                .select("*")
+                .eq("key", "game_mode")
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+
+            if (data?.value) {
+                const mode = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                setGameMode(mode);
+            }
+        } catch (error) {
+            console.error("Error loading game mode:", error);
+        }
+    };
+
+// NOVA FUNCIONALIDADE: Atualizar modalidade do jogo
+    const updateGameMode = async (mode: "mp3" | "spotify") => {
+        setIsLoadingSettings(true);
+        try {
+            const { error } = await supabase
+                .from("game_settings")
+                .upsert({
+                    key: "game_mode",
+                    value: JSON.stringify(mode)
+                });
+
+            if (error) throw error;
+
+            setGameMode(mode);
+            toast({
+                title: "Modalidade atualizada",
+                description: `Modalidade alterada para ${mode.toUpperCase()}`,
+            });
+        } catch (error) {
+            console.error("Error updating game mode:", error);
+            toast({
+                title: "Erro ao atualizar modalidade",
+                description: "Não foi possível alterar a modalidade",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoadingSettings(false);
+        }
+    };
+
+
     // E atualize quando carregar as músicas:
     const loadTotalSongsCount = async() => {
         try {
@@ -330,6 +387,7 @@ export default function AdminDashboard() {
         loadGenres();
         loadSongs();
         loadGameSettings();
+        loadGameMode();
         loadAlbums();
         loadTotalSongsCount();
         loadAllUsers();
@@ -469,7 +527,7 @@ export default function AdminDashboard() {
         }
     };
 
-    const [allUsers, setAllUsers] = useState([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
 
     const openEditAlbumModal = (album: Album) => {
         setEditingAlbum(album);
@@ -1114,6 +1172,10 @@ export default function AdminDashboard() {
                         </p>
                     </div>
                     <div className="flex gap-2">
+                        <ChickenButton variant="egg" onClick={() => navigate('/admin/spotify')}>
+                            <Music2 className="w-4 h-4 mr-2"/>
+                            Gerenciar Spotify
+                        </ChickenButton>
                         <ChickenButton variant="egg" onClick={() => navigate('/')}>
                             🏠 Voltar ao Jogo
                         </ChickenButton>
@@ -1160,6 +1222,55 @@ export default function AdminDashboard() {
                     </BarnCard>
                 </div>
 
+                <BarnCard variant="default" className="mb-8">
+                    <div className="p-6">
+                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <Disc3 className="w-5 h-5" />
+                            Modalidade do Jogo
+                        </h3>
+
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <Label className="text-base font-medium">
+                                    Modalidade Atual: {gameMode === "mp3" ? "MP3 (Sistema Atual)" : "Spotify (Álbuns)"}
+                                </Label>
+                                <p className="text-sm text-muted-foreground">
+                                    {gameMode === "mp3"
+                                        ? "Usando catálogo interno de músicas MP3"
+                                        : "Usando álbuns do Spotify cadastrados"
+                                    }
+                                </p>
+                            </div>
+
+                            <div className="flex items-center space-x-4">
+                                <div className="flex items-center space-x-2">
+                                    <Label htmlFor="mode-mp3" className={gameMode === "mp3" ? "font-semibold" : ""}>
+                                        MP3
+                                    </Label>
+                                    <Switch
+                                        id="game-mode"
+                                        checked={gameMode === "spotify"}
+                                        onCheckedChange={(checked) => updateGameMode(checked ? "spotify" : "mp3")}
+                                        disabled={isLoadingSettings}
+                                    />
+                                    <Label htmlFor="mode-spotify" className={gameMode === "spotify" ? "font-semibold" : ""}>
+                                        Spotify
+                                    </Label>
+                                </div>
+                            </div>
+                        </div>
+
+                        {gameMode === "spotify" && (
+                            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                <p className="text-sm text-blue-700 dark:text-blue-300">
+                                    💡 <strong>Modalidade Spotify ativa:</strong> O jogo usará álbuns do Spotify cadastrados.
+                    Use o botão "Gerenciar Spotify" acima para adicionar álbuns.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </BarnCard>
+
                 {/* Main Content Tabs */}
                 <Tabs defaultValue="albums" className="space-y-10">
                     <TabsList className="grid w-full grid-cols-4">
@@ -1185,7 +1296,7 @@ export default function AdminDashboard() {
                             <h3 className="text-xl font-bold mb-4">Gerenciar Administradores</h3>
 
                             <div className="space-y-3 max-h-96 overflow-y-auto">
-                                {allUsers.map((user) => (
+                                {(allUsers || []).map((user) => (
                                     <div key={user.user_id}
                                          className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
                                         <div className="flex items-center gap-4">

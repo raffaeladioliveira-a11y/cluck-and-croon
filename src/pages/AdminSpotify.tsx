@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Search, Plus, Trash2, Edit, Music, ExternalLink } from "lucide-react";
 import { GameNavigation } from "@/components/GameNavigation";
+import { ArrowLeft } from "lucide-react";
 
 interface SpotifyAlbum {
   id: string;
@@ -60,6 +61,7 @@ export default function AdminSpotify() {
       setGenres(data || []);
     } catch (error: any) {
       console.error("Error loading genres:", error);
+      setGenres([]);
       toast({
         title: "Erro ao carregar gêneros",
         description: error.message,
@@ -82,6 +84,7 @@ export default function AdminSpotify() {
       setStoredAlbums(data || []);
     } catch (error: any) {
       console.error("Error loading stored albums:", error);
+      setStoredAlbums([]);
       toast({
         title: "Erro ao carregar álbuns",
         description: error.message,
@@ -92,25 +95,53 @@ export default function AdminSpotify() {
 
   const searchSpotify = async () => {
     if (!searchQuery.trim()) return;
-    
+
     setIsSearching(true);
+    console.log("🔍 Iniciando busca para:", searchQuery.trim());
+
     try {
+      const requestBody = {
+        action: "search",
+        query: searchQuery.trim()
+      };
+
+      console.log("📤 Enviando requisição:", requestBody);
+
       const { data, error } = await supabase.functions.invoke("spotify-api", {
-        body: {
-          action: "search",
-          query: searchQuery.trim()
-        }
+        body: requestBody
       });
 
-      if (error) throw error;
-      
-      if (data.success) {
-        setSearchResults(data.albums);
+      console.log("📥 Resposta completa:", { data, error });
+
+      if (error) {
+        console.error("❌ Erro na invocação:", error);
+        throw error;
+      }
+
+      if (data) {
+        console.log("✅ Dados recebidos:", data);
+
+        if (data.success) {
+          console.log("🎵 Álbuns encontrados:", data.albums);
+          console.log("📊 Quantidade de álbuns:", data.albums?.length);
+          setSearchResults(data.albums || []);
+
+          if (!data.albums || data.albums.length === 0) {
+            toast({
+              title: "Nenhum resultado",
+              description: "Nenhum álbum encontrado para essa busca"
+            });
+          }
+        } else {
+          console.error("❌ API retornou erro:", data.error);
+          throw new Error(data.error || "Erro desconhecido na busca");
+        }
       } else {
-        throw new Error(data.error);
+        console.error("❌ Resposta vazia da API");
+        throw new Error("Resposta vazia da API");
       }
     } catch (error: any) {
-      console.error("Search error:", error);
+      console.error("💥 Search error:", error);
       toast({
         title: "Erro na busca",
         description: error.message,
@@ -237,7 +268,7 @@ export default function AdminSpotify() {
     }
   };
 
-  const filteredAlbums = storedAlbums.filter(album => {
+  const filteredAlbums = (storedAlbums || []).filter(album => {
     if (selectedGenreFilter === "all") return true;
     return album.genre_id === selectedGenreFilter;
   });
@@ -283,9 +314,9 @@ export default function AdminSpotify() {
             </div>
 
             {/* Search Results */}
-            {searchResults.length > 0 && (
+            {(searchResults || []).length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((album) => (
+                {(searchResults || []).map((album) => (
                   <Card key={album.id} className="overflow-hidden">
                     <CardContent className="p-4">
                       <div className="flex gap-3">
@@ -364,9 +395,9 @@ export default function AdminSpotify() {
             </div>
           </CardHeader>
           <CardContent>
-            {filteredAlbums.length > 0 ? (
+            {(filteredAlbums || []).length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredAlbums.map((album) => (
+                {(filteredAlbums || []).map((album) => (
                   <Card key={album.id} className="overflow-hidden">
                     <CardContent className="p-4">
                       <div className="flex gap-3 mb-3">
@@ -402,7 +433,7 @@ export default function AdminSpotify() {
                             <SelectValue placeholder="Alterar gênero" />
                           </SelectTrigger>
                           <SelectContent>
-                            {genres.map((genre) => (
+                            {(genres || []).map((genre) => (
                               <SelectItem key={genre.id} value={genre.id}>
                                 {genre.emoji} {genre.name}
                               </SelectItem>
