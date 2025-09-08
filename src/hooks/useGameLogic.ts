@@ -930,6 +930,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     loadAlbumInfo();
   }, [roomCode]); // IMPORTANTE: apenas roomCode como dependência
 
+
+
   // próxima rodada (host)
   useEffect(() => {
     if (!sessionId || !isHost) return;
