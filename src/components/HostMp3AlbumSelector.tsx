@@ -182,8 +182,8 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
     return (
         <BarnCard variant="coop" className="p-6">
             <div className="flex items-center gap-3 mb-6">
-                <Music className="w-6 h-6 text-barn-brown" />
-                <h3 className="text-xl font-bold text-barn-brown">
+                <Music className="w-6 h-6 text-white" />
+                <h3 className="text-xl font-bold ttext-white">
                     {step === "genre" && "Escolha o Gênero Musical"}
                     {step === "album" && `Álbuns de ${selectedGenre?.name}`}
                     {step === "confirm" && "Confirmar Seleção"}
@@ -193,7 +193,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
             {/* Passo 1: Seleção de Gênero */}
             {step === "genre" && (
                 <div className="space-y-4">
-                    <p className="text-muted-foreground mb-4">
+                    <p className="text-white mb-4">
                         Selecione o gênero musical para o jogo:
                     </p>
 

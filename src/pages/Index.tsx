@@ -391,7 +391,7 @@ const Index = () => {
               />
             </div>
             <div className="mb-6 animate-barn-door-open">
-              <h1 className="text-3xl md:text-6xl font-bold mb-4 text-transparent bg-gradient-sunrise bg-clip-text">
+              <h1 className="text-3xl md:text-6xl font-bold mb-4 bg-gradient-sunrise bg-clip-text">
                 🎵 Galinheiro Musical
               </h1>
 

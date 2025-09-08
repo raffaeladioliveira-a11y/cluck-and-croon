@@ -115,7 +115,7 @@ function GameArenaContent() {
         if (!showResults) {
             return selectedAnswer === index ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted";
         }
-        if (currentQuestion && index === currentQuestion.correctAnswer) return "bg-accent text-accent-foreground";
+        if (currentQuestion && index === currentQuestion.correctAnswer) return "bg-green-500 text-white border-green-400";
         if (selectedAnswer === index) return "bg-destructive text-destructive-foreground";
         return "bg-muted text-muted-foreground";
     };
@@ -211,32 +211,41 @@ function GameArenaContent() {
                             <div className="space-y-2 sm:space-y-3">
                                 {Array.isArray(players) && players.length > 0 ? (
                                     players
-                                        .sort((a, b) => ((a as any).eggs || 0) - ((b as any).eggs || 0))
-                                        .slice(0, 5) // Limita a 5 no mobile para economizar espaço
-                                        .map((player, index) => (
-                                            <div key={player.id} className="flex items-center gap-2 sm:gap-4">
-                                                <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">{index + 1}º</span>
+                                        .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0)) // CORREÇÃO: b - a para ordenar do maior para menor
+                                        .slice(0, 5)
+                                        .map((player, index) => {
+                                            const isCurrentPlayer = player.id === clientId.current;
+                                            return (
+                                                <div
+                                                    key={player.id}
+                                                    className={`flex items-center gap-2 sm:gap-4 ${isCurrentPlayer ? 'bg-primary/10 rounded-lg p-2' : ''}`}
+                                                >
+                        <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">
+                            {index + 1}º
+                        </span>
 
-                                                {player.avatar?.startsWith("/") && (
-                                                <img
-                                                    src={player.avatar}
-                                                    alt={player.name}
-                                                    className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white flex-shrink-0"
-                                                />
-                                                )}
+                                                    {player.avatar?.startsWith("/") && (
+                                                    <img
+                                                        src={player.avatar}
+                                                        alt={player.name}
+                                                        className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white flex-shrink-0"
+                                                    />
+                                                    )}
 
-                                                <span className="text-xs sm:text-md font-semibold truncate flex-1 min-w-0">
-                                                    {player.name || "Jogador"}
-                                                </span>
+                                                    <span className={`text-xs sm:text-md font-semibold truncate flex-1 min-w-0 ${isCurrentPlayer ? 'text-primary' : ''}`}>
+                            {player.name || "Jogador"}
+                                                        {isCurrentPlayer && <span className="ml-1">(Você)</span>}
+                        </span>
 
-                                                <EggCounter
-                                                    count={(player as any).eggs || 0}
-                                                    size="sm"
-                                                    variant="golden"
-                                                    className="flex-shrink-0"
-                                                />
-                                            </div>
-                                        ))
+                                                    <EggCounter
+                                                        count={(player as any).eggs || 0}
+                                                        size="sm"
+                                                        variant={index === 0 ? "golden" : "default"} // Destaque para o 1º lugar
+                                                        className="flex-shrink-0"
+                                                    />
+                                                </div>
+                                            );
+                                        })
                                 ) : (
                                     <p className="text-xs sm:text-sm text-muted-foreground text-center">
                                         Ranking ainda não disponível...
@@ -362,7 +371,7 @@ function GameArenaContent() {
                                                             <img
                                                                 src={p.avatar}
                                                                 alt={p.name}
-                                                                className="w-6 h-6 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-white"
+                                                                className="w-6 h-6 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white"
                                                                 title={p.name}
                                                             />
                                                             )}
