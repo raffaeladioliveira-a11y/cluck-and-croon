@@ -645,7 +645,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     if (isCorrect) {
       const base = currentSettings.eggs_per_correct;
       const bonus = timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0;
-      setPlayerEggs(e => e + base + bonus);
+      // setPlayerEggs(e => e + base + bonus);
     }
 
     // Salvar estatísticas do jogador no Supabase (modo multiplayer)
@@ -686,10 +686,10 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
                   .eq('client_id', clientId.current);
 
               // FORÇA RELOAD LOCAL
-              await loadPlayersFromRoom();
-
-              // FORÇA SINCRONIZAÇÃO PARA TODOS OS JOGADORES
-              await broadcastScoreUpdate();
+              // await loadPlayersFromRoom();
+              //
+              // // FORÇA SINCRONIZAÇÃO PARA TODOS OS JOGADORES
+              // await broadcastScoreUpdate();
             }
           }
         } catch (error) {
@@ -718,6 +718,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
     broadcastAnswer(idx);
   }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode]);
+
+
 
 
   const loadPlayersFromRoom = useCallback(async () => {
@@ -749,6 +751,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       // console.error('[loadPlayersFromRoom] erro ao carregar jogadores:', e);
     }
   }, [roomCode]);
+
+
+
 
   /* -------------------------- INICIALIZAÇÃO/REALTIME ------------------------- */
 
@@ -894,6 +899,11 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   }, [sessionId, roomCode, clearTimers, startRoundTimer]);
 
 
+
+
+
+
+
   // 4. ADICIONAR um useEffect SEPARADO (não mexer no principal)
 // Adicione este useEffect separado, não mexa no seu useEffect principal:
   useEffect(() => {
@@ -952,6 +962,43 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     });
   }, [sessionId]);
 
+
+
+  // Adicionar nova função para atualizar ovos no final da rodada
+  // 2. ADICIONAR nova função para atualizar scores no final da rodada
+  const updateScoresAtRoundEnd = useCallback(async () => {
+    console.log('🎯 Atualizando scores no final da rodada...');
+
+    if (sessionId) {
+      // Multiplayer: recarregar do banco
+      await loadPlayersFromRoom();
+
+      // Atualizar score local baseado no banco
+      const currentPlayerData = players?.find(p => p.id === clientId.current);
+      if (currentPlayerData) {
+        const bankEggs = (currentPlayerData as any).eggs || 0;
+        console.log('🥚 Atualizando ovos locais:', playerEggs, '->', bankEggs);
+        setPlayerEggs(bankEggs);
+      }
+    } else {
+      // Single player: calcular localmente
+      if (selectedAnswer !== null && currentQuestion && selectedAnswer === currentQuestion.correctAnswer) {
+        const base = currentSettings.eggs_per_correct;
+        const bonus = timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0;
+        setPlayerEggs(e => e + base + bonus);
+      }
+    }
+  }, [sessionId, loadPlayersFromRoom, players, clientId, selectedAnswer, currentQuestion, currentSettings, timeLeft, playerEggs]);
+
+
+
+
+// Chamar no final da rodada (gameState = 'reveal')
+  useEffect(() => {
+    if (gameState === 'reveal') {
+      updateScoresAtRoundEnd();
+    }
+  }, [gameState, updateScoresAtRoundEnd]);
 
 
   // próxima rodada (host)
