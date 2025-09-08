@@ -304,6 +304,7 @@ function GameArenaContent() {
                 {/* Layout principal responsivo */}
                 <div className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-6 lg:space-y-0">
                     {/* Ranking - Mobile: acima | Desktop: esquerda */}
+                    {/* Ranking - Mobile: acima | Desktop: esquerda */}
                     <div className="lg:col-span-4 lg:order-1">
                         <BarnCard variant="coop" className="p-3 sm:p-4">
                             <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
@@ -311,49 +312,107 @@ function GameArenaContent() {
                                 <span className="hidden sm:inline">🏆 Ranking da Partida</span>
                             </h3>
 
-                            <div className="space-y-2 sm:space-y-3">
+                            {/* Layout mobile horizontal - só no mobile */}
+                            <div className="block sm:hidden">
                                 {Array.isArray(players) && players.length > 0 ? (
-                                    players
-                                        .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
-                                        .slice(0, 5)
-                                        .map((player, index) => {
-                                            const isCurrentPlayer = player.id === clientId.current;
-                                            return (
-                                                <div
-                                                    key={player.id}
-                                                    className={`flex items-center gap-2 sm:gap-4 ${isCurrentPlayer ? 'bg-primary/10 rounded-lg p-2' : ''}`}
-                                                >
-                                                    <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">
-                                                        {index + 1}º
-                                                    </span>
+                                    <div className="flex gap-2 overflow-x-auto pb-2">
+                                        {players
+                                            .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
+                                            .slice(0, 5)
+                                            .map((player, index) => {
+                                                const isCurrentPlayer = player.id === clientId.current;
+                                                return (
+                                                    <div
+                                                        key={player.id}
+                                                        className={`flex-shrink-0 text-center p-2 rounded-lg min-w-[70px] ${isCurrentPlayer ? 'bg-primary/20 border-2 border-primary' : 'bg-muted/20'}`}
+                                                    >
+                                                        {/* Posição */}
+                                                        <div className="text-xs font-bold mb-1">
+                                                            {index + 1}º
+                                                        </div>
 
-                                                    {player.avatar?.startsWith("/") && (
-                                                    <img
-                                                        src={player.avatar}
-                                                        alt={player.name}
-                                                        className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white flex-shrink-0"
-                                                    />
-                                                    )}
+                                                        {/* Avatar */}
+                                                        {player.avatar?.startsWith("/") ? (
+                                                        <img
+                                                            src={player.avatar}
+                                                            alt={player.name}
+                                                            className="w-8 h-8 rounded-full object-cover border-2 border-white mx-auto mb-1"
+                                                        />
+                                                        ) : (
+                                                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-1 text-sm">
+                                                            {player.avatar || "🐔"}
+                                                        </div>
+                                                        )}
 
-                                                    <span className={`text-xs sm:text-md font-semibold truncate flex-1 min-w-0 ${isCurrentPlayer ? 'text-primary' : ''}`}>
-                                                        {player.name || "Jogador"}
-                                                        {isCurrentPlayer && <span className="ml-1">(Você)</span>}
-                                                    </span>
+                                                        {/* Nome truncado */}
+                                                        <div className="text-xs font-medium truncate max-w-[60px]">
+                                                            {player.name?.slice(0, 8) || "Player"}
+                                                            {isCurrentPlayer && <div className="text-[10px] text-primary">Você</div>}
+                                                        </div>
 
-                                                    <EggCounter
-                                                        count={(player as any).eggs || 0}
-                                                        size="sm"
-                                                        variant={index === 0 ? "golden" : "default"}
-                                                        className="flex-shrink-0"
-                                                    />
-                                                </div>
-                                            );
-                                        })
+                                                        {/* Ovos */}
+                                                        <div className="flex items-center justify-center mt-1">
+                                                            <span className="text-xs">🥚</span>
+                                                            <span className="text-xs font-bold ml-1">{(player as any).eggs || 0}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        }
+                                    </div>
                                 ) : (
-                                    <p className="text-xs sm:text-sm text-muted-foreground text-center">
-                                        Ranking ainda não disponível...
+                                    <p className="text-xs text-muted-foreground text-center">
+                                        Ranking não disponível...
                                     </p>
                                 )}
+                            </div>
+
+                            {/* Layout desktop vertical - só no desktop */}
+                            <div className="hidden sm:block">
+                                <div className="space-y-2 sm:space-y-3">
+                                    {Array.isArray(players) && players.length > 0 ? (
+                                        players
+                                            .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
+                                            .slice(0, 5)
+                                            .map((player, index) => {
+                                                const isCurrentPlayer = player.id === clientId.current;
+                                                return (
+                                                    <div
+                                                        key={player.id}
+                                                        className={`flex items-center gap-2 sm:gap-4 ${isCurrentPlayer ? 'bg-primary/10 rounded-lg p-2' : ''}`}
+                                                    >
+                                    <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">
+                                        {index + 1}º
+                                    </span>
+
+                                                        {player.avatar?.startsWith("/") && (
+                                                        <img
+                                                            src={player.avatar}
+                                                            alt={player.name}
+                                                            className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white flex-shrink-0"
+                                                        />
+                                                        )}
+
+                                                        <span className={`text-xs sm:text-md font-semibold truncate flex-1 min-w-0 ${isCurrentPlayer ? 'text-primary' : ''}`}>
+                                        {player.name || "Jogador"}
+                                                            {isCurrentPlayer && <span className="ml-1">(Você)</span>}
+                                    </span>
+
+                                                        <EggCounter
+                                                            count={(player as any).eggs || 0}
+                                                            size="sm"
+                                                            variant={index === 0 ? "golden" : "default"}
+                                                            className="flex-shrink-0"
+                                                        />
+                                                    </div>
+                                                );
+                                            })
+                                    ) : (
+                                        <p className="text-xs sm:text-sm text-muted-foreground text-center">
+                                            Ranking ainda não disponível...
+                                        </p>
+                                    )}
+                                </div>
                             </div>
                         </BarnCard>
                     </div>
@@ -423,37 +482,38 @@ function GameArenaContent() {
                                         <BarnCard
                                             key={index}
                                             variant="default"
-                                            className={`cursor-pointer transition-all duration-300 p-3 sm:p-4 ${getAnswerColor(index)}`}
+                                            className={`cursor-pointer transition-all duration-300 p-3 sm:p-4 relative ${getAnswerColor(index)}`}
                                             onClick={() => handleAnswerSelect(index)}
                                         >
-                                            <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                                    <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-sm sm:text-lg flex-shrink-0">
-                                                        {String.fromCharCode(65 + index)}
-                                                    </div>
-                                                    <span className="font-semibold text-sm sm:text-lg truncate">{option}</span>
-                                                </div>
-
-                                                {/* Avatares dos jogadores que escolheram esta opção */}
-                                                <div className="flex -space-x-1 flex-shrink-0">
+                                            {/* Avatares posicionados na borda superior direita */}
+                                            {playersOnOption(index).length > 0 && (
+                                                <div className="absolute -top-2 -right-2 flex -space-x-1 z-10">
                                                     {playersOnOption(index).slice(0, 3).map((p: any) => (
                                                         <div key={p.id} className="relative">
                                                             {p.avatar?.startsWith("/") && (
                                                             <img
                                                                 src={p.avatar}
                                                                 alt={p.name}
-                                                                className="w-6 h-6 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white"
+                                                                className="w-12 h-12 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-white shadow-lg"
                                                                 title={p.name}
                                                             />
                                                             )}
                                                         </div>
                                                     ))}
                                                     {playersOnOption(index).length > 3 && (
-                                                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-400 border-2 border-white flex items-center justify-center">
+                                                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-500 border-2 border-white flex items-center justify-center shadow-lg">
                                                             <span className="text-xs font-bold text-white">+{playersOnOption(index).length - 3}</span>
                                                         </div>
                                                     )}
                                                 </div>
+                                            )}
+
+                                            {/* Conteúdo da opção */}
+                                            <div className="flex items-center gap-2 sm:gap-4">
+                                                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-sm sm:text-lg flex-shrink-0">
+                                                    {String.fromCharCode(65 + index)}
+                                                </div>
+                                                <span className="font-semibold text-sm sm:text-lg pr-8">{option}</span>
                                             </div>
                                         </BarnCard>
                                     ))}

@@ -643,7 +643,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
     const isCorrect = currentQuestion && idx === currentQuestion.correctAnswer;
     if (isCorrect) {
-      const base  = currentSettings.eggs_per_correct;
+      const base = currentSettings.eggs_per_correct;
       const bonus = timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0;
       setPlayerEggs(e => e + base + bonus);
     }
@@ -684,12 +684,16 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
                   })
                   .eq('room_id', room.id)
                   .eq('client_id', clientId.current);
+
+              // FORÇA RELOAD LOCAL
               await loadPlayersFromRoom();
 
+              // FORÇA SINCRONIZAÇÃO PARA TODOS OS JOGADORES
+              await broadcastScoreUpdate();
             }
           }
         } catch (error) {
-          // console.error('[stats] Erro ao salvar estatísticas:', error);
+          console.error('[stats] Erro ao salvar estatísticas:', error);
         }
       })();
     }
@@ -811,6 +815,12 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
               answerIndex: number; participantId: string; name: string; avatar: string;
             };
 
+            ch.on('broadcast', { event: 'SCORE_UPDATE' }, async (msg) => {
+              // Quando recebe atualização de score, recarrega os players
+              console.log('🥚 Score update received, reloading players...');
+              await loadPlayersFromRoom();
+            });
+
             setAnswersByOption(prev => {
               const next = { ...prev };
               const list = next[answerIndex] ? [...next[answerIndex]] : [];
@@ -929,6 +939,18 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
     loadAlbumInfo();
   }, [roomCode]); // IMPORTANTE: apenas roomCode como dependência
+
+  const broadcastScoreUpdate = useCallback(async () => {
+    if (!sessionId || !gameChannelRef.current) return;
+
+    await gameChannelRef.current.send({
+      type: 'broadcast',
+      event: 'SCORE_UPDATE',
+      payload: {
+        timestamp: Date.now()
+      }
+    });
+  }, [sessionId]);
 
 
 
