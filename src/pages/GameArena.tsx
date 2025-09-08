@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { BarnCard } from "@/components/BarnCard";
 import { ChickenAvatar } from "@/components/ChickenAvatar";
@@ -27,6 +27,11 @@ function GameArenaContent() {
 
     const { user } = useAuthSession();
     const clientId = useRef(getOrCreateClientId());
+
+    const [countdown, setCountdown] = useState<number | null>(null);
+    const [showCountdown, setShowCountdown] = useState(false);
+    const countdownStartedRef = useRef(false);
+
 
     // navegação pós-set
     useEffect(() => {
@@ -70,6 +75,72 @@ function GameArenaContent() {
         selectedAlbumInfo,
     } = useGameLogic(roomCode || "", sid);
 
+    // Função para iniciar o countdown
+    // Função para iniciar o countdown
+    const startCountdown = () => {
+        console.log("🔍 startCountdown chamado:", {
+            countdownStarted: countdownStartedRef.current,
+            showCountdown,
+            countdown
+        });
+
+        if (countdownStartedRef.current) {
+            console.log("⛔ Countdown já iniciado, ignorando chamada");
+            return;
+        }
+
+        console.log("✅ Iniciando countdown pela primeira vez");
+        countdownStartedRef.current = true;
+        setShowCountdown(true);
+        setCountdown(5);
+    };
+
+
+    // Effect para gerenciar o countdown
+    useEffect(() => {
+        if (countdown === null) return;
+
+        if (countdown > 0) {
+            const timer = setTimeout(() => {
+                setCountdown(countdown - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        } else {
+            // Countdown chegou a 0, iniciar o jogo
+            console.log("🎯 Countdown terminou, iniciando jogo");
+            setShowCountdown(false);
+            setCountdown(null);
+            // countdownStartedRef.current = false; // Reset para permitir novo countdown se necessário
+            startFirstRound();
+        }
+    }, [countdown, startFirstRound]);
+
+    useEffect(() => {
+        // Reset o flag quando voltar ao estado idle SEM sid
+        if (gameState === "idle" && !sid && countdownStartedRef.current) {
+            console.log("🔄 Resetando countdown flag - voltou ao idle sem sid");
+            countdownStartedRef.current = false;
+        }
+    }, [gameState, sid]);
+
+
+    // NOVA LÓGICA: Auto-iniciar countdown se já tem sessionId
+    useEffect(() => {
+        console.log("🔍 Auto-start useEffect:", {
+            sid: !!sid,
+            isLoading,
+            gameState,
+            gameStarted,
+            showCountdown,
+            countdown,
+            countdownStarted: countdownStartedRef.current
+        });
+        if (sid && !isLoading && gameState === "idle" && !gameStarted && !showCountdown && countdown === null && !countdownStartedRef.current) {
+            console.log("🚀 Auto-starting countdown because session ID is present:", sid);
+            startCountdown();
+        }
+    }, [sid, isLoading, gameState, gameStarted, showCountdown, countdown]);
+
     console.log("=== DEBUG COMPLETO ===");
     console.log("1. clientId.current:", clientId.current);
     console.log("2. players array completo:", players);
@@ -77,6 +148,8 @@ function GameArenaContent() {
     console.log("4. user do supabase:", user);
     console.log("5. user.user_metadata:", user?.user_metadata);
     console.log("6. answersByOption:", answersByOption);
+    console.log("7. countdown:", countdown);
+    console.log("8. showCountdown:", showCountdown);
 
     const debugPlayer = players?.find((p) => p.id === clientId.current);
 
@@ -144,7 +217,37 @@ function GameArenaContent() {
                 <BarnCard variant="golden" className="text-center p-6 sm:p-8 w-full max-w-md">
                     <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🐔</div>
                     <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-4 text-white" />
-                    <p className="text-white text-sm sm:text-lg">Preparando o galinheiro musical...</p>
+                    <p className="text-white text-sm sm:text-lg">{sid ? "Entrando no jogo..." : "Preparando o galinheiro musical..."}</p>
+                </BarnCard>
+            </div>
+        );
+    }
+
+    // ---------- COUNTDOWN SCREEN ----------
+    if (showCountdown && countdown !== null) {
+        return (
+            <div className="min-h-screen bg-gradient-sky flex items-center justify-center p-4">
+                <BarnCard variant="golden" className="text-center p-8 sm:p-12 w-full max-w-lg">
+                    <div className="text-6xl sm:text-8xl mb-6 animate-bounce">
+                        {countdown > 0 ? countdown : "🎵"}
+                    </div>
+                    <h2 className="text-2xl sm:text-4xl font-bold text-white mb-4">
+                        {countdown > 0 ? "Preparando..." : "Vamos começar!"}
+                    </h2>
+                    <p className="text-white/80 text-lg sm:text-xl">
+                        {countdown > 0
+                            ? "O jogo começará em instantes!"
+                            : "Boa sorte, galinhas!"
+                        }
+                    </p>
+
+                    {/* Barra de progresso visual */}
+                    <div className="mt-6 w-full bg-white/20 rounded-full h-2">
+                        <div
+                            className="bg-white h-2 rounded-full transition-all duration-1000 ease-linear"
+                            style={{ width: `${((5 - countdown) / 5) * 100}%` }}
+                        />
+                    </div>
                 </BarnCard>
             </div>
         );
@@ -211,7 +314,7 @@ function GameArenaContent() {
                             <div className="space-y-2 sm:space-y-3">
                                 {Array.isArray(players) && players.length > 0 ? (
                                     players
-                                        .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0)) // CORREÇÃO: b - a para ordenar do maior para menor
+                                        .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
                                         .slice(0, 5)
                                         .map((player, index) => {
                                             const isCurrentPlayer = player.id === clientId.current;
@@ -220,9 +323,9 @@ function GameArenaContent() {
                                                     key={player.id}
                                                     className={`flex items-center gap-2 sm:gap-4 ${isCurrentPlayer ? 'bg-primary/10 rounded-lg p-2' : ''}`}
                                                 >
-                        <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">
-                            {index + 1}º
-                        </span>
+                                                    <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">
+                                                        {index + 1}º
+                                                    </span>
 
                                                     {player.avatar?.startsWith("/") && (
                                                     <img
@@ -233,14 +336,14 @@ function GameArenaContent() {
                                                     )}
 
                                                     <span className={`text-xs sm:text-md font-semibold truncate flex-1 min-w-0 ${isCurrentPlayer ? 'text-primary' : ''}`}>
-                            {player.name || "Jogador"}
+                                                        {player.name || "Jogador"}
                                                         {isCurrentPlayer && <span className="ml-1">(Você)</span>}
-                        </span>
+                                                    </span>
 
                                                     <EggCounter
                                                         count={(player as any).eggs || 0}
                                                         size="sm"
-                                                        variant={index === 0 ? "golden" : "default"} // Destaque para o 1º lugar
+                                                        variant={index === 0 ? "golden" : "default"}
                                                         className="flex-shrink-0"
                                                     />
                                                 </div>
@@ -258,48 +361,19 @@ function GameArenaContent() {
                     {/* Conteúdo do jogo - Mobile: abaixo | Desktop: direita */}
                     <div className="lg:col-span-8 lg:order-2">
                         {/* Estado IDLE */}
-                        {gameState === "idle" && (
+                        {gameState === "idle" && !sid && (
                             <div className="mb-4 sm:mb-6">
                                 <BarnCard variant="golden" className="text-center p-4 sm:p-6">
                                     <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🎵</div>
                                     <h3 className="text-lg sm:text-2xl font-bold text-white mb-2">
-                                        {isHost ? (
-                                            <>
-                                            <span className="sm:hidden">Pronto?</span>
-                                            <span className="hidden sm:inline">Pronto para começar?</span>
-                                            </>
-                                        ) : (sid ? (
-                                            <>
-                                            <span className="sm:hidden">Partida iniciada!</span>
-                                            <span className="hidden sm:inline">A partida já foi iniciada!</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                            <span className="sm:hidden">Aguardando...</span>
-                                            <span className="hidden sm:inline">Aguardando o host...</span>
-                                            </>
-                                        ))}
+                                        {isHost ? "Pronto para começar?" : "Aguardando o host..."}
                                     </h3>
 
                                     <p className="text-white/80 mb-4 sm:mb-6 text-sm sm:text-base px-2">
                                         {isHost
-                                            ? (
-                                            <>
-                                            <span className="sm:hidden">Clique para iniciar.</span>
-                                            <span className="hidden sm:inline">Clique para iniciar e sincronizar todos os jogadores.</span>
-                                            </>
-                                        )
-                                            : (sid ? (
-                                            <>
-                                            <span className="sm:hidden">Clique para entrar.</span>
-                                            <span className="hidden sm:inline">Clique para entrar na partida que o host iniciou.</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                            <span className="sm:hidden">Quando o host iniciar, você entra automaticamente.</span>
-                                            <span className="hidden sm:inline">Quando o host iniciar, você entra automaticamente.</span>
-                                            </>
-                                        ))}
+                                            ? "Clique para iniciar e sincronizar todos os jogadores."
+                                            : "Quando o host iniciar, você entra automaticamente."
+                                        }
                                     </p>
 
                                     <ChickenButton
@@ -307,19 +381,16 @@ function GameArenaContent() {
                                         size="lg"
                                         className="bg-white/20 hover:bg-white/30 text-white border-white/30 w-full sm:w-auto"
                                         chickenStyle="bounce"
-                                        onClick={startFirstRound}
+                                        onClick={() => {
+        console.log("🖱️ Botão clicado manualmente");
+        startCountdown();
+    }}
                                     >
-                                        <span className="sm:hidden">
-                                            {isHost ? "🎵 Iniciar" : (sid ? "🎵 Entrar" : "🔊 Liberar áudio")}
-                                        </span>
-                                        <span className="hidden sm:inline">
-                                            {isHost ? "🎵 Iniciar Jogo" : (sid ? "🎵 Entrar na partida" : "🔊 Liberar áudio")}
-                                        </span>
+                                        {isHost ? "🎵 Iniciar Jogo" : "🔊 Liberar áudio"}
                                     </ChickenButton>
 
                                     <p className="text-white/70 text-xs mt-3 px-2">
-                                        <span className="sm:hidden">Dica: clique no player para liberar o som.</span>
-                                        <span className="hidden sm:inline">Dica: se o áudio não tocar quando o jogo começar, clique uma vez no player acima para liberar o som.</span>
+                                        Dica: clique no player para liberar o som.
                                     </p>
                                 </BarnCard>
                             </div>
@@ -445,26 +516,26 @@ function GameArenaContent() {
                                                 ? (
                                                 <>
                                                 <span className="sm:hidden">
-                                                            🥚 Parabéns! +{currentSettings.eggs_per_correct || 10} ovos
+                                    🥚 Parabéns! +{currentSettings.eggs_per_correct || 10} ovos
                                                     {timeLeft > ((currentSettings.time_per_question || 15) * 0.8) && ` +${currentSettings.speed_bonus || 5}!`}
-                                                        </span>
+                                </span>
                                                 <span className="hidden sm:inline">
-                                                            🥚 Parabéns! Você ganhou {currentSettings.eggs_per_correct || 10} ovos
+                                    🥚 Parabéns! Você ganhou {currentSettings.eggs_per_correct || 10} ovos
                                                     {timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
                                                         ? ` + ${currentSettings.speed_bonus || 5} bônus velocidade!`
                                                         : "!"
                                                     }
-                                                        </span>
+                                </span>
                                                 </>
                                             )
                                                 : (
                                                 <>
                                                 <span className="sm:hidden">
-                                                            💔 Resposta: {currentQuestion.options[currentQuestion.correctAnswer]}
-                                                        </span>
+                                    💔 Resposta: {currentQuestion.options[currentQuestion.correctAnswer]}
+                                </span>
                                                 <span className="hidden sm:inline">
-                                                            💔 Que pena! A resposta correta era: {currentQuestion.options[currentQuestion.correctAnswer]}
-                                                        </span>
+                                    💔 Que pena! A resposta correta era: {currentQuestion.options[currentQuestion.correctAnswer]}
+                                </span>
                                                 </>
                                             )}
                                         </h3>
@@ -482,6 +553,7 @@ function GameArenaContent() {
                                 )}
                             </div>
                         )}
+
                     </div>
                 </div>
 
