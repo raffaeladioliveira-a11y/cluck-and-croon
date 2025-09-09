@@ -31,6 +31,9 @@ function GameArenaContent() {
     const [countdown, setCountdown] = useState<number | null>(null);
     const [showCountdown, setShowCountdown] = useState(false);
     const countdownStartedRef = useRef(false);
+    const [systemGameMode, setSystemGameMode] = useState<"mp3" | "spotify">("mp3");
+
+
 
 
     // navegação pós-set
@@ -111,6 +114,15 @@ function GameArenaContent() {
             setShowCountdown(false);
             setCountdown(null);
             // countdownStartedRef.current = false; // Reset para permitir novo countdown se necessário
+
+            // ADICIONAR: Ativar autoplay para todo o jogo
+            if (typeof window !== 'undefined' && window.navigator) {
+                // Tentar reproduzir um áudio silencioso para "unlock" autoplay
+                const silentAudio = new Audio();
+                silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAAQBoAAEAaAAABAAgAZGF0YQAAAAA=";
+                silentAudio.play().catch(() => console.log('Silent audio failed'));
+            }
+
             startFirstRound();
         }
     }, [countdown, startFirstRound]);
@@ -192,6 +204,33 @@ function GameArenaContent() {
         if (selectedAnswer === index) return "bg-destructive text-destructive-foreground";
         return "bg-muted text-muted-foreground";
     };
+
+
+    const loadGameMode = async () => {
+        try {
+            const { data, error } = await supabase
+                .from("game_settings")
+                .select("value")
+                .eq("key", "game_mode")
+                .maybeSingle();
+
+            console.log('🎮 Game mode from DB:', data);
+
+            if (!error && data?.value) {
+                const mode = typeof data.value === 'string' ? data.value.replace(/"/g, '') : 'mp3';
+                const finalMode = mode === 'spotify' ? 'spotify' : 'mp3';
+                console.log('🎮 Setting game mode to:', finalMode);
+                setSystemGameMode(finalMode);
+            }
+        } catch (error) {
+            console.error("Error loading game mode:", error);
+        }
+    };
+
+    // Chamar no useEffect
+    useEffect(() => {
+        loadGameMode();
+    }, []);
 
     // ---------- DECISÃO: Spotify vs MP3 para a música atual ----------
     const song = currentQuestion?.song ?? {};
@@ -421,59 +460,43 @@ function GameArenaContent() {
                     <div className="lg:col-span-8 lg:order-2">
                         {/* Estado IDLE */}
                         {gameState === "idle" && !sid && (
-                            <div className="mb-4 sm:mb-6">
-                                <BarnCard variant="golden" className="text-center p-4 sm:p-6">
-                                    <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🎵</div>
-                                    <h3 className="text-lg sm:text-2xl font-bold text-white mb-2">
-                                        {isHost ? "Pronto para começar?" : "Aguardando o host..."}
-                                    </h3>
+                            <ChickenButton
+                                onClick={async () => {
+      console.log("🖱️ Liberando áudio para toda a sessão");
 
-                                    <p className="text-white/80 mb-4 sm:mb-6 text-sm sm:text-base px-2">
-                                        {isHost
-                                            ? "Clique para iniciar e sincronizar todos os jogadores."
-                                            : "Quando o host iniciar, você entra automaticamente."
-                                        }
-                                    </p>
+      // Enviar evento para o MusicPlayer fazer unlock
+      const unlockEvent = new CustomEvent('unlockAudio');
+      window.dispatchEvent(unlockEvent);
 
-                                    <ChickenButton
-                                        variant="feather"
-                                        size="lg"
-                                        className="bg-white/20 hover:bg-white/30 text-white border-white/30 w-full sm:w-auto"
-                                        chickenStyle="bounce"
-                                        onClick={() => {
-        console.log("🖱️ Botão clicado manualmente");
+      // Pequeno delay para garantir que o unlock aconteça
+      setTimeout(() => {
         startCountdown();
+      }, 100);
     }}
-                                    >
-                                        {isHost ? "🎵 Iniciar Jogo" : "🔊 Liberar áudio"}
-                                    </ChickenButton>
-
-                                    <p className="text-white/70 text-xs mt-3 px-2">
-                                        Dica: clique no player para liberar o som.
-                                    </p>
-                                </BarnCard>
-                            </div>
+                            >
+                                {isHost ? "🎵 Iniciar Jogo" : "🔊 Liberar áudio"}
+                            </ChickenButton>
                         )}
 
                         {/* Arena do jogo */}
                         {gameState !== "idle" && currentQuestion && (
-                            <div className="space-y-4 sm:space-y-6">
+
+
+
+                        <div className="space-y-4 sm:space-y-6">
                                 {/* Player de música */}
                                 <BarnCard variant="golden" className="p-3 sm:p-4">
                                     <MusicPlayer
-                                        songTitle={(song as any).title}
-                                        artist={(song as any).artist}
-                                        duration={(song as any).duration_seconds || 15}
-                                        gameMode={finalGameMode}
-                                        spotifyTrackId={rawSpotifyTrackId}
-                                        audioUrl={finalGameMode === "mp3" ? (song as any).audioUrl : undefined}
-                                        autoPlay={gameState === "playing"}
-                                        muted={!audioUnlocked}
+                                        songTitle={currentQuestion?.song.title || ""}
+  artist={currentQuestion?.song.artist || ""}
+  audioUrl={currentQuestion?.song.audioUrl}
+  duration={currentSettings.song_duration}
                                         gameState={gameState}
-                                        roundKey={`${currentRound}-${(song as any).id || rawSpotifyTrackId || (song as any).title || "unk"}`}
-                                        onTimeUpdate={() => {}}
-                                        onEnded={() => {}}
-                                    />
+                                        autoPlay={true}
+                                        roundKey={`round-${currentRound}`}
+                                        gameMode={finalGameMode} // Apenas uma prop gameMode
+                                        spotifyTrackId={rawSpotifyTrackId} // Adicionar esta prop
+                                        />
                                 </BarnCard>
 
                                 {/* Opções de resposta */}

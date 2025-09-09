@@ -1,0 +1,26 @@
+
+DECLARE
+  v_code text := upper(p_room_code);
+  v_room_id uuid;
+  v_is_host boolean;
+  v_session_id uuid;
+BEGIN
+  SELECT id INTO v_room_id FROM game_rooms WHERE room_code = v_code;
+  IF v_room_id IS NULL THEN RAISE EXCEPTION 'ROOM_NOT_FOUND'; END IF;
+
+  SELECT EXISTS(
+    SELECT 1 FROM room_participants
+     WHERE room_id = v_room_id AND client_id = p_client_id AND is_host = true
+  ) INTO v_is_host;
+
+  IF NOT v_is_host THEN RAISE EXCEPTION 'NOT_HOST'; END IF;
+
+  -- Criar sessão de jogo
+  INSERT INTO game_sessions (room_code)
+  VALUES (v_code)
+  RETURNING id INTO v_session_id;
+
+  UPDATE game_rooms SET status = 'in_progress', game_session_id = v_session_id WHERE id = v_room_id;
+
+  RETURN v_session_id;
+END 

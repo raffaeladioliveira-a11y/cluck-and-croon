@@ -18,6 +18,7 @@ import {ArrowLeft, FolderOpen} from "lucide-react";
 import {Switch} from "@/components/ui/switch";
 import {Separator} from "@/components/ui/separator";
 import {Music2, Disc3} from "lucide-react";
+import { BulkUploadComponent } from "@/components/BulkUploadComponent";
 
 interface Song {
     id: string;
@@ -98,6 +99,8 @@ export default function AdminDashboard() {
     const [currentUser, setCurrentUser] = useState(null);
     const [gameMode, setGameMode] = useState<"mp3" | "spotify">("mp3");
     const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+    const [showBulkUpload, setShowBulkUpload] = useState(false);
+
 
     // Estados para configurações
     const [gameSettings, setGameSettings] = useState({
@@ -595,6 +598,8 @@ export default function AdminDashboard() {
 
     const handleUpdateAlbum = async() => {
         if (!editingAlbum) return;
+        console.log('💾 Salvando álbum com capa:', editingAlbum.cover_image_url);
+
         if (!editingAlbum.name || !editingAlbum.genre_id) {
             toast({
                 title: "❌ Campos obrigatórios",
@@ -603,30 +608,42 @@ export default function AdminDashboard() {
             });
             return;
         }
+
         try {
+            const updateData = {
+                name: editingAlbum.name,
+                artist_name: editingAlbum.artist_name, // 👈 ADICIONADO
+                release_year: editingAlbum.release_year,
+                description: editingAlbum.description,
+                cover_image_url: editingAlbum.cover_image_url,
+                genre_id: editingAlbum.genre_id,
+            };
+
+            console.log('💾 Dados para atualizar:', updateData);
+
             const {error} = await supabase
                 .from('albums')
-                .update({
-                    name: editingAlbum.name,
-                    release_year: editingAlbum.release_year,
-                    description: editingAlbum.description,
-                    cover_image_url: editingAlbum.cover_image_url,
-                    genre_id: editingAlbum.genre_id,
-                })
+                .update(updateData)
                 .eq('id', editingAlbum.id);
-            if (error) throw error;
+
+            if (error) {
+                console.error('❌ Erro no banco:', error);
+                throw error;
+            }
+
+            console.log('✅ Álbum salvo no banco com sucesso');
             toast({title: "✅ Álbum atualizado!"});
             setIsEditAlbumModalOpen(false);
             setEditingAlbum(null);
             await loadAlbums();
-        } catch {
-            toast
-        ({
-            title: "❌ Erro",
-            description: "Não foi possível atualizar o álbum",
-            variant: "destructive",
-        });
-    }
+        } catch (error) {
+            console.error('💥 Erro completo:', error);
+            toast({
+                title: "❌ Erro",
+                description: "Não foi possível atualizar o álbum",
+                variant: "destructive",
+            });
+        }
     };
 
     const [isFiltering, setIsFiltering] = useState(false);
@@ -1457,13 +1474,62 @@ export default function AdminDashboard() {
                                                     <Input
                                                         type="file"
                                                         accept="image/*"
-                                                        onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                handleCoverUpload(file);
-              }
-            }}
-                                                        className="bg-white/20 border-white/30 text-white"
+                                                        onChange={async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    console.log('🖼️ Arquivo selecionado para edição:', file);
+
+    try {
+      setIsUploadingCover(true);
+
+      const timestamp = Date.now();
+      const slug = editingAlbum.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/gi, "-");
+      const ext = file.name.split(".").pop();
+      const fileName = `${slug}-${timestamp}.${ext}`;
+
+      const { data, error } = await supabase.storage
+        .from("album-covers")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: true
+        });
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("album-covers")
+        .getPublicUrl(fileName);
+
+      console.log('🔗 Nova URL gerada:', publicUrl);
+
+      // Atualizar estado local
+      setEditingAlbum(prev => {
+        if (!prev) return null;
+        const updated = { ...prev, cover_image_url: publicUrl };
+        console.log('🔄 Estado local atualizado:', updated.cover_image_url);
+        return updated;
+      });
+
+      toast({
+        title: "Capa carregada",
+        description: "Agora clique em 'Salvar Alterações' para confirmar"
+      });
+
+    } catch (err) {
+      console.error('💥 Erro no upload:', err);
+      toast({
+        title: "Erro ao carregar capa",
+        description: err.message || "Falha no upload",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingCover(false);
+    }
+  }}
+                                                        disabled={isUploadingCover}
                                                     />
                                                     {newAlbum.cover_image_url && (
                                                         <img
@@ -1695,108 +1761,125 @@ export default function AdminDashboard() {
                                 </BarnCard>
 
                                 {/* Formulário para Adicionar Música */}
+                                {/* Escolha entre upload individual ou em lote */}
+                                {/* Formulário para Adicionar Música */}
                                 <BarnCard variant="coop" className="p-6">
-                                    <h3 className="text-xl font-bold text-barn-brown mb-4 flex items-center gap-2">
-                                        <Plus className="w-5 h-5"/>
-                                        Adicionar Música ao Álbum
-                                    </h3>
-
-                                    <div className="grid md:grid-cols-2 gap-6">
-                                        <div className="space-y-4">
-                                            <div>
-                                                <Label>Título da Música</Label>
-                                                <Input
-                                                    placeholder="Ex: Evidências"
-                                                    value={newSong.title}
-                                                    onChange={(e) => setNewSong(prev => ({...prev, title: e.target.value}))}
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <Label>Artista</Label>
-                                                <Input
-                                                    placeholder="Ex: Chitãozinho & Xororó"
-                                                    value={newSong.artist}
-                                                    onChange={(e) => setNewSong(prev => ({...prev, artist: e.target.value}))}
-                                                />
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <Label>Duração (segundos)</Label>
-                                                    <Input
-                                                        type="number"
-                                                        value={newSong.duration_seconds}
-                                                        onChange={(e) => setNewSong(prev => ({...prev, duration_seconds: e.target.value}))}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <Label>Dificuldade</Label>
-                                                    <Select value={newSong.difficulty_level}
-                                                            onValueChange={(value) => setNewSong(prev => ({...prev, difficulty_level: value}))}>
-                                                        <SelectTrigger>
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="1">🐣 Fácil</SelectItem>
-                                                            <SelectItem value="2">🐔 Médio</SelectItem>
-                                                            <SelectItem value="3">🐓 Difícil</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <div>
-                                                <Label>Arquivo de Áudio (.mp3)</Label>
-                                                <Input
-                                                    type="file"
-                                                    accept=".mp3,audio/mpeg"
-                                                    onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    setAudioFile(file);
-                  }
-                }}
-                                                    className="cursor-pointer"
-                                                />
-                                                {audioFile && (
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        📎 {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)}
-                                                        MB)
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {/*<div>*/}
-                                            {/*<Label>URL do Spotify (opcional)</Label>*/}
-                                            {/*<Input*/}
-                                            {/*placeholder="https://open.spotify.com/..."*/}
-                                            {/*value={newSong.spotify_url}*/}
-                                            {/*onChange={(e) => setNewSong(prev => ({...prev, spotify_url: e.target.value}))}*/}
-                                            {/*/>*/}
-                                            {/*</div>*/}
-
-                                            {/*<div>*/}
-                                            {/*<Label>URL do YouTube (opcional)</Label>*/}
-                                            {/*<Input*/}
-                                            {/*placeholder="https://youtube.com/..."*/}
-                                            {/*value={newSong.youtube_url}*/}
-                                            {/*onChange={(e) => setNewSong(prev => ({...prev, youtube_url: e.target.value}))}*/}
-                                            {/*/>*/}
-                                            {/*</div>*/}
-
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="text-xl font-bold text-barn-brown flex items-center gap-2">
+                                            <Plus className="w-5 h-5"/>
+                                            Adicionar Músicas ao Álbum
+                                        </h3>
+                                        <div className="flex gap-2">
                                             <ChickenButton
-                                                variant="corn"
-                                                onClick={handleAddSong}
-                                                disabled={isUploading}
-                                                className="w-full"
+                                                variant={!showBulkUpload ? "corn" : "feather"}
+                                                size="sm"
+                                                onClick={() => setShowBulkUpload(false)}
                                             >
-                                                {isUploading ? "Fazendo Upload..." : "Adicionar Música"}
+                                                Upload Individual
+                                            </ChickenButton>
+                                            <ChickenButton
+                                                variant={showBulkUpload ? "corn" : "feather"}
+                                                size="sm"
+                                                onClick={() => setShowBulkUpload(true)}
+                                            >
+                                                Upload em Lote
                                             </ChickenButton>
                                         </div>
                                     </div>
+
+                                    {/* Upload em Lote */}
+                                    {showBulkUpload && (
+                                        <BulkUploadComponent
+                                            selectedAlbum={selectedAlbum}
+                                            onComplete={() => {
+        loadAlbumSongs(selectedAlbum.id);
+        loadTotalSongsCount();
+        loadAlbums();
+        setShowBulkUpload(false);
+      }}
+                                        />
+                                    )}
+
+                                    {/* Upload Individual - SEU CÓDIGO ORIGINAL */}
+                                    {!showBulkUpload && (
+                                        <div className="grid md:grid-cols-2 gap-6">
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <Label>Título da Música</Label>
+                                                    <Input
+                                                        placeholder="Ex: Evidências"
+                                                        value={newSong.title}
+                                                        onChange={(e) => setNewSong(prev => ({...prev, title: e.target.value}))}
+                                                    />
+                                                </div>
+
+                                                <div>
+                                                    <Label>Artista</Label>
+                                                    <Input
+                                                        placeholder="Ex: Chitãozinho & Xororó"
+                                                        value={newSong.artist}
+                                                        onChange={(e) => setNewSong(prev => ({...prev, artist: e.target.value}))}
+                                                    />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <Label>Duração (segundos)</Label>
+                                                        <Input
+                                                            type="number"
+                                                            value={newSong.duration_seconds}
+                                                            onChange={(e) => setNewSong(prev => ({...prev, duration_seconds: e.target.value}))}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <Label>Dificuldade</Label>
+                                                        <Select value={newSong.difficulty_level}
+                                                                onValueChange={(value) => setNewSong(prev => ({...prev, difficulty_level: value}))}>
+                                                            <SelectTrigger>
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="1">🐣 Fácil</SelectItem>
+                                                                <SelectItem value="2">🐔 Médio</SelectItem>
+                                                                <SelectItem value="3">🐓 Difícil</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <Label>Arquivo de Áudio (.mp3)</Label>
+                                                    <Input
+                                                        type="file"
+                                                        accept=".mp3,audio/mpeg"
+                                                        onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setAudioFile(file);
+              }
+            }}
+                                                        className="cursor-pointer"
+                                                    />
+                                                    {audioFile && (
+                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                            📎 {audioFile.name} ({(audioFile.size / 1024 / 1024).toFixed(2)} MB)
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                <ChickenButton
+                                                    variant="corn"
+                                                    onClick={handleAddSong}
+                                                    disabled={isUploading}
+                                                    className="w-full"
+                                                >
+                                                    {isUploading ? "Fazendo Upload..." : "Adicionar Música"}
+                                                </ChickenButton>
+                                            </div>
+                                        </div>
+                                    )}
                                 </BarnCard>
                                 {/* Lista de Músicas do Álbum */}
                                 <BarnCard variant="default" className="p-6">
@@ -2180,82 +2263,89 @@ export default function AdminDashboard() {
                                             src={editingAlbum.cover_image_url}
                                             alt="Capa do Álbum"
                                             className="w-32 h-32 object-cover rounded-lg border"
+                                            onError={(e) => {
+        console.error('Erro ao carregar imagem:', e);
+        e.currentTarget.src = '/placeholder-album.png'; // Fallback
+      }}
                                         />
                                     )}
                                     <Input
                                         type="file"
                                         accept="image/*"
                                         onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              try {
-                const timestamp = Date.now();
-                const slug = editingAlbum.name
-                  .toLowerCase()
-                  .replace(/[^a-z0-9]/gi, "-");
-                const ext = file.name.split(".").pop();
-                const fileName = `${slug}-${timestamp}.${ext}`;
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-                const { error } = await supabase.storage
-                  .from("album-covers")
-                  .upload(fileName, file, { cacheControl: "3600", upsert: true });
+      console.log('🖼️ Arquivo selecionado para edição:', file);
 
-                if (error) throw error;
+      try {
+        setIsUploadingCover(true);
 
-                const { data: { publicUrl } } = supabase.storage
-                  .from("album-covers")
-                  .getPublicUrl(fileName);
+        const timestamp = Date.now();
+        const slug = editingAlbum.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]/gi, "-");
+        const ext = file.name.split(".").pop();
+        const fileName = `${slug}-${timestamp}.${ext}`;
 
-                // Atualiza localmente
-                setEditingAlbum(prev =>
-                  prev ? { ...prev, cover_image_url: publicUrl } : null
-                );
+        console.log('📂 Fazendo upload:', fileName);
 
-                toast({ title: "✅ Nova capa carregada!" });
-              } catch (err) {
-                toast({
-                  title: "❌ Erro",
-                  description: "Falha ao fazer upload da capa",
-                  variant: "destructive",
-                });
-              }
-            }}
+        const { data, error } = await supabase.storage
+          .from("album-covers")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: true
+          });
+
+        if (error) {
+          console.error('❌ Erro no storage:', error);
+          throw error;
+        }
+
+        console.log('✅ Upload bem-sucedido:', data);
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("album-covers")
+          .getPublicUrl(fileName);
+
+        console.log('🔗 Nova URL:', publicUrl);
+
+        // Atualizar estado local
+       setEditingAlbum(prev => {
+  const updated = prev ? { ...prev, cover_image_url: publicUrl } : null;
+  console.log('🔄 Estado atualizado:', updated?.cover_image_url);
+  return updated;
+});
+        toast({
+          title: "Nova capa carregada",
+          description: "Clique em 'Salvar Alterações' para confirmar"
+        });
+
+      } catch (err) {
+        console.error('💥 Erro no upload da edição:', err);
+        toast({
+          title: "Erro ao carregar capa",
+          description: err.message || "Falha no upload",
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploadingCover(false);
+      }
+    }}
+                                        disabled={isUploadingCover}
                                     />
+                                    {isUploadingCover && (
+                                        <p className="text-sm text-muted-foreground">
+                                            Fazendo upload da imagem...
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="flex gap-2 pt-4">
                                     <ChickenButton
                                         variant="corn"
                                         className="flex-1"
-                                        onClick={async () => {
-              if (!editingAlbum) return;
-              try {
-                const { error } = await supabase
-                  .from("albums")
-                  .update({
-                    name: editingAlbum.name,
-                    artist_name: editingAlbum.artist_name,
-                    release_year: editingAlbum.release_year,
-                    description: editingAlbum.description,
-                    genre_id: editingAlbum.genre_id,
-                    cover_image_url: editingAlbum.cover_image_url, // 👈 agora salva também a capa
-                  })
-                  .eq("id", editingAlbum.id);
-
-                if (error) throw error;
-
-                toast({ title: "Álbum atualizado!" });
-                setIsEditAlbumModalOpen(false);
-                setEditingAlbum(null);
-                await loadAlbums();
-              } catch (error) {
-                toast({
-                  title: "Erro",
-                  description: "Não foi possível atualizar o álbum",
-                  variant: "destructive",
-                });
-              }
-            }}
+                                        onClick={handleUpdateAlbum}
                                     >
                                         ✅ Salvar Alterações
                                     </ChickenButton>

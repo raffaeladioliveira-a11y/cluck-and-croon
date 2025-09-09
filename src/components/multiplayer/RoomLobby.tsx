@@ -7,6 +7,8 @@ import { PlayerList } from "./PlayerList";
 import { RoomCode } from "./RoomCode";
 import { ChickenButton } from "@/components/ChickenButton";
 import { useAuthSession } from "@/hooks/useAuthSession";
+// Adicionar esta importação no topo do arquivo RoomLobby
+import { SelectedAlbumDisplay } from "@/components/SelectedAlbumDisplay";
 
 interface Room {
     code: string;
@@ -56,6 +58,14 @@ export function RoomLobby() {
     const { user, loading } = useAuthSession();
     const gameModeRef = useRef(gameMode);
 
+    // Adicionar estes estados após os estados existentes
+    const [systemGameMode, setSystemGameMode] = useState<"mp3" | "spotify">("mp3");
+    const [spotifyAlbums, setSpotifyAlbums] = useState<any[]>([]);
+    const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
+    const [loadingGameMode, setLoadingGameMode] = useState(true);
+    const [selectedMp3AlbumId, setSelectedMp3AlbumId] = useState<string | null>(null);
+    const [selectedSpotifyAlbumId, setSelectedSpotifyAlbumId] = useState<string | null>(null);
+
     // DEBUG:
     console.log('AUTH STATUS:', {
         user: user,
@@ -71,6 +81,7 @@ export function RoomLobby() {
 
     useEffect(() => {
         if (loading) return;
+        loadSystemGameMode();
         joinRoom();
     }, [roomCode, loading]);
 
@@ -174,7 +185,7 @@ export function RoomLobby() {
                 }, (payload) => {
                     console.log('🔄 Room participants changed:', payload);
                     // Small delay to ensure DB consistency
-                    setTimeout(() => loadParticipants(roomData.id), 100);
+                    setTimeout(() => loadRoomData(roomData.id), 100);
                 })
                 .on('postgres_changes', {
                     event: 'UPDATE',
@@ -198,6 +209,10 @@ export function RoomLobby() {
                         game_session_id: updatedRoom.game_session_id
                     }));
 
+                    // Atualizar álbuns selecionados
+                    setSelectedMp3AlbumId(updatedRoom.selected_mp3_album_id);
+                    setSelectedSpotifyAlbumId(updatedRoom.selected_spotify_album_id);
+
                     // Navigate to game when it starts
                     if (!navigatedRef.current && updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
                         navigatedRef.current = true;
@@ -216,7 +231,7 @@ export function RoomLobby() {
                 });
 
             // Load initial participants
-            loadParticipants(roomData.id);
+            loadRoomData(roomData.id);
 
             return () => {
                 supabase.removeChannel(channel);
@@ -252,9 +267,68 @@ export function RoomLobby() {
         gameModeRef.current = gameMode;
     }, [gameMode]);
 
-    const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
-    const loadParticipants = async (roomId: string) => {
+    // Adicionar estas funções
+    const loadSystemGameMode = async () => {
         try {
+            const { data, error } = await supabase
+                .from("game_settings")
+                .select("*")
+                .eq("key", "game_mode")
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+
+            if (data?.value) {
+                const mode = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                setSystemGameMode(mode);
+
+                // Se for modo Spotify, carregar os álbuns
+                if (mode === "spotify") {
+                    await loadSpotifyAlbums();
+                }
+            }
+        } catch (error) {
+            console.error("Error loading game mode:", error);
+        } finally {
+            setLoadingGameMode(false);
+        }
+    };
+
+    const loadSpotifyAlbums = async () => {
+        try {
+            const { data, error } = await supabase
+                .from("spotify_albums")
+                .select(`
+                *,
+                genre:genres(name, emoji)
+            `)
+                .order("created_at", { ascending: false });
+
+            if (error) throw error;
+            setSpotifyAlbums(data || []);
+        } catch (error) {
+            console.error("Error loading Spotify albums:", error);
+        }
+    };
+
+    const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
+    const loadRoomData = async (roomId: string) => {
+        try {
+            // Carregar dados da sala incluindo álbuns selecionados
+            const { data: roomData, error: roomError } = await supabase
+                .from('game_rooms')
+                .select('selected_mp3_album_id, selected_spotify_album_id')
+                .eq('id', roomId)
+                .single();
+
+            if (roomError) {
+                console.error('Error loading room data:', roomError);
+            } else {
+                setSelectedMp3AlbumId(roomData.selected_mp3_album_id);
+                setSelectedSpotifyAlbumId(roomData.selected_spotify_album_id);
+            }
+
+            // Carregar participantes (código existente)
             const { data, error } = await supabase
                 .from('room_participants')
                 .select('*')
@@ -265,15 +339,6 @@ export function RoomLobby() {
                 console.error('Error loading participants:', error);
                 return;
             }
-
-            console.log('👥 Loaded participants (ordered by join time):', data);
-
-            // ADICIONE ESTE DEBUG:
-            console.log('🔍 Avatar debug:', data.map(p => ({
-                name: p.display_name,
-                avatar: p.avatar,
-            })));
-
             // Map participants - todos automaticamente "prontos" agora
             const mappedPlayers = data.map(participant => ({
                 id: participant.id,
@@ -292,30 +357,123 @@ export function RoomLobby() {
         }
     };
 
-    const handleStartGame = async () => {
-        // Para modo solo, não precisa verificar número de jogadores
-        if (gameMode === 'multiplayer') {
-            if (players.length < 2) {
-                toast({
-                    title: "Aguarde mais jogadores",
-                    description: "É necessário pelo menos 2 jogadores para começar o jogo multiplayer.",
-                    variant: "destructive",
-                });
-                return;
+    // ADICIONE O COMPONENTE AQUI - depois de todas as funções, antes do return
+    const SpotifyAlbumSelector = () => {
+        if (systemGameMode !== "spotify" || !isHost || selectedSpotifyAlbumId) return null;
+
+        const handleSelectSpotifyAlbum = async (albumId: string) => {
+            try {
+                const { error } = await supabase
+                    .from('game_rooms')
+                    .update({ selected_spotify_album_id: albumId })
+                    .eq('room_code', roomCode);
+
+                if (error) {
+                    console.error('Error selecting Spotify album:', error);
+                    toast({
+                        title: "Erro",
+                        description: "Não foi possível selecionar o álbum",
+                        variant: "destructive",
+                    });
+                } else {
+                    setSelectedSpotifyAlbumId(albumId);
+                    toast({
+                        title: "Álbum selecionado",
+                        description: "Álbum do Spotify selecionado para o jogo",
+                    });
+                }
+            } catch (error) {
+                console.error('Error selecting album:', error);
             }
-            // Removemos a verificação de ready - todos os jogadores estão sempre prontos
+        };
+
+        return (
+            <div className="mb-8">
+                <h3 className="text-lg font-bold mb-4 text-white text-center">
+                    Escolha um álbum do Spotify:
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                    {spotifyAlbums.map((album) => (
+                        <div
+                            key={album.id}
+                            className="cursor-pointer rounded-lg p-3 transition-all bg-white/20 hover:bg-white/25"
+                            onClick={() => handleSelectSpotifyAlbum(album.id)}
+                        >
+                            {album.album_cover_url && (
+                                <img
+                                    src={album.album_cover_url}
+                                    alt={album.album_name}
+                                    className="w-full h-24 object-cover rounded mb-2"
+                                />
+                            )}
+                            <h4 className="text-white text-sm font-semibold truncate">
+                                {album.album_name}
+                            </h4>
+                            <p className="text-white/80 text-xs truncate">
+                                {album.artist_name}
+                            </p>
+                            <div className="flex items-center justify-between mt-1">
+                                {album.genre && (
+                                    <span className="text-xs bg-white/20 px-2 py-1 rounded">
+                                        {album.genre.emoji} {album.genre.name}
+                                    </span>
+                                )}
+                                <span className="text-xs text-white/60">
+                                    {album.total_tracks} faixas
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {spotifyAlbums.length === 0 && (
+                    <div className="text-center py-8">
+                        <p className="text-white/80">
+                            Nenhum álbum do Spotify disponível.
+                            <br />
+                            Adicione álbuns no painel administrativo.
+                        </p>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+
+    const handleStartGame = async () => {
+        // Verificações existentes...
+        if (gameMode === 'multiplayer' && players.length < 2) {
+            toast({
+                title: "Aguarde mais jogadores",
+                description: "É necessário pelo menos 2 jogadores para começar o jogo multiplayer.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        // NOVA VERIFICAÇÃO: Se for modo Spotify e nenhum álbum selecionado
+        if (systemGameMode === "spotify" && !selectedSpotifyAlbumId) {
+            toast({
+                title: "Selecione um álbum",
+                description: "Escolha um álbum do Spotify para jogar.",
+                variant: "destructive",
+            });
+            return;
         }
 
         try {
-            // Use RPC function to start game (host-only)
+            // CORREÇÃO: Passar parâmetros adicionais para o RPC
             const { data: sessionId, error } = await supabase.rpc('start_game', {
                 p_room_code: roomCode.trim(),
-                p_client_id: clientId
+                p_client_id: clientId,
+                // NOVOS PARÂMETROS:
+                p_game_mode: systemGameMode,
+                p_selected_spotify_album_id: systemGameMode === "spotify" ? selectedSpotifyAlbumId : null,
+                p_selected_mp3_album_id: systemGameMode === "mp3" ? selectedMp3AlbumId : null
             });
 
             if (error) {
                 console.error('Error starting game:', error);
-
                 if (error.message === 'NOT_HOST') {
                     toast({
                         title: "Acesso negado",
@@ -347,12 +505,14 @@ export function RoomLobby() {
         navigate('/');
     };
 
-    if (isLoading) {
+    if (isLoading || loadingGameMode) {
         return (
             <div className="min-h-screen bg-gradient-sky p-4 flex items-center justify-center">
                 <div className="text-center">
                     <div className="text-6xl animate-chicken-walk mb-4">🐔</div>
-                    <p className="text-xl text-muted-foreground">Entrando no galinheiro...</p>
+                    <p className="text-xl text-muted-foreground">
+                        {loadingGameMode ? "Carregando configurações..." : "Entrando no galinheiro..."}
+                    </p>
                 </div>
             </div>
         );
@@ -421,8 +581,19 @@ export function RoomLobby() {
                     </div>
                 )}
 
+                <SpotifyAlbumSelector />
+
                 {/* Room Code Display */}
                 <RoomCode roomCode={roomCode} />
+
+                {/* NOVO: Display do álbum selecionado */}
+                <SelectedAlbumDisplay
+                    roomCode={roomCode}
+                    gameMode={systemGameMode}
+                    selectedMp3AlbumId={selectedMp3AlbumId}
+                    selectedSpotifyAlbumId={selectedSpotifyAlbumId}
+                    isHost={isHost}
+                />
 
                 {/* Players List com seleção de álbum habilitada para ambos os modos */}
                 <PlayerList
@@ -430,8 +601,8 @@ export function RoomLobby() {
                     currentClientId={clientId}
                     onToggleReady={undefined} // Removido completamente - nenhum botão de ready
                     roomCode={roomCode}
-                    gameMode="mp3" // Sempre habilita seleção de álbum para o host
-                    showAlbumSelectorForHost={true}
+                    gameMode={systemGameMode}
+                    showAlbumSelectorForHost={systemGameMode === "mp3" && !selectedMp3AlbumId}
                 />
 
                 {/* Action Buttons */}

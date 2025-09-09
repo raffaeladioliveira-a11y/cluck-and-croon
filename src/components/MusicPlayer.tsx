@@ -8,7 +8,7 @@ import { GameState } from "@/hooks/useGameLogic";
 interface MusicPlayerProps {
   songTitle: string;
   artist: string;
-  audioUrl?: string; // MP3 ou Spotify embed url
+  audioUrl?: string;
   duration?: number;
   onTimeUpdate?: (currentTime: number) => void;
   onEnded?: () => void;
@@ -17,10 +17,7 @@ interface MusicPlayerProps {
   gameState?: GameState;
   roundKey?: string;
   className?: string;
-
-  /** NOVO: modo do jogo */
   gameMode?: "mp3" | "spotify";
-  /** NOVO: id da track Spotify (se gameMode=spotify) */
   spotifyTrackId?: string;
 }
 
@@ -39,21 +36,43 @@ export const MusicPlayer = ({
     gameMode = "mp3",
     spotifyTrackId,
 }: MusicPlayerProps) => {
+  console.log('🎵 MusicPlayer props:', { gameMode, spotifyTrackId, gameState, songTitle, artist });
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.7);
   const [isMuted, setIsMuted] = useState(false);
   const [audioError, setAudioError] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
   const stopTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // NOVO: Função para liberar autoplay de uma vez
+  const unlockAudio = async () => {
+    const audio = audioRef.current;
+    if (!audio || audioUnlocked) return;
+
+    try {
+      // Tentar reproduzir um som silencioso
+      audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAAQBoAAEAaAAABAAgAZGF0YQAAAAA=";
+      audio.volume = 0;
+      await audio.play();
+      audio.pause();
+      audio.currentTime = 0;
+
+      setAudioUnlocked(true);
+      console.log('✅ Audio unlocked successfully');
+    } catch (error) {
+      console.log('⚠️ Audio unlock failed:', error);
+    }
+  };
 
   const teardownAudio = () => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.pause();
     audio.currentTime = 0;
-    audio.removeAttribute("src");
-    audio.load();
     setIsPlaying(false);
     setCurrentTime(0);
     setAudioError(false);
@@ -62,6 +81,41 @@ export const MusicPlayer = ({
       clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
     }
+
+    if (countdownTimerRef.current) {
+      clearTimeout(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+  };
+
+  const startSpotifyCountdown = () => {
+    console.log('🕒 Starting Spotify countdown for', duration, 'seconds');
+    setCurrentTime(0);
+    setIsPlaying(true);
+
+    let timeLeft = duration;
+    const updateCountdown = () => {
+      timeLeft -= 1;
+      const elapsed = duration - timeLeft;
+      setCurrentTime(elapsed);
+      onTimeUpdate?.(elapsed);
+
+      if (timeLeft <= 0) {
+        console.log('🕒 Spotify countdown finished');
+        setIsPlaying(false);
+        setCurrentTime(duration);
+        onEnded?.();
+        return;
+      }
+
+      countdownTimerRef.current = setTimeout(updateCountdown, 1000);
+    };
+
+    countdownTimerRef.current = setTimeout(updateCountdown, 1000);
+    stopTimerRef.current = setTimeout(() => {
+      console.log('🕒 Spotify main timer finished');
+      teardownAudio();
+    }, duration * 1000);
   };
 
   const setupAndPlayAudio = async (audioSrc: string, shouldAutoPlay: boolean) => {
@@ -73,11 +127,22 @@ export const MusicPlayer = ({
     audio.currentTime = 0;
     audio.volume = isMuted ? 0 : volume;
 
+    console.log('🔊 Volume settings:', { volume, isMuted, finalVolume: audio.volume });
+    console.log('🎵 Audio source:', audioSrc);
+
     try {
       audio.load();
+
       if (shouldAutoPlay) {
-        await audio.play();
-        setIsPlaying(true);
+        // MODIFICADO: Tentar autoplay, se falhar, não dar erro
+        try {
+          await audio.play();
+          setIsPlaying(true);
+          console.log('🎵 Audio playing automatically');
+        } catch (playError) {
+          console.log('⚠️ Autoplay failed, requires user interaction');
+          setAudioError(false); // Não tratar como erro
+        }
 
         const durationMs = duration * 1000;
         stopTimerRef.current = setTimeout(() => {
@@ -92,7 +157,13 @@ export const MusicPlayer = ({
 
   const togglePlay = async () => {
     const audio = audioRef.current;
-    if (!audio || audioError) return;
+    if (!audio) return;
+
+    // NOVO: Unlock audio na primeira interação
+    if (!audioUnlocked) {
+      await unlockAudio();
+    }
+
     try {
       if (isPlaying) {
         audio.pause();
@@ -100,24 +171,65 @@ export const MusicPlayer = ({
       } else {
         await audio.play();
         setIsPlaying(true);
+        setAudioError(false);
       }
     } catch (err) {
+      console.error('Play error:', err);
       setAudioError(true);
     }
   };
 
-  useEffect(() => {
-    if (gameMode !== "mp3") return;
-    const audio = audioRef.current;
-    if (!audio) return;
+  // Adicione esta função antes dos useEffect existentes:
+  const unlockAudioAutomatically = async () => {
+    if (audioUnlocked) return;
 
-    if (gameState === "playing" && audioUrl) {
-      setupAndPlayAudio(audioUrl, autoPlay || false);
+    try {
+      // Para MP3, usar o elemento audio
+      if (gameMode === "mp3" && audioRef.current) {
+        const audio = audioRef.current;
+        audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAAQBoAAEAaAAABAAgAZGF0YQAAAAA=";
+        audio.volume = 0;
+        await audio.play();
+        audio.pause();
+      }
+
+      setAudioUnlocked(true);
+      console.log('✅ Audio unlocked automatically');
+    } catch (error) {
+      console.log('⚠️ Auto unlock failed:', error);
+    }
+  };
+
+  // Effect principal para mudanças de estado
+  useEffect(() => {
+    console.log('🔄 Game state changed:', { gameState, gameMode, roundKey, audioUnlocked });
+
+    if (gameState === "playing") {
+      if (!audioUnlocked) {
+        unlockAudioAutomatically();
+      }
+      if (gameMode === "mp3" && audioUrl) {
+        console.log('🎵 Setting up MP3 audio');
+        setupAndPlayAudio(audioUrl, autoPlay && audioUnlocked);
+      } else if (gameMode === "spotify" && spotifyTrackId) {
+        console.log('🎵 Starting Spotify mode with trackId:', spotifyTrackId);
+        startSpotifyCountdown();
+      }
     } else if (gameState !== "playing" && isPlaying) {
+      console.log('🛑 Stopping audio due to game state change');
       teardownAudio();
     }
-  }, [roundKey, gameState, audioUrl, autoPlay, gameMode]);
+  }, [roundKey, gameState, audioUrl, autoPlay, gameMode, spotifyTrackId, audioUnlocked]);
 
+  // Adicione este useEffect específico para Spotify:
+  useEffect(() => {
+    // No modo Spotify, não precisamos de unlock de áudio tradicional
+    if (gameMode === "spotify" && gameState === "playing") {
+      setAudioUnlocked(true);
+    }
+  }, [gameMode, gameState]);
+
+  // Effect para eventos de áudio (apenas MP3)
   useEffect(() => {
     if (gameMode !== "mp3") return;
     const audio = audioRef.current;
@@ -142,38 +254,78 @@ export const MusicPlayer = ({
     };
   }, [onTimeUpdate, onEnded, gameMode]);
 
+  useEffect(() => {
+    return () => {
+      teardownAudio();
+    };
+  }, []);
+
+  // ADICIONE ESTE NOVO useEffect AQUI:
+  useEffect(() => {
+    const handleUnlockAudio = () => {
+      unlockAudio();
+    };
+
+    window.addEventListener('unlockAudio', handleUnlockAudio);
+    return () => window.removeEventListener('unlockAudio', handleUnlockAudio);
+  }, []);
+
   const progress = (currentTime / duration) * 100;
 
   return (
       <div className={cn("bg-white/10 rounded-lg p-3 sm:p-4 shadow-lg", className)} key={roundKey}>
-        {/* MP3: usa <audio> */}
-        {gameMode === "mp3" && (
-            <audio ref={audioRef} preload="metadata" crossOrigin="anonymous" />
+        {/* Debug info - remover em produção */}
+        {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-white/50 mb-2">
+              Debug: {gameMode} | {gameState} | audioUnlocked: {audioUnlocked ? 'yes' : 'no'}
+            </div>
         )}
 
-        {/* SPOTIFY: usa embed - escondido mas funcional */}
+        {/* MP3: elemento de áudio sempre presente */}
+        {gameMode === "mp3" && (
+            <audio
+                ref={audioRef}
+                preload="metadata"
+                crossOrigin="anonymous"
+                onClick={unlockAudio} // Unlock quando clicado
+            />
+        )}
+
+        {/* SPOTIFY: iframe visível apenas quando tocando */}
         {gameMode === "spotify" && spotifyTrackId && gameState === "playing" && (
-            <div className="hidden">
+            <div className="w-full mb-3">
               <iframe
                   src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator&theme=0`}
                   width="100%"
-                  height="80"
+                  height="152"
                   frameBorder="0"
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                   loading="lazy"
-                  allowFullScreen
-              ></iframe>
+                  style={{ borderRadius: '8px' }}
+                  title={`Spotify player for ${songTitle}`}
+              />
             </div>
         )}
 
-        {/* Estado inicial - compacto */}
+        {/* Estado inicial */}
         {gameState === "idle" && (
             <div className="text-center py-2">
-              <p className="text-white/80 text-sm sm:text-base">Clique em "Iniciar Jogo" para começar!</p>
+              <p className="text-white/80 text-sm sm:text-base">
+                {!audioUnlocked ? (
+                    <button
+                        onClick={unlockAudio}
+                        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
+                    >
+                      🔊 Clique para liberar o som
+                    </button>
+                ) : (
+                    <>Clique em "Iniciar Jogo" para começar! {gameMode === "spotify" && " (Modo Spotify)"}</>
+                )}
+              </p>
             </div>
         )}
 
-        {/* Tocando - apenas controles e barra */}
+        {/* Tocando - controles e barra */}
         {gameState === "playing" && (
             <div className="space-y-3">
               {/* Linha superior: controles + tempo */}
@@ -196,47 +348,50 @@ export const MusicPlayer = ({
                       >
                         {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
                       </Button>
+
+                      {/* NOVO: Indicador de status do autoplay */}
+                      {!audioUnlocked && (
+                          <div className="text-xs text-red-400 ml-2">
+                            Clique ▶ para ativar
+                          </div>
+                      )}
                     </div>
                 )}
 
-                {/* Placeholder para Spotify */}
+                {/* Indicador Spotify */}
                 {gameMode === "spotify" && (
                     <div className="flex items-center gap-2">
                       <div className="h-8 w-8 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">♪</span>
+                        <span className="text-white text-xs font-bold">♫</span>
                       </div>
-                      <span className="text-white/80 text-xs">Spotify</span>
+                      <span className="text-white/80 text-xs font-medium">Spotify</span>
                     </div>
                 )}
 
                 {/* Tempo */}
                 <div className="text-white/90 font-medium text-sm">
-                  {gameMode === "mp3" ? (
-                      `${currentTime.toFixed(0)}s / ${duration}s`
-                  ) : (
-                      `${duration}s`
-                  )}
+                  {Math.ceil(currentTime)}s / {duration}s
                 </div>
               </div>
 
               {/* Barra de progresso */}
               <div className="w-full">
                 <Progress
-                    value={gameMode === "mp3" ? progress : ((duration - currentTime) / duration) * 100}
+                    value={progress}
                     className="h-2 bg-white/20"
                 />
               </div>
 
-              {/* Info da música - apenas para Spotify e bem pequena */}
-              {gameMode === "spotify" && (
-                  <div className="text-center">
-                    <p className="text-white/70 text-xs truncate">{songTitle} - {artist}</p>
-                  </div>
-              )}
+              {/* Info da música */}
+              {/*<div className="text-center">*/}
+                {/*<p className="text-white/70 text-xs truncate">*/}
+                  {/*{songTitle} - {artist}*/}
+                {/*</p>*/}
+              {/*</div>*/}
             </div>
         )}
 
-        {/* Estados de resultado - mantém compacto */}
+        {/* Estados de resultado */}
         {(gameState === "reveal" || gameState === "transition") && (
             <div className="text-center py-2">
               <p className="text-white/80 text-sm">Aguarde a próxima música...</p>
