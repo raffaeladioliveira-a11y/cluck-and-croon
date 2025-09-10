@@ -403,96 +403,7 @@ function GameArenaContent() {
                     {/* Arena do jogo */}
                     {gameState !== "idle" && currentQuestion && (
                         <div className="space-y-4">
-                            {/* RANKING - SEMPRE ACIMA EM TODAS AS RESOLUÇÕES */}
 
-                            <div className="space-y-4">
-                                {/* RANKING HORIZONTAL COM SCROLL */}
-                                <div className="w-full">
-                                    <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
-                                        🏆 Ranking da Partida
-                                    </h3>
-
-                                    {/* Container com scroll horizontal */}
-                                    <div className="overflow-x-auto pb-2">
-                                        <div className="flex gap-1 min-w-max px-2">
-                                            {Array.isArray(players) && players.length > 0 ? (
-                                                players
-                                                    .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
-                                                    .map((player, index) => {
-                                                        const isCurrentPlayer = player.id === clientId.current;
-                                                        const position = index + 1;
-
-                                                        // Cores para as 3 primeiras posições
-                                                        const badgeColor =
-                                                            position === 1
-                                                                ? "bg-yellow-500"
-                                                                : position === 2
-                                                                ? "bg-gray-500"
-                                                                : position === 3
-                                                                ? "bg-orange-500"
-                                                                : "bg-muted text-muted-foreground";
-
-                                                        return (
-                                                            <div
-                                                                key={player.id}
-                                                                className="relative flex flex-col items-center p-3 rounded-lg min-w-[90px] sm:min-w-[110px]"
-
-                                                            >
-                                                                {/* Avatar com medalha de posição */}
-                                                                <div className="relative mb-2">
-                                                                    {player.avatar?.startsWith("/") ? (
-                                                                    <img
-                                                                        src={player.avatar}
-                                                                        alt={player.name}
-                                                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white"
-                                                                    />
-                                                                    ) : (
-                                                                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl bg-primary/20 border-2 border-white">
-                                                                        {player.avatar || "🐔"}
-                                                                    </div>
-                                                                    )}
-
-                                                                    {/* Medalha */}
-                                                                    <div
-                                                                        className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${badgeColor}`}
-                                                                    >
-                                                                        {position}
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Nome do jogador */}
-                                                                <div className="text-xs font-medium text-white truncate max-w-[80px] mb-1 text-center">
-                                                                    {player.name || "Jogador"}
-                                                                </div>
-
-                                                                {/* Contador de Ovos */}
-                                                                <div className="flex items-center gap-1 text-xs font-bold text-white">
-                                                                    <span>{(player as any).eggs || 0}</span>
-                                                                    <span>🥚</span>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                            ) : (
-                                                <div className="w-full text-center py-8">
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Ranking ainda não disponível...
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Indicador de scroll (opcional) */}
-                                    {Array.isArray(players) && players.length > 4 && (
-                                        <div className="text-center mt-2">
-                                            <p className="text-xs text-muted-foreground">
-                                                ← Role para ver mais jogadores →
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
 
                             {/*<BarnCard variant="coop" className="p-3 sm:p-4">*/}
                                 {/*<h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">*/}
@@ -590,6 +501,97 @@ function GameArenaContent() {
                                         </div>
                                     </BarnCard>
                                 ))}
+                            </div>
+
+                            {/* RANKING - SEMPRE ACIMA EM TODAS AS RESOLUÇÕES */}
+
+                            <div className="space-y-4 pt-4 sm:pt-4">
+                                {/* RANKING HORIZONTAL COM SCROLL */}
+                                <div className="w-full">
+                                    <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
+                                        🏆 Ranking da Partida
+                                    </h3>
+
+                                    {/* Container com scroll horizontal */}
+                                    <div className="overflow-x-auto pb-2">
+                                        <div className="flex gap-1 min-w-max px-2">
+                                            {Array.isArray(players) && players.length > 0 ? (
+                                                players
+                                                    .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
+                                                    .map((player, index) => {
+                                                        const isCurrentPlayer = player.id === clientId.current;
+                                                        const position = index + 1;
+
+                                                        // Cores para as 3 primeiras posições
+                                                        const badgeColor =
+                                                            position === 1
+                                                                ? "bg-yellow-500"
+                                                                : position === 2
+                                                                ? "bg-gray-500"
+                                                                : position === 3
+                                                                ? "bg-orange-500"
+                                                                : "bg-muted text-muted-foreground";
+
+                                                        return (
+                                                            <div
+                                                                key={player.id}
+                                                                className="relative flex flex-col items-center p-3 rounded-lg min-w-[90px] sm:min-w-[110px]"
+
+                                                            >
+                                                                {/* Avatar com medalha de posição */}
+                                                                <div className="relative mb-2">
+                                                                    {player.avatar?.startsWith("/") ? (
+                                                                    <img
+                                                                        src={player.avatar}
+                                                                        alt={player.name}
+                                                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white"
+                                                                    />
+                                                                    ) : (
+                                                                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl bg-primary/20 border-2 border-white">
+                                                                        {player.avatar || "🐔"}
+                                                                    </div>
+                                                                    )}
+
+                                                                    {/* Medalha */}
+                                                                    <div
+                                                                        className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${badgeColor}`}
+                                                                    >
+                                                                        {position}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Nome do jogador */}
+                                                                <div className="text-xs font-medium text-white truncate max-w-[80px] mb-1 text-center">
+                                                                    {player.name || "Jogador"}
+                                                                </div>
+
+                                                                {/* Contador de Ovos */}
+                                                                <div className="flex items-center gap-1 text-xs font-bold text-white">
+                                                                    <span>{(player as any).eggs || 0}</span>
+                                                                    <span>🥚</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                            ) : (
+                                                <div className="w-full text-center py-8">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Ranking ainda não disponível...
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Indicador de scroll (opcional) */}
+                                    {Array.isArray(players) && players.length > 4 && (
+                                        <div className="text-center mt-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                ← Role para ver mais jogadores →
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Sua pontuação */}

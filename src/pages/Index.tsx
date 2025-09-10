@@ -79,9 +79,7 @@ const Index = () => {
 
         if (error) return 'classic';
 
-        const raw = data ?
-        .
-        value;
+        const raw = data ?.value;
         const normalized = typeof raw === 'string' ? raw.replace(/"/g, '') : 'classic';
         return normalized === 'battle' ? 'battle' : 'classic';
     };
