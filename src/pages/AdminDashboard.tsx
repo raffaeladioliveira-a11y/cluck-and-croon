@@ -192,6 +192,69 @@ export default function AdminDashboard() {
         }
     }, [filters]);
 
+
+    // 1. PRIMEIRO: Adicione esta função no seu componente AdminDashboard, junto com as outras funções:
+
+    const handleUpdateSongModal = async () => {
+        if (!editingSong) {
+            toast({
+                title: "Erro",
+                description: "Nenhuma música selecionada para edição",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        try {
+            console.log('Atualizando música:', editingSong.id, editingSong.title);
+
+            const { error } = await supabase
+                .from('songs')
+                .update({
+                    title: editingSong.title,
+                    artist: editingSong.artist,
+                    duration_seconds: editingSong.duration_seconds || 10,
+                    difficulty_level: editingSong.difficulty_level || 1,
+                    // Mantém os campos de URL se existirem
+                    spotify_url: editingSong.spotify_url || null,
+                    youtube_url: editingSong.youtube_url || null,
+                    audio_file_url: editingSong.audio_file_url || null,
+                })
+                .eq('id', editingSong.id);
+
+            if (error) {
+                console.error('Erro no banco:', error);
+                throw error;
+            }
+
+            console.log('Música atualizada com sucesso');
+
+            toast({
+                title: "Música atualizada!",
+                description: `${editingSong.title} foi atualizada com sucesso`,
+            });
+
+            // Fechar modal
+            setIsEditSongModalOpen(false);
+            setEditingSong(null);
+
+            // Recarregar dados
+            if (selectedAlbum) {
+                await loadAlbumSongs(selectedAlbum.id);
+            }
+            await loadTotalSongsCount();
+            await loadAlbums();
+
+        } catch (error) {
+            console.error('Erro ao atualizar música:', error);
+            toast({
+                title: "Erro",
+                description: "Não foi possível atualizar a música",
+                variant: "destructive",
+            });
+        }
+    };
+
     const loadAllSongs = async() => {
         try {
             const {data, error} = await supabase
@@ -2656,7 +2719,7 @@ export default function AdminDashboard() {
                 </Dialog>
 
 
-                {/* Modal de Edição de Música */}
+                {/* Modal de Edição de Música - VERSÃO CORRIGIDA */}
                 <Dialog open={isEditSongModalOpen} onOpenChange={setIsEditSongModalOpen}>
                     <DialogContent className="max-w-2xl">
                         <DialogHeader>
@@ -2708,7 +2771,6 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
 
-                                {/* ADICIONE O CÓDIGO DO PLAYER AQUI - ANTES DOS BOTÕES */}
                                 {/* Prévia do Áudio - apenas para MP3 */}
                                 {editingSong?.audio_file_url && (
                                 <div className="border rounded-lg p-4 bg-muted/30">
@@ -2741,74 +2803,23 @@ export default function AdminDashboard() {
                                         </div>
                                     </div>
                                 )}
-                                {/* FIM DO CÓDIGO DO PLAYER */}
 
-                                {/*<div>*/}
-                                {/*<Label>URL do Spotify (opcional)</Label>*/}
-                                {/*<Input*/}
-                                {/*value={editingSong.spotify_url || ''}*/}
-                                {/*onChange={(e) => setEditingSong(prev => prev ? {...prev, spotify_url: e.target.value} : null)}*/}
-                                {/*placeholder="https://open.spotify.com/..."*/}
-                                {/*/>*/}
-                                {/*</div>*/}
-
-                                {/*<div>*/}
-                                {/*<Label>URL do YouTube (opcional)</Label>*/}
-                                {/*<Input*/}
-                                {/*value={editingSong.youtube_url || ''}*/}
-                                {/*onChange={(e) => setEditingSong(prev => prev ? {...prev, youtube_url: e.target.value} : null)}*/}
-                                {/*placeholder="https://youtube.com/..."*/}
-                                {/*/>*/}
-                                {/*</div>*/}
-
-                                {/*<div>*/}
-                                {/*<Label>URL do arquivo de áudio (opcional)</Label>*/}
-                                {/*<Input*/}
-                                {/*value={editingSong.audio_file_url || ''}*/}
-                                {/*onChange={(e) => setEditingSong(prev => prev ? {...prev, audio_file_url: e.target.value} : null)}*/}
-                                {/*placeholder="URL do arquivo de áudio"*/}
-                                {/*/>*/}
-                                {/*</div>*/}
-
+                                {/* Botões de ação - VERSÃO CORRIGIDA */}
                                 <div className="flex gap-2 pt-4">
                                     <ChickenButton
                                         variant="corn"
                                         className="flex-1"
-                                        onClick={async () => {
-              if (!editingSong || !selectedAlbum) return;
-
-              try {
-                const { error } = await supabase
-                  .from('songs')
-                  .update({
-                    title: editingSong.title,
-                    artist: editingSong.artist,
-                    duration_seconds: editingSong.duration_seconds || 10,
-                    spotify_url: editingSong.spotify_url || null,
-                    youtube_url: editingSong.youtube_url || null,
-                    audio_file_url: editingSong.audio_file_url || null,
-                    difficulty_level: editingSong.difficulty_level || 1,
-                  })
-                  .eq('id', editingSong.id);
-
-                if (error) throw error;
-
-                toast({ title: "Música atualizada!" });
-                setIsEditSongModalOpen(false);
-                setEditingSong(null);
-                await loadAlbumSongs(selectedAlbum.id);
-              } catch (error) {
-                toast({
-                  title: "Erro",
-                  description: "Não foi possível atualizar a música",
-                  variant: "destructive",
-                });
-              }
-            }}
+                                        onClick={handleUpdateSongModal}
                                     >
                                         ✅ Salvar Alterações
                                     </ChickenButton>
-                                    <ChickenButton variant="feather" onClick={() => setIsEditSongModalOpen(false)}>
+                                    <ChickenButton
+                                        variant="feather"
+                                        onClick={() => {
+              setIsEditSongModalOpen(false);
+              setEditingSong(null);
+            }}
+                                    >
                                         ❌ Cancelar
                                     </ChickenButton>
                                 </div>

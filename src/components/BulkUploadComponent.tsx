@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -36,6 +36,8 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
     const [isProcessing, setIsProcessing] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [currentStep, setCurrentStep] = useState<'select' | 'review' | 'upload' | 'complete'>('select');
+    const [isDragOver, setIsDragOver] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Função para extrair metadados básicos do arquivo
     const extractMetadata = useCallback(async (file: File): Promise<{ title: string; artist: string; duration: number }> => {
@@ -43,7 +45,13 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
             const audio = new Audio();
             const url = URL.createObjectURL(file);
 
-            audio.addEventListener('loadedmetadata', () => {
+            const cleanup = () => {
+                URL.revokeObjectURL(url);
+                audio.removeEventListener('loadedmetadata', onLoad);
+                audio.removeEventListener('error', onError);
+            };
+
+            const onLoad = () => {
                 // Extrair nome do arquivo sem extensão
                 const fileName = file.name.replace(/\.[^/.]+$/, "");
 
@@ -64,26 +72,39 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
                     duration: Math.round(audio.duration) || 30
                 });
 
-                URL.revokeObjectURL(url);
-            });
+                cleanup();
+            };
 
-            audio.addEventListener('error', () => {
+            const onError = () => {
                 resolve({
                         title: file.name.replace(/\.[^/.]+$/, ""),
                         artist: selectedAlbum?.artist_name || "Artista Desconhecido",
                     duration: 30
             });
-                URL.revokeObjectURL(url);
-            });
+                cleanup();
+            };
 
+            audio.addEventListener('loadedmetadata', onLoad);
+            audio.addEventListener('error', onError);
             audio.src = url;
+
+            // Timeout para casos onde o áudio não carrega
+            setTimeout(() => {
+                if (audio.readyState === 0) {
+                    onError();
+                }
+            }, 5000);
         });
     }, [selectedAlbum]);
 
-    // Processar arquivos selecionados
-    const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const selectedFiles = Array.from(event.target.files || []);
-        const mp3Files = selectedFiles.filter(file => file.type === 'audio/mpeg' || file.name.endsWith('.mp3'));
+    // Função para processar arquivos (usada tanto para click quanto drag)
+    const processFiles = useCallback(async (fileList: FileList | File[]) => {
+        const selectedFiles = Array.from(fileList);
+        const mp3Files = selectedFiles.filter(file =>
+            file.type === 'audio/mpeg' ||
+            file.type === 'audio/mp3' ||
+            file.name.toLowerCase().endsWith('.mp3')
+        );
 
         if (mp3Files.length === 0) {
             toast({
@@ -94,19 +115,43 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
             return;
         }
 
+        if (mp3Files.length > 20) {
+            toast({
+                title: "Muitos arquivos selecionados",
+                description: "Por favor, selecione no máximo 20 arquivos por vez",
+                variant: "destructive"
+            });
+            return;
+        }
+
         setIsProcessing(true);
         const audioFiles: AudioFile[] = [];
 
         for (let i = 0; i < mp3Files.length; i++) {
             const file = mp3Files[i];
-            const metadata = await extractMetadata(file);
+            try {
+                const metadata = await extractMetadata(file);
 
-            audioFiles.push({
-                file,
-                id: `${Date.now()}-${i}`,
-                metadata,
-                status: 'pending'
+                audioFiles.push({
+                    file,
+                    id: `${Date.now()}-${i}`,
+                    metadata,
+                    status: 'pending'
+                });
+            } catch (error) {
+                console.error(`Erro ao processar ${file.name}:`, error);
+                // Adiciona mesmo com erro, usando metadados básicos
+                audioFiles.push({
+                        file,
+                        id: `${Date.now()}-${i}`,
+                        metadata: {
+                            title: file.name.replace(/\.[^/.]+$/, ""),
+                            artist: selectedAlbum?.artist_name || "Artista Desconhecido",
+                        duration: 30
+                    },
+                    status: 'pending'
             });
+            }
         }
 
         setFiles(audioFiles);
@@ -117,7 +162,58 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
             title: `${mp3Files.length} arquivos processados`,
             description: "Revise os metadados antes de fazer upload"
         });
-    }, [extractMetadata]);
+    }, [extractMetadata, selectedAlbum]);
+
+    // Processar arquivos selecionados via input
+    const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (files && files.length > 0) {
+            await processFiles(files);
+        }
+        // Limpar o input para permitir selecionar os mesmos arquivos novamente
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }, [processFiles]);
+
+    // Handlers para drag and drop
+    const handleDragEnter = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(true);
+    }, []);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Só remove o highlight se realmente saiu da área
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setIsDragOver(false);
+        }
+    }, []);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, []);
+
+    const handleDrop = useCallback(async (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+
+        const droppedFiles = Array.from(e.dataTransfer.files);
+        if (droppedFiles.length > 0) {
+            await processFiles(droppedFiles);
+        }
+    }, [processFiles]);
+
+    // Clique na área de upload
+    const handleUploadAreaClick = useCallback(() => {
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    }, []);
 
     // Atualizar metadados de um arquivo
     const updateFileMetadata = useCallback((fileId: string, field: keyof AudioFile['metadata'], value: string) => {
@@ -222,6 +318,10 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
         setCurrentStep('select');
         setUploadProgress(0);
         setIsProcessing(false);
+        setIsDragOver(false);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
     }, []);
 
     return (
@@ -240,24 +340,49 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
                 {/* Step 1: Seleção de arquivos */}
                 {currentStep === 'select' && (
                     <div className="space-y-4">
-                        <div className="text-center py-8 border-2 border-dashed border-white/30 rounded-lg">
-                            <Upload className="w-12 h-12 text-white/60 mx-auto mb-4" />
-                            <Label htmlFor="bulk-files" className="cursor-pointer">
-                                <div className="text-white mb-2">
-                                    Clique para selecionar arquivos MP3
+                        <div
+                            className={`text-center py-8 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ${
+                                isDragOver
+                                    ? 'border-white bg-white/20 scale-105'
+                                    : 'border-white/30 hover:border-white/50 hover:bg-white/10'
+                            } ${isProcessing ? 'pointer-events-none opacity-50' : ''}`}
+                            onDragEnter={handleDragEnter}
+                            onDragLeave={handleDragLeave}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            onClick={handleUploadAreaClick}
+                        >
+                            <Upload className={`w-12 h-12 mx-auto mb-4 transition-colors ${
+                                isDragOver ? 'text-white' : 'text-white/60'
+                            }`} />
+
+                            {isProcessing ? (
+                                <div className="text-white">
+                                    <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full mx-auto mb-2" />
+                                    Processando arquivos...
+                                </div>
+                            ) : (
+                                <>
+                                <div className={`mb-2 transition-colors ${
+                                        isDragOver ? 'text-white font-semibold' : 'text-white'
+                                    }`}>
+                                    {isDragOver ? 'Solte os arquivos aqui!' : 'Clique para selecionar arquivos MP3'}
                                 </div>
                                 <div className="text-white/60 text-sm">
                                     Ou arraste e solte os arquivos aqui
                                 </div>
-                                <Input
-                                    id="bulk-files"
-                                    type="file"
-                                    multiple
-                                    accept=".mp3,audio/mpeg"
-                                    onChange={handleFileSelect}
-                                    className="hidden"
-                                />
-                            </Label>
+                                </>
+                            )}
+
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                multiple
+                                accept=".mp3,audio/mpeg,audio/mp3"
+                                onChange={handleFileSelect}
+                                className="hidden"
+                                disabled={isProcessing}
+                            />
                         </div>
 
                         <div className="bg-white/10 rounded-lg p-4">
