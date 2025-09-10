@@ -663,17 +663,23 @@ function GameArenaContent() {
                     roomCode={roomCode || ""}
                     sessionId={sid}
                     isVisible={showChat}
-                    onToggle={() => setShowChat(false)}
+                    onToggle={() => {
+                    setShowChat(false);
+                    setChatUnreadCount(0); // Reset contador ao fechar
+                }}
+                    onUnreadChange={(count) => setChatUnreadCount(count)} // NOVA PROP
                 />
 
                 {/* Botão do chat */}
                 {!showChat && (
                     <ChatToggleButton
-                        onClick={() => setShowChat(true)}
+                        onClick={() => {
+                        setShowChat(true);
+                        setChatUnreadCount(0); // Reset contador ao abrir
+                    }}
                         unreadCount={chatUnreadCount}
                     />
                 )}
-
 
                 {/* Enfeites decorativos - apenas desktop */}
                 <div className="fixed inset-0 pointer-events-none z-0 hidden lg:block">

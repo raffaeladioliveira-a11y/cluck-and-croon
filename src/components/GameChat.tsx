@@ -23,18 +23,21 @@ interface GameChatProps {
     sessionId: string;
     isVisible?: boolean;
     onToggle?: () => void;
+    onUnreadChange?: (count: number) => void;
     className?: string;
 }
 
-export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, className = "" }: GameChatProps) {
+export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onUnreadChange, className = "" }: GameChatProps) {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [roomId, setRoomId] = useState<string | null>(null);
     const [isMinimized, setIsMinimized] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [isBlinking, setIsBlinking] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const messagesContainerRef = useRef<HTMLDivElement>(null);
     const clientId = useRef(getOrCreateClientId());
     const profile = useRef(loadProfile());
     const chatChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -44,14 +47,15 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
 
     // Scroll para a última mensagem
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
     };
 
     // Carregar room_id e mensagens iniciais
     useEffect(() => {
         const loadChatData = async () => {
             try {
-                // Buscar room_id
                 const { data: room } = await supabase
                     .from('game_rooms')
                     .select('id')
@@ -61,7 +65,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
                 if (room) {
                     setRoomId(room.id);
 
-                    // Carregar mensagens existentes
                     const { data: chatMessages } = await supabase
                         .from('chat_messages')
                         .select('*')
@@ -97,9 +100,16 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
             const { message } = msg.payload;
             setMessages(prev => [...prev, message]);
 
-            // Se não é a sua mensagem e o chat está minimizado, incrementar contador
+            // Se não é a sua mensagem e o chat está fechado ou minimizado
             if (message.client_id !== clientId.current && (isMinimized || !isVisible)) {
-                setUnreadCount(prev => prev + 1);
+                setUnreadCount(prev => {
+                    const newCount = prev + 1;
+                    onUnreadChange?.(newCount);
+                    return newCount;
+                });
+
+                setIsBlinking(true);
+                setTimeout(() => setIsBlinking(false), 3000);
             }
 
             setTimeout(scrollToBottom, 100);
@@ -116,14 +126,7 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
                 supabase.removeChannel(chatChannelRef.current);
             }
         };
-    }, [sessionId, roomId, isMinimized, isVisible]);
-
-    // Reset do contador quando abrir o chat
-    useEffect(() => {
-        if (isVisible && !isMinimized) {
-            setUnreadCount(0);
-        }
-    }, [isVisible, isMinimized]);
+    }, [sessionId, roomId, isMinimized, isVisible, onUnreadChange]);
 
     const sendMessage = async () => {
         if (!newMessage.trim() || !roomId || isLoading) return;
@@ -131,7 +134,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
         setIsLoading(true);
 
         try {
-            // Buscar dados do participante na sala (fonte principal)
             const { data: participant } = await supabase
                 .from('room_participants')
                 .select('display_name, avatar')
@@ -139,26 +141,17 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
                 .eq('client_id', clientId.current)
                 .maybeSingle();
 
-            console.log('=== DEBUG CHAT ===');
-            console.log('roomId:', roomId);
-            console.log('clientId:', clientId.current);
-            console.log('participant encontrado:', participant);
-
             let playerName = 'Jogador Anônimo';
             let playerAvatar = '🐔';
 
             if (participant?.display_name) {
                 playerName = participant.display_name;
                 playerAvatar = participant.avatar || '🐔';
-                console.log('Usando dados da sala:', { playerName, playerAvatar });
             } else {
-                console.log('Participante não encontrado ou sem display_name');
-                // Fallback apenas se não encontrar na sala
                 playerName = user?.user_metadata?.display_name || profile.current?.name || 'Jogador Anônimo';
                 playerAvatar = user?.user_metadata?.avatar_url || profile.current?.avatar || '🐔';
             }
 
-            // Criar mensagem
             const messageData = {
                 room_id: roomId,
                 client_id: clientId.current,
@@ -168,7 +161,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
                 timestamp: new Date().toISOString()
             };
 
-            // Salvar no banco
             const { data: savedMessage, error } = await supabase
                 .from('chat_messages')
                 .insert(messageData)
@@ -177,7 +169,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
 
             if (error) throw error;
 
-            // Broadcast para outros jogadores
             if (chatChannelRef.current) {
                 await chatChannelRef.current.send({
                     type: 'broadcast',
@@ -186,7 +177,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
                 });
             }
 
-            // Adicionar à lista local
             setMessages(prev => [...prev, savedMessage]);
             setNewMessage("");
             setTimeout(scrollToBottom, 100);
@@ -221,126 +211,144 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, cla
         return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
     };
 
+    const handleMinimizeToggle = () => {
+        const newMinimized = !isMinimized;
+        setIsMinimized(newMinimized);
+        if (!newMinimized) {
+            setUnreadCount(0);
+            onUnreadChange?.(0);
+        }
+    };
+
+    const handleClose = () => {
+        setUnreadCount(0);
+        onUnreadChange?.(0);
+        onToggle?.();
+    };
+
     if (!isVisible) return null;
 
     return (
-        <div className={`fixed bottom-4 right-4 w-80 max-w-[90vw] z-50 ${className}`}>
-            <BarnCard variant="coop" className="flex flex-col h-96 max-h-[70vh]">
-                {/* Header do chat */}
-                <div className="flex items-center justify-between p-3 border-b border-muted">
+        <div className={`fixed bottom-4 right-4 w-80 max-w-[90vw] z-50 ${className} ${isBlinking ? 'animate-pulse' : ''}`}>
+            {/* Chat container com altura fixa e fundo transparente */}
+            <div className="bg-black/20 backdrop-blur-md rounded-lg shadow-2xl border border-white/20 overflow-hidden" style={{ height: '400px' }}>
+
+                {/* Header com fundo transparente */}
+                <div className="bg-black/30 backdrop-blur-sm text-white p-3 flex items-center justify-between border-b border-white/10">
                     <div className="flex items-center gap-2">
                         <MessageCircle className="h-4 w-4" />
                         <h3 className="font-bold text-sm">Chat da Sala</h3>
                         {unreadCount > 0 && (
-                            <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center">
-                {unreadCount}
-              </span>
+                            <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-[20px] text-center animate-bounce">
+                                {unreadCount}
+                            </span>
                         )}
                     </div>
                     <div className="flex items-center gap-1">
-                        <ChickenButton
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsMinimized(!isMinimized)}
-                            className="h-6 w-6 p-0"
+                        <button
+                            onClick={handleMinimizeToggle}
+                            className="p-1 hover:bg-white/20 rounded transition-colors"
                         >
                             {isMinimized ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </ChickenButton>
+                        </button>
                         {onToggle && (
-                            <ChickenButton
-                                variant="ghost"
-                                size="sm"
-                                onClick={onToggle}
-                                className="h-6 w-6 p-0"
+                            <button
+                                onClick={handleClose}
+                                className="p-1 hover:bg-white/20 rounded transition-colors"
                             >
                                 <X className="h-3 w-3" />
-                            </ChickenButton>
+                            </button>
                         )}
                     </div>
                 </div>
 
                 {!isMinimized && (
                     <>
-                    {/* Mensagens */}
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
+                    {/* Messages area - altura fixa com scroll e fundo transparente */}
+                    <div
+                        ref={messagesContainerRef}
+                        className="bg-black/10 backdrop-blur-sm p-3 overflow-y-auto"
+                        style={{ height: '280px' }}
+                    >
                         {messages.length === 0 ? (
-                            <div className="text-center text-muted-foreground text-sm py-8">
+                            <div className="text-center text-white/70 text-sm py-8">
                                 <MessageCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
                                 <p>Nenhuma mensagem ainda...</p>
                                 <p className="text-xs">Seja o primeiro a falar!</p>
                             </div>
                         ) : (
-                            messages.map((message) => {
-                                const isOwnMessage = message.client_id === clientId.current;
-                                return (
-                                    <div
-                                        key={message.id}
-                                        className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
-                                    >
+                            <div className="space-y-2">
+                                {messages.map((message) => {
+                                    const isOwnMessage = message.client_id === clientId.current;
+                                    return (
                                         <div
-                                            className={`max-w-[80%] rounded-lg p-2 ${
-                          isOwnMessage
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted'
-                        }`}
+                                            key={message.id}
+                                            className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
                                         >
-                                            {!isOwnMessage && (
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    {isImageUrl(message.player_avatar) ? (
-                                                        <img
-                                                            src={message.player_avatar}
-                                                            alt={message.player_name}
-                                                            className="w-4 h-4 rounded-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <span className="text-xs">{message.player_avatar}</span>
-                                                    )}
-                                                    <span className="text-xs font-medium opacity-80">
-                              {message.player_name}
-                            </span>
-                                                </div>
-                                            )}
-                                            <p className="text-sm break-words">{message.message}</p>
-                                            <p className={`text-xs mt-1 ${isOwnMessage ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                                                {formatTime(message.timestamp)}
-                                            </p>
+                                            <div
+                                                className={`max-w-[80%] rounded-lg p-2 ${
+                                                        isOwnMessage
+                                                            ? 'bg-primary/90 backdrop-blur-sm text-white'
+                                                            : 'bg-white/20 backdrop-blur-sm text-white shadow-sm border border-white/10'
+                                                    }`}
+                                            >
+                                                {!isOwnMessage && (
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        {isImageUrl(message.player_avatar) ? (
+                                                            <img
+                                                                src={message.player_avatar}
+                                                                alt={message.player_name}
+                                                                className="w-4 h-4 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <span className="text-xs">{message.player_avatar}</span>
+                                                        )}
+                                                        <span className="text-xs font-medium opacity-80">
+                                                                {message.player_name}
+                                                            </span>
+                                                    </div>
+                                                )}
+                                                <p className="text-sm break-words">{message.message}</p>
+                                                <p className={`text-xs mt-1 opacity-70`}>
+                                                    {formatTime(message.timestamp)}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })
+                                    );
+                                })}
+                                <div ref={messagesEndRef} />
+                            </div>
                         )}
-                        <div ref={messagesEndRef} />
                     </div>
 
-                    {/* Input de mensagem */}
-                    <div className="p-3 border-t border-muted">
-                        <div className="flex gap-2">
+                    {/* Input area - altura fixa com fundo transparente */}
+                    <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-3" style={{ height: '72px' }}>
+                        <div className="flex gap-2 mb-1">
                             <input
                                 type="text"
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
                                 onKeyPress={handleKeyPress}
                                 placeholder="Digite sua mensagem..."
-                                className="flex-1 px-3 py-2 text-sm border border-muted rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                className="flex-1 px-3 py-1 text-sm bg-white/10 backdrop-blur-sm border border-white/20 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-white placeholder-white/60"
                                 maxLength={200}
                                 disabled={isLoading}
                             />
-                            <ChickenButton
+                            <button
                                 onClick={sendMessage}
                                 disabled={!newMessage.trim() || isLoading}
-                                size="sm"
-                                className="px-3"
+                                className="px-3 py-1 bg-primary/90 backdrop-blur-sm text-white rounded-md disabled:opacity-50 hover:bg-primary transition-colors"
                             >
                                 <Send className="h-4 w-4" />
-                            </ChickenButton>
+                            </button>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            {newMessage.length}/200 caracteres
+                        <p className="text-xs text-white/60">
+                            {newMessage.length}/200
                         </p>
                     </div>
                     </>
                 )}
-            </BarnCard>
+            </div>
         </div>
     );
 }
@@ -358,14 +366,14 @@ export function ChatToggleButton({ onClick, unreadCount = 0, className = "" }: C
             onClick={onClick}
             variant="default"
             size="lg"
-            className={`fixed bottom-4 right-4 z-40 rounded-full h-12 w-12 p-0 shadow-lg ${className}`}
+            className={`fixed bottom-4 right-4 z-40 rounded-full h-12 w-12 p-0 shadow-lg ${unreadCount > 0 ? 'animate-pulse' : ''} ${className}`}
         >
             <div className="relative">
                 <MessageCircle className="h-6 w-6" />
                 {unreadCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </span>
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 min-w-[18px] text-center animate-bounce">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
                 )}
             </div>
         </ChickenButton>
