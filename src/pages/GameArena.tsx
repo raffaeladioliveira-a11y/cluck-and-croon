@@ -11,6 +11,7 @@ import { Loader2 } from "lucide-react";
 import GameArenaGuard from "./GameArenaGuard";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { getOrCreateClientId } from "@/utils/clientId";
+import { GameChat, ChatToggleButton } from "@/components/GameChat";
 
 /** Util: extrai o trackId a partir de uma URL de embed do Spotify */
 function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
@@ -33,8 +34,9 @@ function GameArenaContent() {
     const countdownStartedRef = useRef(false);
     const [systemGameMode, setSystemGameMode] = useState<"mp3" | "spotify">("mp3");
 
-
-
+    // Estados do chat
+    const [showChat, setShowChat] = useState(false);
+    const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
     // navegação pós-set
     useEffect(() => {
@@ -654,6 +656,24 @@ function GameArenaContent() {
 
                     </div>
                 </div>
+
+
+                {/* Chat */}
+                <GameChat
+                    roomCode={roomCode || ""}
+                    sessionId={sid}
+                    isVisible={showChat}
+                    onToggle={() => setShowChat(false)}
+                />
+
+                {/* Botão do chat */}
+                {!showChat && (
+                    <ChatToggleButton
+                        onClick={() => setShowChat(true)}
+                        unreadCount={chatUnreadCount}
+                    />
+                )}
+
 
                 {/* Enfeites decorativos - apenas desktop */}
                 <div className="fixed inset-0 pointer-events-none z-0 hidden lg:block">
