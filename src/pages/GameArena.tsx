@@ -279,7 +279,7 @@ function GameArenaContent() {
                     </h2>
                     <p className="text-white/80 text-lg sm:text-xl">
                         {countdown > 0
-                            ? "O jogo começará em instantes!"
+                            ? "O jogo começará em instantes! Aumente o volume do seu dispositivo para ouvir as músicas."
                             : "Boa sorte, galinhas!"
                         }
                     </p>
@@ -299,393 +299,435 @@ function GameArenaContent() {
     // ---------- RENDER ----------
     return (
         <div className="min-h-screen bg-gradient-sky p-2 sm:p-4">
-            <GameNavigation showLeaveRoom={true} />
-            <div className="max-w-6xl mx-auto">
-                {/* Header consolidado - Mobile First */}
-                <div className="mb-4 sm:mb-6">
-                    {/* Card principal com todas as informações */}
-                    <BarnCard variant="golden" className="mb-3 sm:mb-4">
-                        <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-                            {/* Rodada */}
-                            <div className="flex flex-col items-center">
-                                <span className="text-lg sm:text-2xl mb-1">🔢</span>
-                                <p className="text-xs sm:text-sm text-white/80">Rodada</p>
-                                <p className="text-sm sm:text-xl font-bold text-white">{currentRound}/10</p>
+            {/* Header fixo com informações do jogo - CENTRALIZADO */}
+            <div className="flex justify-center mb-4">
+                <div className="w-full max-w-4xl sticky top-0 z-50 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-2">
+                    <div className="px-4 py-3">
+                        {/* Container principal com 3 seções: vazio | conteúdo central | botão sair */}
+                        <div className="flex items-center justify-between mb-3">
+                            {/* Espaço vazio à esquerda para equilibrar */}
+                            <div className="w-16 sm:w-20"></div>
+
+                            {/* Conteúdo central - Grid das informações */}
+                            <div className="flex-1 flex justify-start sm:justify-center">
+                                <div className="bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-2">
+                                    <div className="grid grid-cols-4 gap-2 text-center">
+                                        {/* Rodada */}
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-sm mb-1">🔢</span>
+                                            <p className="text-xs text-white/80">Rodada</p>
+                                            <p className="text-sm font-bold text-white">{currentRound}/10</p>
+                                        </div>
+
+                                        {/* Tempo */}
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-sm mb-1 animate-chicken-walk">🐓</span>
+                                            <p className="text-xs text-white/80">Tempo</p>
+                                            <p className="text-sm font-bold text-white">{timeLeft}s</p>
+                                        </div>
+
+                                        {/* Valendo */}
+                                        <div className="flex flex-col items-center">
+                                            <span className="text-sm mb-1 animate-egg-bounce">🥚</span>
+                                            <p className="text-xs text-white/80">Valendo</p>
+                                            <p className="text-sm font-bold text-white">{currentSettings?.eggs_per_correct || 10}</p>
+                                        </div>
+
+                                        {/* Gênero ativo como 4ª coluna */}
+                                        {activeGenre ? (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm mb-1">{activeGenre.emoji}</span>
+                                                <p className="text-xs text-white/80">Estilo</p>
+                                                <p className="text-xs font-bold text-white">{activeGenre.name}</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-sm mb-1">🎵</span>
+                                                <p className="text-xs text-white/80">Estilo</p>
+                                                <p className="text-xs font-bold text-white">-</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
-                            {/* Tempo */}
-                            <div className="flex flex-col items-center">
-                                <span className="text-xl sm:text-3xl mb-1 animate-chicken-walk">🐓</span>
-                                <p className="text-xs sm:text-sm text-white/80">Tempo</p>
-                                <p className="text-lg sm:text-2xl font-bold text-white">{timeLeft}s</p>
-                            </div>
-
-                            {/* Valendo */}
-                            <div className="flex flex-col items-center">
-                                <span className="text-lg sm:text-2xl mb-1 animate-egg-bounce">🥚</span>
-                                <p className="text-xs sm:text-sm text-white/80">Valendo</p>
-                                <p className="text-sm sm:text-xl font-bold text-white">{currentSettings?.eggs_per_correct || 10}</p>
-                                <p className="text-xs text-white/60 hidden sm:block">+{currentSettings?.speed_bonus || 5} bônus</p>
+                            {/* Botão sair à direita - com mais espaço */}
+                            <div className="w-16 sm:w-20 flex justify-end">
+                                <div className="relative">
+                                    <GameNavigation showLeaveRoom={true} />
+                                </div>
                             </div>
                         </div>
-                    </BarnCard>
 
-                    {/* Gênero ativo - Separado para mobile */}
-                    {activeGenre && (
-                        <BarnCard variant="nest" className="text-center py-2 sm:py-3">
-                            <div className="flex items-center justify-center gap-2">
-                                <span className="text-lg sm:text-2xl">{activeGenre.emoji}</span>
-                                <div>
-                                    <p className="text-xs sm:text-sm text-muted-foreground">Estilo</p>
-                                    <p className="text-sm sm:text-lg font-bold text-primary">{activeGenre.name}</p>
-                                </div>
+                        {/* Barra de progresso do áudio - centralizada */}
+                        {gameState !== "idle" && currentQuestion && (
+                            <div className="bg-black/20 rounded-lg p-2">
+                                <MusicPlayer
+                                    songTitle={currentQuestion?.song.title || ""}
+                                artist={currentQuestion?.song.artist || ""}
+                                audioUrl={currentQuestion?.song.audioUrl}
+                                duration={currentSettings.song_duration}
+                                    gameState={gameState}
+                                    autoPlay={true}
+                                    roundKey={`round-${currentRound}`}
+                                    gameMode={finalGameMode}
+                                    spotifyTrackId={rawSpotifyTrackId}
+                                    />
                             </div>
-                        </BarnCard>
-                    )}
-                </div>
-
-                {/* Layout principal responsivo */}
-                <div className="space-y-4 lg:grid lg:grid-cols-12 lg:gap-6 lg:space-y-0">
-                    {/* Ranking - Mobile: acima | Desktop: esquerda */}
-                    {/* Ranking - Mobile: acima | Desktop: esquerda */}
-                    <div className="lg:col-span-4 lg:order-1">
-                        <BarnCard variant="coop" className="p-3 sm:p-4">
-                            <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
-                                <span className="sm:hidden">🏆 Ranking</span>
-                                <span className="hidden sm:inline">🏆 Ranking da Partida</span>
-                            </h3>
-
-                            {/* Layout mobile horizontal - só no mobile */}
-                            <div className="block sm:hidden">
-                                {Array.isArray(players) && players.length > 0 ? (
-                                    <div className="flex gap-2 overflow-x-auto pb-2">
-                                        {players
-                                            .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
-                                            .slice(0, 5)
-                                            .map((player, index) => {
-                                                const isCurrentPlayer = player.id === clientId.current;
-                                                return (
-                                                    <div
-                                                        key={player.id}
-                                                        className={`flex-shrink-0 text-center p-2 rounded-lg min-w-[70px] ${isCurrentPlayer ? 'bg-primary/20 border-2 border-primary' : 'bg-muted/20'}`}
-                                                    >
-                                                        {/* Posição */}
-                                                        <div className="text-xs font-bold mb-1">
-                                                            {index + 1}º
-                                                        </div>
-
-                                                        {/* Avatar */}
-                                                        {player.avatar?.startsWith("/") ? (
-                                                        <img
-                                                            src={player.avatar}
-                                                            alt={player.name}
-                                                            className="w-8 h-8 rounded-full object-cover border-2 border-white mx-auto mb-1"
-                                                        />
-                                                        ) : (
-                                                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-1 text-sm">
-                                                            {player.avatar || "🐔"}
-                                                        </div>
-                                                        )}
-
-                                                        {/* Nome truncado */}
-                                                        <div className="text-xs font-medium truncate max-w-[60px]">
-                                                            {player.name?.slice(0, 8) || "Player"}
-                                                            {isCurrentPlayer && <div className="text-[10px] text-primary">Você</div>}
-                                                        </div>
-
-                                                        {/* Ovos */}
-                                                        <div className="flex items-center justify-center mt-1">
-                                                            <span className="text-xs">🥚</span>
-                                                            <span className="text-xs font-bold ml-1">{(player as any).eggs || 0}</span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })
-                                        }
-                                    </div>
-                                ) : (
-                                    <p className="text-xs text-muted-foreground text-center">
-                                        Ranking não disponível...
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Layout desktop vertical - só no desktop */}
-                            <div className="hidden sm:block">
-                                <div className="space-y-2 sm:space-y-3">
-                                    {Array.isArray(players) && players.length > 0 ? (
-                                        players
-                                            .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
-                                            .slice(0, 5)
-                                            .map((player, index) => {
-                                                const isCurrentPlayer = player.id === clientId.current;
-                                                return (
-                                                    <div
-                                                        key={player.id}
-                                                        className={`flex items-center gap-2 sm:gap-4 ${isCurrentPlayer ? 'bg-primary/10 rounded-lg p-2' : ''}`}
-                                                    >
-                                    <span className="text-sm sm:text-lg font-bold w-4 sm:w-6 text-right">
-                                        {index + 1}º
-                                    </span>
-
-                                                        {player.avatar?.startsWith("/") && (
-                                                        <img
-                                                            src={player.avatar}
-                                                            alt={player.name}
-                                                            className="w-8 h-8 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-white flex-shrink-0"
-                                                        />
-                                                        )}
-
-                                                        <span className={`text-xs sm:text-md font-semibold truncate flex-1 min-w-0 ${isCurrentPlayer ? 'text-primary' : ''}`}>
-                                        {player.name || "Jogador"}
-                                                            {isCurrentPlayer && <span className="ml-1">(Você)</span>}
-                                    </span>
-
-                                                        <EggCounter
-                                                            count={(player as any).eggs || 0}
-                                                            size="sm"
-                                                            variant={index === 0 ? "golden" : "default"}
-                                                            className="flex-shrink-0"
-                                                        />
-                                                    </div>
-                                                );
-                                            })
-                                    ) : (
-                                        <p className="text-xs sm:text-sm text-muted-foreground text-center">
-                                            Ranking ainda não disponível...
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </BarnCard>
+                        )}
                     </div>
+                </div>
+            </div>
 
-                    {/* Conteúdo do jogo - Mobile: abaixo | Desktop: direita */}
-                    <div className="lg:col-span-8 lg:order-2">
-                        {/* Estado IDLE */}
-                        {gameState === "idle" && !sid && (
+            {/* Container principal centralizado */}
+            <div className="flex justify-center">
+                <div className="w-full max-w-4xl">
+                    {/* Estado IDLE */}
+                    {gameState === "idle" && !sid && (
+                        <div className="flex justify-center">
                             <ChickenButton
                                 onClick={async () => {
-      console.log("🖱️ Liberando áudio para toda a sessão");
-
-      // Enviar evento para o MusicPlayer fazer unlock
-      const unlockEvent = new CustomEvent('unlockAudio');
-      window.dispatchEvent(unlockEvent);
-
-      // Pequeno delay para garantir que o unlock aconteça
-      setTimeout(() => {
-        startCountdown();
-      }, 100);
-    }}
+                                console.log("🖱️ Liberando áudio para toda a sessão");
+                                const unlockEvent = new CustomEvent('unlockAudio');
+                                window.dispatchEvent(unlockEvent);
+                                setTimeout(() => {
+                                    startCountdown();
+                                }, 100);
+                            }}
                             >
                                 {isHost ? "🎵 Iniciar Jogo" : "🔊 Liberar áudio"}
                             </ChickenButton>
-                        )}
+                        </div>
+                    )}
 
-                        {/* Arena do jogo */}
-                        {gameState !== "idle" && currentQuestion && (
+                    {/* Arena do jogo */}
+                    {gameState !== "idle" && currentQuestion && (
+                        <div className="space-y-4">
+                            {/* RANKING - SEMPRE ACIMA EM TODAS AS RESOLUÇÕES */}
 
+                            <div className="space-y-4">
+                                {/* RANKING HORIZONTAL COM SCROLL */}
+                                <div className="w-full">
+                                    <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
+                                        🏆 Ranking da Partida
+                                    </h3>
 
+                                    {/* Container com scroll horizontal */}
+                                    <div className="overflow-x-auto pb-2">
+                                        <div className="flex gap-1 min-w-max px-2">
+                                            {Array.isArray(players) && players.length > 0 ? (
+                                                players
+                                                    .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
+                                                    .map((player, index) => {
+                                                        const isCurrentPlayer = player.id === clientId.current;
+                                                        const position = index + 1;
 
-                        <div className="space-y-4 sm:space-y-6">
-                                {/* Player de música */}
-                                <BarnCard variant="golden" className="p-3 sm:p-4">
-                                    <MusicPlayer
-                                        songTitle={currentQuestion?.song.title || ""}
-  artist={currentQuestion?.song.artist || ""}
-  audioUrl={currentQuestion?.song.audioUrl}
-  duration={currentSettings.song_duration}
-                                        gameState={gameState}
-                                        autoPlay={true}
-                                        roundKey={`round-${currentRound}`}
-                                        gameMode={finalGameMode} // Apenas uma prop gameMode
-                                        spotifyTrackId={rawSpotifyTrackId} // Adicionar esta prop
-                                        />
-                                </BarnCard>
+                                                        // Cores para as 3 primeiras posições
+                                                        const badgeColor =
+                                                            position === 1
+                                                                ? "bg-yellow-500"
+                                                                : position === 2
+                                                                ? "bg-gray-500"
+                                                                : position === 3
+                                                                ? "bg-orange-500"
+                                                                : "bg-muted text-muted-foreground";
 
-                                {/* Opções de resposta */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                                    {currentQuestion.options.map((option: string, index: number) => (
-                                        <BarnCard
-                                            key={index}
-                                            variant="default"
-                                            className={`cursor-pointer transition-all duration-300 p-3 sm:p-4 relative ${getAnswerColor(index)}`}
-                                            onClick={() => handleAnswerSelect(index)}
-                                        >
-                                            {/* Avatares posicionados na borda superior direita */}
-                                            {playersOnOption(index).length > 0 && (
-                                                <div className="absolute -top-2 -right-2 flex -space-x-1 z-10">
-                                                    {playersOnOption(index).slice(0, 3).map((p: any) => (
-                                                        <div key={p.id} className="relative">
-                                                            {p.avatar?.startsWith("/") && (
-                                                            <img
-                                                                src={p.avatar}
-                                                                alt={p.name}
-                                                                className="w-12 h-12 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-white shadow-lg"
-                                                                title={p.name}
-                                                            />
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {playersOnOption(index).length > 3 && (
-                                                        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-500 border-2 border-white flex items-center justify-center shadow-lg">
-                                                            <span className="text-xs font-bold text-white">+{playersOnOption(index).length - 3}</span>
-                                                        </div>
-                                                    )}
+                                                        return (
+                                                            <div
+                                                                key={player.id}
+                                                                className="relative flex flex-col items-center p-3 rounded-lg min-w-[90px] sm:min-w-[110px]"
+
+                                                            >
+                                                                {/* Avatar com medalha de posição */}
+                                                                <div className="relative mb-2">
+                                                                    {player.avatar?.startsWith("/") ? (
+                                                                    <img
+                                                                        src={player.avatar}
+                                                                        alt={player.name}
+                                                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white"
+                                                                    />
+                                                                    ) : (
+                                                                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl bg-primary/20 border-2 border-white">
+                                                                        {player.avatar || "🐔"}
+                                                                    </div>
+                                                                    )}
+
+                                                                    {/* Medalha */}
+                                                                    <div
+                                                                        className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${badgeColor}`}
+                                                                    >
+                                                                        {position}
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Nome do jogador */}
+                                                                <div className="text-xs font-medium text-white truncate max-w-[80px] mb-1 text-center">
+                                                                    {player.name || "Jogador"}
+                                                                </div>
+
+                                                                {/* Contador de Ovos */}
+                                                                <div className="flex items-center gap-1 text-xs font-bold text-white">
+                                                                    <span>{(player as any).eggs || 0}</span>
+                                                                    <span>🥚</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                            ) : (
+                                                <div className="w-full text-center py-8">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Ranking ainda não disponível...
+                                                    </p>
                                                 </div>
                                             )}
-
-                                            {/* Conteúdo da opção */}
-                                            <div className="flex items-center gap-2 sm:gap-4">
-                                                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-primary/20 flex items-center justify-center font-bold text-sm sm:text-lg flex-shrink-0">
-                                                    {String.fromCharCode(65 + index)}
-                                                </div>
-                                                <span className="font-semibold text-sm sm:text-lg pr-8">{option}</span>
-                                            </div>
-                                        </BarnCard>
-                                    ))}
-                                </div>
-
-                                {/* Sua pontuação */}
-                                <BarnCard variant="coop" className="p-3 sm:p-4">
-                                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                                        <span className="text-lg sm:text-xl">🏆</span>
-                                        <h3 className="text-sm sm:text-xl font-bold text-barn-brown">
-                                            <span className="sm:hidden">Sua Pontuação</span>
-                                            <span className="hidden sm:inline">Sua Pontuação - Rodada {currentRound}</span>
-                                        </h3>
+                                        </div>
                                     </div>
 
-                                    // Apenas para debug - remover depois
-                                    {battleMode === 'battle' && isHost && (
-                                        <button onClick={() => {
-    console.log('🧪 Teste de redistribuição forçada');
-    redistributeEggs(roomCode, 0, {
-      'player1': { answer: 0, responseTime: 5 },
-      'player2': { answer: 1, responseTime: 3 }
-    }, battleSettings);
-  }}>
-                                            Testar Redistribuição
-                                        </button>
+                                    {/* Indicador de scroll (opcional) */}
+                                    {Array.isArray(players) && players.length > 4 && (
+                                        <div className="text-center mt-2">
+                                            <p className="text-xs text-muted-foreground">
+                                                ← Role para ver mais jogadores →
+                                            </p>
+                                        </div>
                                     )}
+                                </div>
+                            </div>
 
-                                    <div className="flex flex-col items-center text-center">
-                                        {currentPlayer.avatar?.startsWith("/") ? (
-                                        <img
-                                            src={currentPlayer.avatar}
-                                            alt={currentPlayer.name}
-                                            className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white mb-2"
-                                        />
-                                        ) : (
-                                        <ChickenAvatar
-                                            emoji={currentPlayer.avatar || "🐔"}
-                                            size="lg"
-                                            animated
-                                            className="mb-2 border-2 border-white"
-                                        />
-                                        )}
+                            {/*<BarnCard variant="coop" className="p-3 sm:p-4">*/}
+                                {/*<h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">*/}
+                                    {/*🏆 Ranking da Partida*/}
+                                {/*</h3>*/}
 
-                                        <p className="font-semibold text-sm sm:text-lg mb-2">{currentPlayer.name}</p>
-                                        <EggCounter count={playerEggs} size="lg" variant="golden" />
+                                {/*/!* Layout vertical para TODAS as resoluções *!/*/}
+                                {/*<div className="space-y-2 sm:space-y-3">*/}
+                                    {/*{Array.isArray(players) && players.length > 0 ? (*/}
+                                        {/*players*/}
+                                            {/*.sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))*/}
+                                            {/*.slice(0, 6)*/}
+                                            {/*.map((player, index) => {*/}
+                                                {/*const isCurrentPlayer = player.id === clientId.current;*/}
+                                                {/*return (*/}
+                                                    {/*<div*/}
+                                                        {/*key={player.id}*/}
+                                                        {/*className={`flex items-center gap-2 sm:gap-3 p-2 rounded-lg ${isCurrentPlayer ? 'bg-primary/10 border-2 border-primary' : 'bg-muted/10'}`}*/}
+                                                    {/*>*/}
+                            {/*<span className="text-sm font-bold w-6 text-center">*/}
+                                {/*{index + 1}º*/}
+                            {/*</span>*/}
 
-                                        {selectedAnswer !== null && (
-                                            <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-muted/50 rounded-lg w-full">
-                                                <p className="text-xs sm:text-sm font-medium">
-                                                    <span className="sm:hidden">Resposta: </span>
-                                                    <span className="hidden sm:inline">Sua resposta: </span>
-                                                    <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
-                                                </p>
-                                                {answerTime && (
-                                                    <p className="text-xs text-muted-foreground mt-1">
-                                                        Tempo: {answerTime.toFixed(1)}s
-                                                    </p>
+                                                        {/*{player.avatar?.startsWith("/") ? (*/}
+                                                        {/*<img*/}
+                                                            {/*src={player.avatar}*/}
+                                                            {/*alt={player.name}*/}
+                                                            {/*className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-white flex-shrink-0"*/}
+                                                        {/*/>*/}
+                                                        {/*) : (*/}
+                                                        {/*<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 text-sm">*/}
+                                                            {/*{player.avatar || "🐔"}*/}
+                                                        {/*</div>*/}
+                                                        {/*)}*/}
+
+                                                        {/*<div className="flex-1 min-w-0">*/}
+                                {/*<span className={`text-sm font-semibold truncate block ${isCurrentPlayer ? 'text-primary' : ''}`}>*/}
+                                    {/*{player.name || "Jogador"}*/}
+                                    {/*{isCurrentPlayer && <span className="ml-1">(Você)</span>}*/}
+                                {/*</span>*/}
+                                                        {/*</div>*/}
+
+                                                        {/*<EggCounter*/}
+                                                            {/*count={(player as any).eggs || 0}*/}
+                                                            {/*size="sm"*/}
+                                                            {/*variant={index === 0 ? "golden" : "default"}*/}
+                                                            {/*className="flex-shrink-0"*/}
+                                                        {/*/>*/}
+                                                    {/*</div>*/}
+                                                {/*);*/}
+                                            {/*})*/}
+                                    {/*) : (*/}
+                                        {/*<p className="text-sm text-muted-foreground text-center">*/}
+                                            {/*Ranking ainda não disponível...*/}
+                                        {/*</p>*/}
+                                    {/*)}*/}
+                                {/*</div>*/}
+                            {/*</BarnCard>*/}
+
+                            {/* Opções de resposta */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                                {currentQuestion.options.map((option: string, index: number) => (
+                                    <BarnCard
+                                        key={index}
+                                        variant="default"
+                                        className={`cursor-pointer transition-all duration-300 p-2 sm:p-3 relative ${getAnswerColor(index)}`}
+                                        onClick={() => handleAnswerSelect(index)}
+                                    >
+                                        {/* Avatares posicionados na borda superior direita */}
+                                        {playersOnOption(index).length > 0 && (
+                                            <div className="absolute -top-2 -right-2 flex -space-x-1 z-10">
+                                                {playersOnOption(index).slice(0, 3).map((p: any) => (
+                                                    <div key={p.id} className="relative">
+                                                        {p.avatar?.startsWith("/") && (
+                                                        <img
+                                                            src={p.avatar}
+                                                            alt={p.name}
+                                                            className="w-8 h-8 sm:w-8 sm:h-8 rounded-full object-cover border-2 border-white shadow-lg"
+                                                            title={p.name}
+                                                        />
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {playersOnOption(index).length > 3 && (
+                                                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-500 border-2 border-white flex items-center justify-center shadow-lg">
+                                                        <span className="text-xs font-bold text-white">+{playersOnOption(index).length - 3}</span>
+                                                    </div>
                                                 )}
                                             </div>
                                         )}
-                                    </div>
-                                </BarnCard>
 
-                                {/* Resultados */}
-                                {showResults && (
-                                    <BarnCard variant="golden" className="text-center p-4 sm:p-6">
-                                        <div className="text-4xl sm:text-6xl mb-4">
-                                            {selectedAnswer === currentQuestion.correctAnswer ? "🎉" : "😅"}
+                                        {/* Conteúdo da opção - apenas o texto */}
+                                        <div className="flex items-center">
+                                            <span className="font-semibold text-sm sm:text-base pr-6">{option}</span>
                                         </div>
-                                        <h3 className="text-lg sm:text-2xl font-bold text-white mb-2">
-                                            {selectedAnswer === currentQuestion.correctAnswer
-                                                ? (
-                                                <>
-                                                <span className="sm:hidden">
-                                    🥚 Parabéns! +{currentSettings.eggs_per_correct || 10} ovos
-                                                    {timeLeft > ((currentSettings.time_per_question || 15) * 0.8) && ` +${currentSettings.speed_bonus || 5}!`}
-                                </span>
-                                                <span className="hidden sm:inline">
-                                    🥚 Parabéns! Você ganhou {currentSettings.eggs_per_correct || 10} ovos
-                                                    {timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
-                                                        ? ` + ${currentSettings.speed_bonus || 5} bônus velocidade!`
-                                                        : "!"
-                                                    }
-                                </span>
-                                                </>
-                                            )
-                                                : (
-                                                <>
-                                                <span className="sm:hidden">
-                                    💔 Resposta: {currentQuestion.options[currentQuestion.correctAnswer]}
-                                </span>
-                                                <span className="hidden sm:inline">
-                                    💔 Que pena! A resposta correta era: {currentQuestion.options[currentQuestion.correctAnswer]}
-                                </span>
-                                                </>
-                                            )}
-                                        </h3>
-                                        <p className="text-white/80 text-sm sm:text-lg">
-                                            {currentRound < 10 ? (
-                                                <>
-                                                <span className="sm:hidden">Próxima música...</span>
-                                                <span className="hidden sm:inline">Próxima música em instantes...</span>
-                                                </>
-                                            ) : (
-                                                "Fim do jogo! Parabéns!"
-                                            )}
-                                        </p>
                                     </BarnCard>
-                                )}
+                                ))}
                             </div>
-                        )}
 
-                    </div>
+                            {/* Sua pontuação */}
+                            <BarnCard variant="coop" className="p-3 sm:p-4">
+                                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                                    <span className="text-lg sm:text-xl">🏆</span>
+                                    <h3 className="text-sm sm:text-xl font-bold text-barn-brown">
+                                        <span className="sm:hidden">Sua Pontuação</span>
+                                        <span className="hidden sm:inline">Sua Pontuação - Rodada {currentRound}</span>
+                                    </h3>
+                                </div>
+
+                                {/*{battleMode === 'battle' && isHost && (*/}
+                                    {/*<button onClick={() => {*/}
+                                    {/*console.log('🧪 Teste de redistribuição forçada');*/}
+                                    {/*redistributeEggs(roomCode, 0, {*/}
+                                      {/*'player1': { answer: 0, responseTime: 5 },*/}
+                                      {/*'player2': { answer: 1, responseTime: 3 }*/}
+                                    {/*}, battleSettings);*/}
+                                {/*}}>*/}
+                                        {/*Testar Redistribuição*/}
+                                    {/*</button>*/}
+                                {/*)}*/}
+
+                                <div className="flex flex-col items-center text-center">
+                                    {currentPlayer.avatar?.startsWith("/") ? (
+                                    <img
+                                        src={currentPlayer.avatar}
+                                        alt={currentPlayer.name}
+                                        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white mb-2"
+                                    />
+                                    ) : (
+                                    <ChickenAvatar
+                                        emoji={currentPlayer.avatar || "🐔"}
+                                        size="lg"
+                                        animated
+                                        className="mb-2 border-2 border-white"
+                                    />
+                                    )}
+
+                                    <p className="font-semibold text-sm sm:text-lg mb-2">{currentPlayer.name}</p>
+                                    <EggCounter count={playerEggs} size="lg" variant="golden" />
+
+                                    {selectedAnswer !== null && (
+                                        <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-muted/50 rounded-lg w-full">
+                                            <p className="text-xs sm:text-sm font-medium">
+                                                <span className="sm:hidden">Resposta: </span>
+                                                <span className="hidden sm:inline">Sua resposta: </span>
+                                                <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
+                                            </p>
+                                            {answerTime && (
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    Tempo: {answerTime.toFixed(1)}s
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </BarnCard>
+
+                            {/* Resultados */}
+                            {showResults && (
+                                <BarnCard variant="golden" className="text-center p-4 sm:p-6">
+                                    <div className="text-4xl sm:text-6xl mb-4">
+                                        {selectedAnswer === currentQuestion.correctAnswer ? "🎉" : "😅"}
+                                    </div>
+                                    <h3 className="text-lg sm:text-2xl font-bold text-white mb-2">
+                                        {selectedAnswer === currentQuestion.correctAnswer
+                                            ? (
+                                            <>
+                                            <span className="sm:hidden">
+                                                    🥚 Parabéns! +{currentSettings.eggs_per_correct || 10} ovos
+                                                {timeLeft > ((currentSettings.time_per_question || 15) * 0.8) && ` +${currentSettings.speed_bonus || 5}!`}
+                                                </span>
+                                            <span className="hidden sm:inline">
+                                                    🥚 Parabéns! Você ganhou {currentSettings.eggs_per_correct || 10} ovos
+                                                {timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
+                                                    ? ` + ${currentSettings.speed_bonus || 5} bônus velocidade!`
+                                                    : "!"
+                                                }
+                                                </span>
+                                            </>
+                                        )
+                                            : (
+                                            <>
+                                            <span className="sm:hidden">
+                                                    💔 Resposta: {currentQuestion.options[currentQuestion.correctAnswer]}
+                                                </span>
+                                            <span className="hidden sm:inline">
+                                                    💔 Que pena! A resposta correta era: {currentQuestion.options[currentQuestion.correctAnswer]}
+                                                </span>
+                                            </>
+                                        )}
+                                    </h3>
+                                    <p className="text-white/80 text-sm sm:text-lg">
+                                        {currentRound < 10 ? (
+                                            <>
+                                            <span className="sm:hidden">Próxima música...</span>
+                                            <span className="hidden sm:inline">Próxima música em instantes...</span>
+                                            </>
+                                        ) : (
+                                            "Fim do jogo! Parabéns!"
+                                        )}
+                                    </p>
+                                </BarnCard>
+                            )}
+                        </div>
+                    )}
                 </div>
+            </div>
 
+            {/* Chat */}
+            <GameChat
+                roomCode={roomCode || ""}
+                sessionId={sid}
+                isVisible={showChat}
+                onToggle={() => {
+                setShowChat(false);
+                setChatUnreadCount(0);
+            }}
+                onUnreadChange={(count) => setChatUnreadCount(count)}
+            />
 
-                {/* Chat */}
-                <GameChat
-                    roomCode={roomCode || ""}
-                    sessionId={sid}
-                    isVisible={showChat}
-                    onToggle={() => {
-                    setShowChat(false);
-                    setChatUnreadCount(0); // Reset contador ao fechar
+            {/* Botão do chat */}
+            {!showChat && (
+                <ChatToggleButton
+                    onClick={() => {
+                    setShowChat(true);
+                    setChatUnreadCount(0);
                 }}
-                    onUnreadChange={(count) => setChatUnreadCount(count)} // NOVA PROP
+                    unreadCount={chatUnreadCount}
                 />
+            )}
 
-                {/* Botão do chat */}
-                {!showChat && (
-                    <ChatToggleButton
-                        onClick={() => {
-                        setShowChat(true);
-                        setChatUnreadCount(0); // Reset contador ao abrir
-                    }}
-                        unreadCount={chatUnreadCount}
-                    />
-                )}
-
-                {/* Enfeites decorativos - apenas desktop */}
-                <div className="fixed inset-0 pointer-events-none z-0 hidden lg:block">
-                    <div className="absolute top-20 right-10 animate-feather-float text-xl opacity-20">🪶</div>
-                    <div className="absolute bottom-40 left-10 animate-egg-bounce text-2xl opacity-10">🌽</div>
-                </div>
+            {/* Enfeites decorativos - apenas desktop */}
+            <div className="fixed inset-0 pointer-events-none z-0 hidden lg:block">
+                <div className="absolute top-20 right-10 animate-feather-float text-xl opacity-20">🪶</div>
+                <div className="absolute bottom-40 left-10 animate-egg-bounce text-2xl opacity-10">🌽</div>
             </div>
         </div>
     );

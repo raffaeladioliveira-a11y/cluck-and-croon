@@ -72,7 +72,7 @@ export function GameNavigation({
             size="sm"
             onClick={handleLeaveRoom}
           >
-            <LogOut className="w-4 h-4 mr-2" />
+            <LogOut className="w-4 h-4" />
 
           </ChickenButton>
         )}

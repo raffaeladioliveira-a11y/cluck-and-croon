@@ -36,8 +36,6 @@ export const MusicPlayer = ({
     gameMode = "mp3",
     spotifyTrackId,
 }: MusicPlayerProps) => {
-  console.log('🎵 MusicPlayer props:', { gameMode, spotifyTrackId, gameState, songTitle, artist });
-
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [volume, setVolume] = useState(0.7);
@@ -48,23 +46,19 @@ export const MusicPlayer = ({
   const stopTimerRef = useRef<NodeJS.Timeout | null>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // NOVO: Função para liberar autoplay de uma vez
   const unlockAudio = async () => {
     const audio = audioRef.current;
     if (!audio || audioUnlocked) return;
 
     try {
-      // Tentar reproduzir um som silencioso
       audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAAQBoAAEAaAAABAAgAZGF0YQAAAAA=";
       audio.volume = 0;
       await audio.play();
       audio.pause();
       audio.currentTime = 0;
-
       setAudioUnlocked(true);
-      console.log('✅ Audio unlocked successfully');
     } catch (error) {
-      console.log('⚠️ Audio unlock failed:', error);
+      // Silent fail
     }
   };
 
@@ -89,7 +83,6 @@ export const MusicPlayer = ({
   };
 
   const startSpotifyCountdown = () => {
-    console.log('🕒 Starting Spotify countdown for', duration, 'seconds');
     setCurrentTime(0);
     setIsPlaying(true);
 
@@ -101,7 +94,6 @@ export const MusicPlayer = ({
       onTimeUpdate?.(elapsed);
 
       if (timeLeft <= 0) {
-        console.log('🕒 Spotify countdown finished');
         setIsPlaying(false);
         setCurrentTime(duration);
         onEnded?.();
@@ -113,7 +105,6 @@ export const MusicPlayer = ({
 
     countdownTimerRef.current = setTimeout(updateCountdown, 1000);
     stopTimerRef.current = setTimeout(() => {
-      console.log('🕒 Spotify main timer finished');
       teardownAudio();
     }, duration * 1000);
   };
@@ -127,21 +118,15 @@ export const MusicPlayer = ({
     audio.currentTime = 0;
     audio.volume = isMuted ? 0 : volume;
 
-    console.log('🔊 Volume settings:', { volume, isMuted, finalVolume: audio.volume });
-    console.log('🎵 Audio source:', audioSrc);
-
     try {
       audio.load();
 
       if (shouldAutoPlay) {
-        // MODIFICADO: Tentar autoplay, se falhar, não dar erro
         try {
           await audio.play();
           setIsPlaying(true);
-          console.log('🎵 Audio playing automatically');
         } catch (playError) {
-          console.log('⚠️ Autoplay failed, requires user interaction');
-          setAudioError(false); // Não tratar como erro
+          setAudioError(false);
         }
 
         const durationMs = duration * 1000;
@@ -150,7 +135,6 @@ export const MusicPlayer = ({
         }, durationMs);
       }
     } catch (error) {
-      console.error("🎵 Audio setup error:", error);
       setAudioError(true);
     }
   };
@@ -159,7 +143,6 @@ export const MusicPlayer = ({
     const audio = audioRef.current;
     if (!audio) return;
 
-    // NOVO: Unlock audio na primeira interação
     if (!audioUnlocked) {
       await unlockAudio();
     }
@@ -174,17 +157,14 @@ export const MusicPlayer = ({
         setAudioError(false);
       }
     } catch (err) {
-      console.error('Play error:', err);
       setAudioError(true);
     }
   };
 
-  // Adicione esta função antes dos useEffect existentes:
   const unlockAudioAutomatically = async () => {
     if (audioUnlocked) return;
 
     try {
-      // Para MP3, usar o elemento audio
       if (gameMode === "mp3" && audioRef.current) {
         const audio = audioRef.current;
         audio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAAQBoAAEAaAAABAAgAZGF0YQAAAAA=";
@@ -194,42 +174,32 @@ export const MusicPlayer = ({
       }
 
       setAudioUnlocked(true);
-      console.log('✅ Audio unlocked automatically');
     } catch (error) {
-      console.log('⚠️ Auto unlock failed:', error);
+      // Silent fail
     }
   };
 
-  // Effect principal para mudanças de estado
   useEffect(() => {
-    console.log('🔄 Game state changed:', { gameState, gameMode, roundKey, audioUnlocked });
-
     if (gameState === "playing") {
       if (!audioUnlocked) {
         unlockAudioAutomatically();
       }
       if (gameMode === "mp3" && audioUrl) {
-        console.log('🎵 Setting up MP3 audio');
         setupAndPlayAudio(audioUrl, autoPlay && audioUnlocked);
       } else if (gameMode === "spotify" && spotifyTrackId) {
-        console.log('🎵 Starting Spotify mode with trackId:', spotifyTrackId);
         startSpotifyCountdown();
       }
     } else if (gameState !== "playing" && isPlaying) {
-      console.log('🛑 Stopping audio due to game state change');
       teardownAudio();
     }
   }, [roundKey, gameState, audioUrl, autoPlay, gameMode, spotifyTrackId, audioUnlocked]);
 
-  // Adicione este useEffect específico para Spotify:
   useEffect(() => {
-    // No modo Spotify, não precisamos de unlock de áudio tradicional
     if (gameMode === "spotify" && gameState === "playing") {
       setAudioUnlocked(true);
     }
   }, [gameMode, gameState]);
 
-  // Effect para eventos de áudio (apenas MP3)
   useEffect(() => {
     if (gameMode !== "mp3") return;
     const audio = audioRef.current;
@@ -260,7 +230,6 @@ export const MusicPlayer = ({
     };
   }, []);
 
-  // ADICIONE ESTE NOVO useEffect AQUI:
   useEffect(() => {
     const handleUnlockAudio = () => {
       unlockAudio();
@@ -273,130 +242,166 @@ export const MusicPlayer = ({
   const progress = (currentTime / duration) * 100;
 
   return (
-      <div className={cn("bg-white/10 rounded-lg p-3 sm:p-4 shadow-lg", className)} key={roundKey}>
-        {/* Debug info - remover em produção */}
-        {process.env.NODE_ENV === 'development' && (
-            <div className="text-xs text-white/50 mb-2">
-              Debug: {gameMode} | {gameState} | audioUnlocked: {audioUnlocked ? 'yes' : 'no'}
-            </div>
-        )}
+      <div className={cn("relative overflow-hidden", className)}>
+        {/* Background com gradiente moderno */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-blue-800/20 to-indigo-900/30 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-black/10" />
 
-        {/* MP3: elemento de áudio sempre presente */}
-        {gameMode === "mp3" && (
-            <audio
-                ref={audioRef}
-                preload="metadata"
-                crossOrigin="anonymous"
-                onClick={unlockAudio} // Unlock quando clicado
-            />
-        )}
-
-        {/* SPOTIFY: iframe visível apenas quando tocando */}
-        {gameMode === "spotify" && spotifyTrackId && gameState === "playing" && (
-            <div className="w-full mb-3">
-              <iframe
-                  src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator&theme=0`}
-                  width="100%"
-                  height="152"
-                  frameBorder="0"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  loading="lazy"
-                  style={{ borderRadius: '8px' }}
-                  title={`Spotify player for ${songTitle}`}
+        {/* Conteúdo */}
+        <div className="relative z-10 p-4 sm:p-6">
+          {/* MP3: elemento de áudio sempre presente */}
+          {gameMode === "mp3" && (
+              <audio
+                  ref={audioRef}
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                  onClick={unlockAudio}
               />
-            </div>
-        )}
+          )}
 
-        {/* Estado inicial */}
-        {gameState === "idle" && (
-            <div className="text-center py-2">
-              <p className="text-white/80 text-sm sm:text-base">
-                {!audioUnlocked ? (
-                    <button
-                        onClick={unlockAudio}
-                        className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-colors"
-                    >
-                      🔊 Clique para liberar o som
-                    </button>
-                ) : (
-                    <>Clique em "Iniciar Jogo" para começar! {gameMode === "spotify" && " (Modo Spotify)"}</>
-                )}
-              </p>
-            </div>
-        )}
-
-        {/* Tocando - controles e barra */}
-        {gameState === "playing" && (
-            <div className="space-y-3">
-              {/* Linha superior: controles + tempo */}
-              <div className="flex items-center justify-between">
-                {/* Controles MP3 */}
-                {gameMode === "mp3" && (
-                    <div className="flex items-center gap-2">
-                      <Button
-                          onClick={togglePlay}
-                          size="sm"
-                          className="bg-white/20 border-white/30 text-white h-8 w-8 p-0"
-                      >
-                        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          className="bg-white/20 border-white/30 text-white h-8 w-8 p-0"
-                          onClick={() => setIsMuted((m) => !m)}
-                      >
-                        {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-                      </Button>
-
-                      {/* NOVO: Indicador de status do autoplay */}
-                      {!audioUnlocked && (
-                          <div className="text-xs text-red-400 ml-2">
-                            Clique ▶ para ativar
-                          </div>
-                      )}
-                    </div>
-                )}
-
-                {/* Indicador Spotify */}
-                {gameMode === "spotify" && (
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 bg-green-500 rounded-full flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">♫</span>
-                      </div>
-                      <span className="text-white/80 text-xs font-medium">Spotify</span>
-                    </div>
-                )}
-
-                {/* Tempo */}
-                <div className="text-white/90 font-medium text-sm">
-                  {Math.ceil(currentTime)}s / {duration}s
-                </div>
-              </div>
-
-              {/* Barra de progresso */}
-              <div className="w-full">
-                <Progress
-                    value={progress}
-                    className="h-2 bg-white/20"
+          {/* SPOTIFY: iframe com estilo melhorado */}
+          {gameMode === "spotify" && spotifyTrackId && gameState === "playing" && (
+              <div className="w-full mb-4 rounded-xl overflow-hidden shadow-lg">
+                <iframe
+                    src={`https://open.spotify.com/embed/track/${spotifyTrackId}?utm_source=generator&theme=0`}
+                    width="100%"
+                    height="152"
+                    frameBorder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                    title={`Spotify player for ${songTitle}`}
                 />
               </div>
+          )}
 
-              {/* Info da música */}
-              {/*<div className="text-center">*/}
-                {/*<p className="text-white/70 text-xs truncate">*/}
-                  {/*{songTitle} - {artist}*/}
-                {/*</p>*/}
-              {/*</div>*/}
-            </div>
-        )}
+          {/* Estado inicial */}
+          {gameState === "idle" && (
+              <div className="text-center py-8">
+                <div className="mb-4">
+                  <div className="w-16 h-16 mx-auto bg-white/10 rounded-full flex items-center justify-center mb-3">
+                    <Play className="w-8 h-8 text-white/70" />
+                  </div>
+                </div>
+                <p className="text-white/80 text-sm sm:text-base">
+                  {!audioUnlocked ? (
+                      <button
+                          onClick={unlockAudio}
+                          className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-6 py-3 rounded-full transition-all duration-300 transform hover:scale-105 shadow-lg"
+                      >
+                        🔊 Clique para liberar o som
+                      </button>
+                  ) : (
+                      <span className="text-white/60">
+                  Aguardando início do jogo...
+                        {gameMode === "spotify" && (
+                            <span className="block text-xs mt-1 text-green-400">Modo Spotify Ativo</span>
+                        )}
+                </span>
+                  )}
+                </p>
+              </div>
+          )}
 
-        {/* Estados de resultado */}
-        {(gameState === "reveal" || gameState === "transition") && (
-            <div className="text-center py-2">
-              <p className="text-white/80 text-sm">Aguarde a próxima música...</p>
-            </div>
-        )}
+          {/* Tocando - layout moderno */}
+          {gameState === "playing" && (
+              <div className="space-y-4">
+                {/* Header com título da música */}
+                {/*<div className="text-center">*/}
+                  {/*<h3 className="text-lg sm:text-xl font-bold text-white mb-1">*/}
+                    {/*GUESS THE SONG!*/}
+                  {/*</h3>*/}
+                  {/*<p className="text-white/60 text-sm">*/}
+                    {/*{songTitle && artist ? `${songTitle} - ${artist}` : "Descubra qual é a música"}*/}
+                  {/*</p>*/}
+                {/*</div>*/}
+
+                {/* Controles principais */}
+                <div className="flex items-center justify-between">
+                  {/* Controles MP3 */}
+                  {gameMode === "mp3" && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                            onClick={togglePlay}
+                            size="sm"
+                            className="bg-white/20 hover:bg-white/30 border-white/30 text-white h-8 w-8 p-0 rounded-full transition-all duration-300 hover:scale-110 shadow-lg"
+                        >
+                          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-white/10 hover:bg-white/20 border-white/20 text-white h-8 w-8 p-0 rounded-full"
+                            onClick={() => setIsMuted((m) => !m)}
+                        >
+                          {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
+                        </Button>
+
+                        {!audioUnlocked && (
+                            <div className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded-full">
+                              Clique ▶ para ativar
+                            </div>
+                        )}
+                      </div>
+                  )}
+
+                  {/* Indicador Spotify melhorado */}
+                  {gameMode === "spotify" && (
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+                          <span className="text-white text-lg font-bold">♫</span>
+                        </div>
+                        <div>
+                          <span className="text-white font-medium text-sm">Spotify Mode</span>
+                          <div className="text-green-400 text-xs">Reproduzindo via Spotify</div>
+                        </div>
+                      </div>
+                  )}
+
+                  {/* Timer moderno */}
+                  {/*<div className="text-right">*/}
+                    {/*<div className="bg-white/10 px-4 py-2 rounded-full backdrop-blur-sm">*/}
+                      {/*<div className="text-white font-bold text-lg">*/}
+                        {/*{Math.ceil(duration - currentTime)}*/}
+                      {/*</div>*/}
+                      {/*<div className="text-white/60 text-xs">segundos</div>*/}
+                    {/*</div>*/}
+                  {/*</div>*/}
+                </div>
+
+                {/* Barra de progresso melhorada */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-white/60">
+                    <span>{Math.floor(currentTime)}s</span>
+                    <span>{duration}s</span>
+                  </div>
+                  <div className="relative">
+                    <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+                      <div
+                          className="h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    {/* Pulse effect no progresso */}
+                    <div
+                        className="absolute top-0 h-2 w-1 bg-white rounded-full shadow-lg transition-all duration-300"
+                        style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}
+                    />
+                  </div>
+                </div>
+              </div>
+          )}
+
+          {/* Estados de resultado */}
+          {(gameState === "reveal" || gameState === "transition") && (
+              <div className="text-center py-6">
+                <div className="w-12 h-12 mx-auto bg-white/10 rounded-full flex items-center justify-center mb-3">
+                  <Pause className="w-6 h-6 text-white/70" />
+                </div>
+                <p className="text-white/60 text-sm">Preparando próxima música...</p>
+              </div>
+          )}
+        </div>
       </div>
   );
 };
