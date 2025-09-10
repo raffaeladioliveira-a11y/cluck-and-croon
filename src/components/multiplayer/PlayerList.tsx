@@ -30,6 +30,7 @@ interface PlayerListProps {
   selectedMp3AlbumId?: string | null;
   roomStatus?: string;
   showAlbumSelectorForHost?: boolean;
+  selectedGenre?: string | null;
 }
 
 /** Lê o game_mode da tabela key/value (key='game_mode') */
@@ -86,6 +87,7 @@ export function PlayerList({
     selectedMp3AlbumId: selectedMp3FromProp,
     roomStatus: roomStatusProp,
     showAlbumSelectorForHost = true,
+    selectedGenre,
 }: PlayerListProps) {
 
   console.log("PlayerList - roomCode recebido:", roomCode);
@@ -335,7 +337,10 @@ export function PlayerList({
           {/* SELETOR DE ÁLBUM PARA HOST - MP3 */}
           {shouldShowMp3AlbumSelector && (
               <div className="mt-6 sm:mt-8">
-                <HostMp3AlbumSelector roomCode={roomCode} />
+                <HostMp3AlbumSelector
+                    roomCode={roomCode}
+                    genreId={selectedGenre} // ← ADICIONAR esta linha
+                />
               </div>
           )}
         </div>

@@ -20,12 +20,6 @@ interface Mp3Album {
     song_count?: number;
 }
 
-interface Genre {
-    id: string;
-    name: string;
-    emoji: string;
-}
-
 interface HostMp3AlbumSelectorProps {
     roomCode: string;
 }
@@ -47,13 +41,9 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                 const { data: albumsData, error: albumsError } = await supabase
                     .from("albums")
                     .select(`
-            *,
-            genres (
-              id,
-              name,
-              emoji
-            )
-          `)
+                        *,
+                        genres (id, name, emoji)
+                    `)
                     .order("artist_name", { ascending: true })
                     .order("name", { ascending: true });
 
@@ -62,7 +52,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                     return;
                 }
 
-                // Contar músicas por álbum (se você tiver tabela songs)
+                // Contar músicas por álbum
                 const albumsWithCount = await Promise.all(
                     (albumsData || []).map(async (album) => {
                         const { count } = await supabase
@@ -110,10 +100,20 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
         }
     }, [selectedGenre, albums]);
 
-    const handleGenreSelect = (genre: Genre) => {
+    const handleGenreSelect = async (genre: Genre) => {
         setSelectedGenre(genre);
         setSelectedAlbum(null);
         setStep("album");
+
+        // Salvar gênero na sala
+        try {
+            await supabase
+                .from('game_rooms')
+                .update({ next_genre_id: genre.id })
+                .eq('room_code', roomCode);
+        } catch (error) {
+            console.error('Erro ao salvar gênero:', error);
+        }
     };
 
     const handleAlbumSelect = (album: Mp3Album) => {
@@ -129,15 +129,16 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
             const { error } = await supabase
                 .from("game_rooms")
                 .update({
-                    selected_mp3_album_id: selectedAlbum.id,
+                        selected_mp3_album_id: selectedAlbum.id,
+                        next_genre_id: selectedGenre?.id,
                     status: "lobby",
-                })
-                .eq("room_code", roomCode);
+        })
+        .eq("room_code", roomCode);
 
             if (error) {
                 console.error("Erro ao salvar seleção de álbum:", error);
             } else {
-                // ADICIONAR: Disparar evento personalizado para round-lobby
+                // Disparar evento para RoomLobby
                 const event = new CustomEvent('albumSelected', {
                     detail: {
                         albumId: selectedAlbum.id,
@@ -183,7 +184,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
         <BarnCard variant="coop" className="p-6">
             <div className="flex items-center gap-3 mb-6">
                 <Music className="w-6 h-6 text-white" />
-                <h3 className="text-xl font-bold ttext-white">
+                <h3 className="text-xl font-bold text-white">
                     {step === "genre" && "Escolha o Gênero Musical"}
                     {step === "album" && `Álbuns de ${selectedGenre?.name}`}
                     {step === "confirm" && "Confirmar Seleção"}
@@ -223,7 +224,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
             {step === "album" && selectedGenre && (
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <p className="text-muted-foreground">
+                        <p className="text-white">
                             Escolha um álbum de <strong>{selectedGenre.name}</strong>:
                         </p>
                         <ChickenButton variant="feather" size="sm" onClick={handleBack}>
@@ -252,17 +253,17 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                                     )}
 
                                     <div className="flex-1">
-                                        <h4 className="font-semibold text-barn-brown">{album.name}</h4>
-                                        <p className="text-sm text-muted-foreground">
+                                        <h4 className="font-semibold text-white">{album.name}</h4>
+                                        <p className="text-sm text-white/80">
                                             {album.artist_name}
                                         </p>
                                         {album.release_year && (
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="text-xs text-white/60">
                                                 Ano: {album.release_year}
                                             </p>
                                         )}
                                         {album.song_count !== undefined && (
-                                            <p className="text-xs text-muted-foreground mt-1">
+                                            <p className="text-xs text-white/60 mt-1">
                                                 {album.song_count} música
                                                 {album.song_count !== 1 ? "s" : ""}
                                             </p>
@@ -274,10 +275,15 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                     </div>
 
                     {filteredAlbums.length === 0 && (
-                        <p className="text-center text-muted-foreground py-8">
-                            Nenhum álbum encontrado para o gênero{" "}
-                            <strong>{selectedGenre.name}</strong>.
-                        </p>
+                        <div className="text-center py-8">
+                            <p className="text-white/60 mb-4">
+                                Nenhum álbum encontrado para o gênero{" "}
+                                <strong>{selectedGenre.name}</strong>.
+                            </p>
+                            <ChickenButton variant="feather" onClick={handleBack}>
+                                ← Escolher Outro Gênero
+                            </ChickenButton>
+                        </div>
                     )}
                 </div>
             )}
@@ -286,7 +292,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
             {step === "confirm" && selectedAlbum && selectedGenre && (
                 <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                        <h4 className="text-lg font-semibold text-barn-brown">
+                        <h4 className="text-lg font-semibold text-white">
                             Confirmar Seleção:
                         </h4>
                         <ChickenButton variant="feather" size="sm" onClick={handleBack}>
@@ -309,22 +315,22 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                             )}
 
                             <div>
-                                <h3 className="text-xl font-bold text-barn-brown">
+                                <h3 className="text-xl font-bold text-white">
                                     {selectedAlbum.name}
                                 </h3>
-                                <p className="text-lg text-muted-foreground">
+                                <p className="text-lg text-white/80">
                                     {selectedAlbum.artist_name}
                                 </p>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-sm text-white/60">
                                     Gênero: {selectedGenre.emoji} {selectedGenre.name}
                                 </p>
                                 {selectedAlbum.release_year && (
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-sm text-white/60">
                                         Ano: {selectedAlbum.release_year}
                                     </p>
                                 )}
                                 {selectedAlbum.song_count !== undefined && (
-                                    <p className="text-sm text-muted-foreground">
+                                    <p className="text-sm text-white/60">
                                         {selectedAlbum.song_count} música
                                         {selectedAlbum.song_count !== 1 ? "s" : ""}
                                     </p>
@@ -333,15 +339,13 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                         </div>
 
                         {selectedAlbum.description && (
-                            <p className="text-sm text-muted-foreground mb-4">
+                            <p className="text-sm text-white/60 mb-4">
                                 {selectedAlbum.description}
                             </p>
                         )}
 
-                        <p className="text-muted-foreground mb-4">
-                            O jogo será jogado apenas com as músicas deste álbum. Todos os
-                            jogadores precisarão adivinhar as músicas de{" "}
-                            <strong>{selectedAlbum.name}</strong>.
+                        <p className="text-white/80 mb-4">
+                            As próximas 10 rodadas serão tocadas apenas com músicas deste álbum.
                         </p>
                     </div>
 
@@ -359,7 +363,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                                 Confirmando...
                                 </>
                             ) : (
-                                "✅ Confirmar e Iniciar Jogo"
+                                "✅ Confirmar Álbum"
                             )}
                         </ChickenButton>
                     </div>
