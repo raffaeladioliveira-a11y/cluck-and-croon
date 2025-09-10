@@ -127,6 +127,7 @@ async function getOtherMP3TracksFromGenre(genreId: string, excludeSongId: string
   return songs.map(s => s.title);
 }
 
+
 /** Sorteia UMA faixa do Spotify, priorizando:
  * 1) Álbum escolhido (selected_spotify_album_id)
  * 2) Qualquer álbum do gênero (selected_genre_id ou next_genre_id)
@@ -305,6 +306,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   const clientId = useRef(getOrCreateClientId());
   const profile  = useRef(loadProfile()); // { displayName, avatar }
 
+  // ADICIONE ESTA LINHA AQUI DENTRO:
+  const [redistributionProcessed, setRedistributionProcessed] = useState<Record<number, boolean>>({});
+
   // estado principal
   const [isLoading, setIsLoading] = useState(true);
   const [gameState, setGameState] = useState<GameState>('idle');
@@ -324,6 +328,15 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   const [audioUnlocked, setAudioUnlocked] = useState(true);
   const [isHost, setIsHost] = useState(false);
   const [usedSongIds, setUsedSongIds] = useState<string[]>([]);
+
+  // Adicione após os estados existentes
+  const [battleMode, setBattleMode] = useState<'classic' | 'battle'>('classic');
+  const [battleSettings, setBattleSettings] = useState({
+    eggsPerRound: 10,
+    totalRounds: 10,
+    initialEggs: 100
+  });
+  const [roundAnswers, setRoundAnswers] = useState<Record<string, { answer: number; responseTime: number }>>({});
 
   const [currentSettings, setCurrentSettings] = useState({
     eggs_per_correct: 10,
@@ -580,6 +593,206 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     }
   };
 
+  // Função para obter modo de batalha
+  const getBattleMode = async (): Promise<'classic' | 'battle'> => {
+    const { data, error } = await supabase
+        .from('game_settings')
+        .select('value')
+        .eq('key', 'battle_mode')
+        .maybeSingle();
+
+    if (error) return 'classic';
+
+    const raw = data?.value;
+    const normalized = typeof raw === 'string' ? raw.replace(/"/g, '') : 'classic';
+    return normalized === 'battle' ? 'battle' : 'classic';
+  };
+
+// Função para inicializar ovos
+  const initializeBattleEggs = async (roomCode: string, battleSettings: any) => {
+    const { data: room } = await supabase
+        .from('game_rooms')
+        .select('id')
+        .eq('room_code', roomCode)
+        .single();
+
+    if (!room) throw new Error('Sala não encontrada');
+
+    await supabase
+        .from('room_participants')
+        .update({
+          current_eggs: battleSettings.initialEggs,
+          battle_eggs: battleSettings.initialEggs
+        })
+        .eq('room_id', room.id);
+  };
+
+// Função para redistribuir ovos
+  const redistributeEggs = async (roomCode: string, correctAnswerIndex: number, answersData: any, battleSettings: any) => {
+    console.log('🎯 [redistributeEggs] ===================');
+    console.log('🎯 [redistributeEggs] Iniciando redistribuição:', {
+      roomCode,
+      correctAnswerIndex,
+      answersData,
+      battleSettings,
+      totalAnswers: Object.keys(answersData).length
+    });
+
+    try {
+      const { data: room, error: roomError } = await supabase
+          .from('game_rooms')
+          .select('id')
+          .eq('room_code', roomCode)
+          .single();
+
+      if (roomError) {
+        console.error('🎯 [redistributeEggs] Erro ao buscar sala:', roomError);
+        return;
+      }
+
+      if (!room) {
+        console.error('🎯 [redistributeEggs] Sala não encontrada');
+        return;
+      }
+
+      console.log('🎯 [redistributeEggs] Sala encontrada:', room);
+
+      const { data: participants, error: participantsError } = await supabase
+          .from('room_participants')
+          .select('client_id, current_eggs, display_name')
+          .eq('room_id', room.id);
+
+      if (participantsError) {
+        console.error('🎯 [redistributeEggs] Erro ao buscar participantes:', participantsError);
+        return;
+      }
+
+      if (!participants) {
+        console.error('🎯 [redistributeEggs] Participantes não encontrados');
+        return;
+      }
+
+      console.log('🎯 [redistributeEggs] Participantes ANTES da redistribuição:', participants);
+
+      const playersWhoAnswered = Object.keys(answersData);
+      const correctPlayers = playersWhoAnswered.filter(
+          playerId => answersData[playerId].answer === correctAnswerIndex
+      );
+      const incorrectPlayers = playersWhoAnswered.filter(
+          playerId => answersData[playerId].answer !== correctAnswerIndex
+      );
+
+      console.log('🎯 [redistributeEggs] Análise das respostas:', {
+        playersWhoAnswered,
+        correctPlayers,
+        incorrectPlayers,
+        correctAnswerIndex
+      });
+
+      if (incorrectPlayers.length === 0) {
+        console.log('🎯 [redistributeEggs] Nenhum jogador errou, sem redistribuição');
+        return;
+      }
+
+      if (correctPlayers.length === 0) {
+        console.log('🎯 [redistributeEggs] Nenhum jogador acertou, sem redistribuição');
+        return;
+      }
+
+      const eggsToRedistribute = incorrectPlayers.length * battleSettings.eggsPerRound;
+      const eggsPerWinner = Math.floor(eggsToRedistribute / correctPlayers.length);
+
+      console.log('🎯 [redistributeEggs] Cálculos:', {
+        eggsToRedistribute,
+        eggsPerWinner,
+        incorrectCount: incorrectPlayers.length,
+        correctCount: correctPlayers.length,
+        eggsPerRound: battleSettings.eggsPerRound
+      });
+
+      if (eggsPerWinner === 0) {
+        console.log('🎯 [redistributeEggs] Nenhum ovo para redistribuir');
+        return;
+      }
+
+      const updates = [];
+
+      // Processar jogadores que erraram
+      for (const playerId of incorrectPlayers) {
+        const participant = participants.find(p => p.client_id === playerId);
+        if (participant) {
+          const newEggs = Math.max(0, participant.current_eggs - battleSettings.eggsPerRound);
+          console.log(`🎯 [redistributeEggs] ${participant.display_name} (${playerId}) perde ovos: ${participant.current_eggs} -> ${newEggs}`);
+
+          const updatePromise = supabase
+              .from('room_participants')
+              .update({ current_eggs: newEggs })
+              .eq('room_id', room.id)
+              .eq('client_id', playerId);
+
+          updates.push({ type: 'loss', playerId, newEggs, promise: updatePromise });
+        } else {
+          console.warn(`🎯 [redistributeEggs] Participante não encontrado para ${playerId}`);
+        }
+      }
+
+      // Processar jogadores que acertaram
+      for (const playerId of correctPlayers) {
+        const participant = participants.find(p => p.client_id === playerId);
+        if (participant) {
+          const newEggs = participant.current_eggs + eggsPerWinner;
+          console.log(`🎯 [redistributeEggs] ${participant.display_name} (${playerId}) ganha ovos: ${participant.current_eggs} -> ${newEggs}`);
+
+          const updatePromise = supabase
+              .from('room_participants')
+              .update({ current_eggs: newEggs })
+              .eq('room_id', room.id)
+              .eq('client_id', playerId);
+
+          updates.push({ type: 'gain', playerId, newEggs, promise: updatePromise });
+        } else {
+          console.warn(`🎯 [redistributeEggs] Participante não encontrado para ${playerId}`);
+        }
+      }
+
+      console.log(`🎯 [redistributeEggs] Executando ${updates.length} atualizações...`);
+
+      // Executar todas as atualizações
+      const results = await Promise.all(updates.map(update => update.promise));
+
+      console.log('🎯 [redistributeEggs] Resultados das atualizações:');
+      results.forEach((result, index) => {
+        const update = updates[index];
+        if (result.error) {
+          console.error(`🎯 [redistributeEggs] ERRO ${update.type} para ${update.playerId}:`, result.error);
+        } else {
+          console.log(`🎯 [redistributeEggs] ✅ ${update.type} para ${update.playerId}: ${update.newEggs} ovos`);
+        }
+      });
+
+      // Verificar se todas as atualizações foram bem-sucedidas
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        console.error('🎯 [redistributeEggs] ❌ Erros encontrados:', errors);
+      } else {
+        console.log('🎯 [redistributeEggs] ✅ Redistribuição concluída com sucesso!');
+      }
+
+      // Verificar estado final
+      const { data: finalParticipants } = await supabase
+          .from('room_participants')
+          .select('client_id, current_eggs, display_name')
+          .eq('room_id', room.id);
+
+      console.log('🎯 [redistributeEggs] Participantes DEPOIS da redistribuição:', finalParticipants);
+
+    } catch (error) {
+      console.error('🎯 [redistributeEggs] ❌ Erro geral na redistribuição:', error);
+    }
+
+    console.log('🎯 [redistributeEggs] ===================');
+  };
+
 // 5. ADICIONAR reset do histórico quando o jogo reinicia
   const resetUsedSongs = useCallback(() => {
     setUsedSongIds([]);
@@ -590,6 +803,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
   const broadcastRoundStart = useCallback(async (q: GameQuestion, round: number) => {
     if (!sessionId || !gameChannelRef.current) return;
+
+    // LIMPAR flag de redistribuição para nova rodada
+    setRedistributionProcessed(prev => ({ ...prev, [round]: false }));
 
     const payload = {
       question: q,
@@ -630,19 +846,29 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
   const broadcastAnswer = useCallback(async (answerIndex: number) => {
     if (!sessionId || !gameChannelRef.current) return;
+
+    const responseTime = currentSettings.time_per_question - timeLeft;
     const loggedPlayer = players?.find((p) => p.id === clientId.current);
+
+    console.log('🎯 [broadcastAnswer] Enviando resposta:', {
+      answerIndex,
+      responseTime,
+      participantId: clientId.current,
+      battleMode
+    });
 
     await gameChannelRef.current.send({
       type: 'broadcast',
       event: 'ANSWER',
       payload: {
         answerIndex,
+        responseTime, // ADICIONE: Include responseTime
         participantId: clientId.current,
         name: profile.current.displayName || 'Jogador',
         avatar: loggedPlayer?.avatar,
-      },
-    });
-  }, [sessionId, players]);
+    },
+  });
+  }, [sessionId, players, currentSettings, timeLeft, battleMode]);
 
   /* --------------------------------- AÇÕES -------------------------------- */
 
@@ -655,6 +881,24 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     }
 
     setAudioUnlocked(true);
+
+    // // ADICIONE ESTA PARTE para modo batalha
+    // if (battleMode === 'battle' && isHost && sessionId) {
+    //   try {
+    //     await initializeBattleEggs(roomCode, battleSettings);
+    //     toast({
+    //       title: '⚔️ Modo Batalha Ativado!',
+    //       description: `Cada jogador recebeu ${battleSettings.initialEggs} ovos para a batalha!`,
+    //     });
+    //   } catch (error) {
+    //     toast({
+    //       title: 'Erro',
+    //       description: 'Falha ao inicializar modo batalha',
+    //       variant: 'destructive'
+    //     });
+    //     return;
+    //   }
+    // }
 
     if (sessionId && isHost) {
       try {
@@ -681,18 +925,46 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   const handleAnswerSelect = useCallback((idx: number) => {
     if (gameState !== 'playing' || selectedAnswer !== null) return;
 
+    console.log('🎯 [handleAnswerSelect] CHAMADO:', {
+      idx,
+      battleMode,
+      sessionId: !!sessionId
+    });
+
     setSelectedAnswer(idx);
     const responseTime = currentSettings.time_per_question - timeLeft;
     setAnswerTime(responseTime);
 
     const isCorrect = currentQuestion && idx === currentQuestion.correctAnswer;
-    if (isCorrect) {
-      const base = currentSettings.eggs_per_correct;
-      const bonus = timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0;
-      // setPlayerEggs(e => e + base + bonus);
+
+    // SEPARAR CLARAMENTE: Modo batalha vs clássico
+    if (battleMode === 'battle' && sessionId) {
+      console.log('🎯 [handleAnswerSelect] MODO BATALHA - apenas registrando resposta');
+
+      // Modo batalha: APENAS registrar a resposta, SEM aplicar pontuação
+      setRoundAnswers(prev => {
+        const updated = {
+          ...prev,
+          [clientId.current]: { answer: idx, responseTime }
+        };
+        console.log('🎯 [handleAnswerSelect] roundAnswers ATUALIZADO:', updated);
+        return updated;
+      });
+
+      // NO MODO BATALHA: NÃO APLICAR PONTUAÇÃO LOCAL
+
+    } else {
+      console.log('🎯 [handleAnswerSelect] MODO CLÁSSICO - aplicando pontuação');
+
+      // Modo clássico: aplicar pontuação imediatamente
+      if (isCorrect) {
+        const base = currentSettings.eggs_per_correct;
+        const bonus = timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0;
+        setPlayerEggs(e => e + base + bonus);
+      }
     }
 
-    // Salvar estatísticas do jogador no Supabase (modo multiplayer)
+    // Salvar estatísticas no Supabase (modo multiplayer)
     if (sessionId) {
       (async () => {
         try {
@@ -703,7 +975,6 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
               .maybeSingle();
 
           if (room?.id) {
-            // Buscar dados atuais do participante
             const { data: participant } = await supabase
                 .from('room_participants')
                 .select('current_eggs, correct_answers, total_answers, total_response_time')
@@ -712,12 +983,23 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
                 .maybeSingle();
 
             if (participant) {
-              const newEggs = participant.current_eggs + (isCorrect ? currentSettings.eggs_per_correct + (timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0) : 0);
+              // IMPORTANTE: No modo batalha, NÃO aplicar pontuação aqui
+              const eggGain = (battleMode === 'classic' && isCorrect)
+                  ? currentSettings.eggs_per_correct + (timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0)
+                  : 0; // Zero para modo batalha
+
+              console.log('🎯 [handleAnswerSelect] Salvando no banco:', {
+                battleMode,
+                isCorrect,
+                eggGain,
+                currentEggs: participant.current_eggs
+              });
+
+              const newEggs = participant.current_eggs + eggGain;
               const newCorrectAnswers = participant.correct_answers + (isCorrect ? 1 : 0);
               const newTotalAnswers = participant.total_answers + 1;
               const newTotalResponseTime = participant.total_response_time + responseTime;
 
-              // Atualizar estatísticas do participante
               await supabase
                   .from('room_participants')
                   .update({
@@ -729,11 +1011,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
                   .eq('room_id', room.id)
                   .eq('client_id', clientId.current);
 
-              // FORÇA RELOAD LOCAL
-              // await loadPlayersFromRoom();
-              //
-              // // FORÇA SINCRONIZAÇÃO PARA TODOS OS JOGADORES
-              // await broadcastScoreUpdate();
+              console.log('🎯 [handleAnswerSelect] Dados salvos no banco');
             }
           }
         } catch (error) {
@@ -748,7 +1026,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       const list = next[idx] ? [...next[idx]] : [];
       if (!list.find(p => p.id === clientId.current)) {
         const loggedPlayer = players?.find((p) => p.id === clientId.current);
-        if (loggedPlayer?.avatar?.startsWith("/")) {  // Só adiciona se tiver avatar válido
+        if (loggedPlayer?.avatar?.startsWith("/")) {
           list.push({
             id: clientId.current,
             name: loggedPlayer.name,
@@ -761,7 +1039,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     });
 
     broadcastAnswer(idx);
-  }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode]);
+  }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode, battleMode, players, clientId]);
 
 
 
@@ -806,6 +1084,26 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
     const init = async () => {
       try {
+        // ADICIONE estas linhas
+        const [gameSettings, battleModeResult] = await Promise.all([
+          supabase.from('game_settings').select('key,value'),
+          getBattleMode()
+        ]);
+
+        if (!cancelled) {
+          setBattleMode(battleModeResult);
+
+          // Configurar battleSettings baseado nas configurações
+          if (gameSettings.data) {
+            const eggsPerRound = gameSettings.data.find(s => s.key === 'battle_eggs_per_round')?.value || 10;
+            const totalRounds = gameSettings.data.find(s => s.key === 'battle_total_rounds')?.value || 10;
+            setBattleSettings({
+              eggsPerRound: parseInt(String(eggsPerRound), 10),
+              totalRounds: parseInt(String(totalRounds), 10),
+              initialEggs: parseInt(String(eggsPerRound), 10) * parseInt(String(totalRounds), 10)
+            });
+          }
+        }
         // carrega configurações (opcional)
         const { data, error } = await supabase.from('game_settings').select('key,value');
         if (!error && data) {
@@ -835,6 +1133,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
       }
 
       // se houver sessão, conecta no canal e descobre se sou host
+      // se houver sessão, conecta no canal e descobre se sou host
       if (sessionId) {
         try {
           const ch = supabase.channel(`game:${sessionId}`, {
@@ -851,6 +1150,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             setCurrentSettings(settings);
             setSelectedAnswer(null);
             setAnswersByOption({});
+            setRoundAnswers({}); // ADICIONE: Reset das respostas da rodada
             setGameState('playing');
 
             const elapsed = Math.floor((Date.now() - startedAt) / 1000);
@@ -860,21 +1160,34 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           });
 
           ch.on('broadcast', { event: 'ANSWER' }, (msg) => {
-            const { answerIndex, participantId, name, avatar } = msg.payload as {
-              answerIndex: number; participantId: string; name: string; avatar: string;
+            const { answerIndex, responseTime, participantId, name, avatar } = msg.payload as {
+              answerIndex: number; responseTime: number; participantId: string; name: string; avatar: string;
             };
 
-            ch.on('broadcast', { event: 'SCORE_UPDATE' }, async (msg) => {
-              // Quando recebe atualização de score, recarrega os players
-              console.log('🥚 Score update received, reloading players...');
-              await loadPlayersFromRoom();
+            console.log('🎯 [realtime ANSWER] Resposta recebida:', {
+              answerIndex,
+              responseTime,
+              participantId,
+              name,
+              battleMode
             });
+
+            // Registrar resposta para modo batalha
+            if (battleMode === 'battle') {
+              setRoundAnswers(prev => {
+                const updated = {
+                  ...prev,
+                  [participantId]: { answer: answerIndex, responseTime }
+                };
+                console.log('🎯 [realtime ANSWER] roundAnswers atualizado:', updated);
+                return updated;
+              });
+            }
 
             setAnswersByOption(prev => {
               const next = { ...prev };
               const list = next[answerIndex] ? [...next[answerIndex]] : [];
               if (!list.find(p => p.id === participantId)) {
-                // CORREÇÃO: Só adiciona se o avatar for URL válida
                 if (avatar?.startsWith("/")) {
                   list.push({ id: participantId, name, avatar });
                 }
@@ -884,11 +1197,22 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
             });
           });
 
+          // SEPARAR: Event listener para BATTLE_RESULTS
+          ch.on('broadcast', { event: 'BATTLE_RESULTS' }, async (msg) => {
+            console.log('🥚 Resultados de batalha recebidos, recarregando jogadores...');
+            await loadPlayersFromRoom();
+          });
+
+          // SEPARAR: Event listener para SCORE_UPDATE
+          ch.on('broadcast', { event: 'SCORE_UPDATE' }, async (msg) => {
+            console.log('🥚 Score update received, reloading players...');
+            await loadPlayersFromRoom();
+          });
+
           ch.on('broadcast', { event: 'ROUND_COMPLETE' }, (msg) => {
             const { roomCode, sessionId } = msg.payload as {
               roomCode: string; sessionId: string;
             };
-            // console.log('[realtime] Round complete, redirecting to lobby...');
             const navigateEvent = new CustomEvent("navigateToRoundLobby", {
               detail: { roomCode, playerEggs, sessionId }
             });
@@ -896,7 +1220,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           });
 
           ch.subscribe((status) => {
-            // console.log('[realtime] game channel status:', status);
+            console.log('[realtime] game channel status:', status);
           });
 
           gameChannelRef.current = ch;
@@ -945,7 +1269,73 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
 
 
+// Substitua o useEffect atual por este:
+  useEffect(() => {
+    if (battleMode === 'battle' && isHost && currentQuestion && sessionId) {
+      console.log('🎯 [useEffect battle] Verificando estado para redistribuição:', {
+        gameState,
+        battleMode,
+        isHost,
+        sessionId,
+        roundAnswersCount: Object.keys(roundAnswers).length,
+        currentQuestion: currentQuestion.correctAnswer,
+        currentRound,
+        alreadyProcessed: redistributionProcessed[currentRound]
+      });
 
+
+      // ADICIONE: Verificar se já foi processado
+      if (redistributionProcessed[currentRound]) {
+        console.log('🎯 [useEffect battle] Rodada já processada, ignorando');
+        return;
+      }
+
+      // Processar TANTO em 'reveal' quanto em 'transition' para garantir execução
+      if (gameState === 'reveal' || gameState === 'transition') {
+        console.log('🎯 [useEffect battle] Estado adequado detectado, processando...');
+
+        const processRoundEnd = async () => {
+          try {
+            // Verificar se já tem respostas suficientes
+            const answerCount = Object.keys(roundAnswers).length;
+            console.log('🎯 [processRoundEnd] Respostas disponíveis:', answerCount);
+
+            if (answerCount === 0) {
+              console.log('🎯 [processRoundEnd] Nenhuma resposta registrada, pulando redistribuição');
+              return;
+            }
+
+            // MARCAR COMO PROCESSADO ANTES de executar
+            setRedistributionProcessed(prev => ({ ...prev, [currentRound]: true }));
+
+            console.log('🎯 [processRoundEnd] Chamando redistributeEggs...');
+            await redistributeEggs(roomCode, currentQuestion.correctAnswer, roundAnswers, battleSettings);
+
+            console.log('🎯 [processRoundEnd] Recarregando jogadores...');
+            await loadPlayersFromRoom();
+
+            console.log('🎯 [processRoundEnd] Enviando broadcast...');
+            if (gameChannelRef.current) {
+              await gameChannelRef.current.send({
+                type: 'broadcast',
+                event: 'BATTLE_RESULTS',
+                payload: { processed: true }
+              });
+            }
+
+            console.log('🎯 [processRoundEnd] Processamento completo!');
+
+          } catch (error) {
+            console.error('🎯 [processRoundEnd] Erro ao processar final da rodada:', error);
+            // REMOVER flag em caso de erro para permitir retry
+            setRedistributionProcessed(prev => ({ ...prev, [currentRound]: false }));
+          }
+        };
+
+        processRoundEnd();
+      }
+    }
+  }, [gameState, battleMode, isHost, currentQuestion, sessionId, roomCode, roundAnswers, battleSettings, currentRound, redistributionProcessed]);
 
 
   // 4. ADICIONAR um useEffect SEPARADO (não mexer no principal)
@@ -1044,6 +1434,18 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     }
   }, [gameState, updateScoresAtRoundEnd]);
 
+  // Adicione DENTRO da função useGameLogic, após os outros useEffect
+  useEffect(() => {
+    console.log('🎮 [useGameLogic] Estado COMPLETO:', {
+      battleMode,
+      battleSettings,
+      gameState,
+      sessionId: !!sessionId,
+      isHost,
+      roundAnswersKeys: Object.keys(roundAnswers)
+    });
+  }, [battleMode, battleSettings, gameState, sessionId, isHost, roundAnswers]);
+
 
   // próxima rodada (host)
   useEffect(() => {
@@ -1076,6 +1478,24 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameState, roomCode, playerEggs, sessionId, broadcastEndOfRound]);
+
+  // Adicione este useEffect separado APÓS todos os outros useEffect:
+  useEffect(() => {
+    if (battleMode === 'battle' && sessionId && !isLoading) {
+      const initializeBattleEggsOnce = async () => {
+        try {
+          console.log('🥚 [useEffect] Inicializando ovos de batalha...');
+          await initializeBattleEggs(roomCode, battleSettings);
+          await loadPlayersFromRoom();
+          console.log('🥚 [useEffect] Ovos de batalha inicializados');
+        } catch (error) {
+          console.error('🥚 [useEffect] Erro ao inicializar ovos:', error);
+        }
+      };
+
+      initializeBattleEggsOnce();
+    }
+  }, [battleMode, sessionId, isLoading, roomCode, battleSettings]); // Executa apenas quando necessário
 
   return {
     // estado
@@ -1110,5 +1530,10 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
     activeGenre,
     players,
     selectedAlbumInfo,
+    // ADICIONE estas novas propriedades:
+    battleMode,
+    battleSettings,
+    roundAnswers: Object.keys(roundAnswers).length,
+    redistributionProcessed, // ADICIONE esta linha
   };
 };

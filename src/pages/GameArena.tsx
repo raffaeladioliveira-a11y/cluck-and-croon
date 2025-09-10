@@ -76,6 +76,8 @@ function GameArenaContent() {
         isHost,
         activeGenre,
         selectedAlbumInfo,
+        battleMode, // ADICIONE ESTA LINHA
+        battleSettings, // ADICIONE ESTA LINHA
     } = useGameLogic(roomCode || "", sid);
 
     // Função para iniciar o countdown
@@ -551,6 +553,19 @@ function GameArenaContent() {
                                             <span className="hidden sm:inline">Sua Pontuação - Rodada {currentRound}</span>
                                         </h3>
                                     </div>
+
+                                    // Apenas para debug - remover depois
+                                    {battleMode === 'battle' && isHost && (
+                                        <button onClick={() => {
+    console.log('🧪 Teste de redistribuição forçada');
+    redistributeEggs(roomCode, 0, {
+      'player1': { answer: 0, responseTime: 5 },
+      'player2': { answer: 1, responseTime: 3 }
+    }, battleSettings);
+  }}>
+                                            Testar Redistribuição
+                                        </button>
+                                    )}
 
                                     <div className="flex flex-col items-center text-center">
                                         {currentPlayer.avatar?.startsWith("/") ? (

@@ -14,6 +14,31 @@ import { toast } from "@/hooks/use-toast";
 import { loadProfile, saveProfile, Profile, getDisplayNameOrDefault, getAvatarOrDefault } from "@/utils/clientId";
 import heroImage from "@/assets/galinheiro-hero.jpg";
 import heroImagelogo from "@/assets/smokechicken.png";
+import { supabase } from "@/integrations/supabase/client";
+
+
+interface BattleSettings {
+  eggsPerRound: number;
+  totalRounds: number;
+  initialEggs: number;
+}
+
+// Adicione este componente na sua tela de entrada
+const BattleModeInfo = ({ battleSettings }: { battleSettings: BattleSettings }) => (
+    <div className="bg-gradient-to-r from-glass-500/10 to-orange-500/10 border border-red-200 rounded-lg p-4 mb-4">
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <span className="text-4xl">⚔️</span>
+        <h3 className="font-bold text-700 text-xl md:text-3xl">Modo Batalha Ativado!</h3>
+      </div>
+      <div className="text-sm md:text-base space-y-1">
+        <p>• Você receberá <strong>{battleSettings.initialEggs} ovos</strong> para participar</p>
+        <p>• Cada rodada vale <strong>{battleSettings.eggsPerRound} ovos</strong></p>
+        <p>• Se errar: seus ovos vão para quem acertou</p>
+        <p>• Se acertar: ganha ovos de quem errou</p>
+        <p>• Se não responder: mantém seus ovos</p>
+      </div>
+    </div>
+);
 
 const Index = () => {
   const navigate = useNavigate();
@@ -28,6 +53,49 @@ const Index = () => {
   // Estado para auto-join via sessionStorage (vindo do LobbyRedirectGuard)
   const [pendingRoomCode, setPendingRoomCode] = useState<string | null>(null);
   const [showAutoJoinForm, setShowAutoJoinForm] = useState(false);
+
+  // Adicione estas funções no seu componente:
+  const getBattleMode = async (): Promise<'classic' | 'battle'> => {
+    const { data, error } = await supabase
+        .from('game_settings')
+        .select('value')
+        .eq('key', 'battle_mode')
+        .maybeSingle();
+
+    if (error) return 'classic';
+
+    const raw = data?.value;
+    const normalized = typeof raw === 'string' ? raw.replace(/"/g, '') : 'classic';
+    return normalized === 'battle' ? 'battle' : 'classic';
+  };
+
+  const getBattleSettings = async (): Promise<BattleSettings> => {
+    const { data, error } = await supabase
+        .from('game_settings')
+        .select('key, value')
+        .in('key', ['battle_eggs_per_round', 'battle_total_rounds']);
+
+    const defaults: BattleSettings = {
+      eggsPerRound: 10,
+      totalRounds: 10,
+      initialEggs: 100
+    };
+
+    if (error || !data) return defaults;
+
+    const settings = { ...defaults };
+    data.forEach(row => {
+      if (row.key === 'battle_eggs_per_round') {
+        settings.eggsPerRound = parseInt(String(row.value), 10) || defaults.eggsPerRound;
+      }
+      if (row.key === 'battle_total_rounds') {
+        settings.totalRounds = parseInt(String(row.value), 10) || defaults.totalRounds;
+      }
+    });
+
+    settings.initialEggs = settings.eggsPerRound * settings.totalRounds;
+    return settings;
+  };
 
   const chickenAvatars = [
     "/avatars/avatar1.jpg",
@@ -61,6 +129,17 @@ const Index = () => {
     "/avatars/avatar29.webp",
     "/avatars/avatar30.webp",
   ];
+
+
+
+  // Dentro do componente da sua tela de entrada, adicione estes estados:
+  const [battleMode, setBattleMode] = useState<'classic' | 'battle'>('classic');
+  const [battleSettings, setBattleSettings] = useState<BattleSettings>({
+    eggsPerRound: 10,
+    totalRounds: 10,
+    initialEggs: 100
+  });
+  const [isLoadingBattleSettings, setIsLoadingBattleSettings] = useState(true);
 
   // NOVA LÓGICA: Detecta auto-join vindo do LobbyRedirectGuard
   useEffect(() => {
@@ -107,6 +186,27 @@ const Index = () => {
     }
   }, [user, roomCode]);
 
+  useEffect(() => {
+    const loadBattleConfig = async () => {
+      try {
+        setIsLoadingBattleSettings(true);
+        const [mode, settings] = await Promise.all([
+          getBattleMode(),
+          getBattleSettings()
+        ]);
+
+        setBattleMode(mode);
+        setBattleSettings(settings);
+      } catch (error) {
+        console.error('Erro ao carregar configurações de batalha:', error);
+      } finally {
+        setIsLoadingBattleSettings(false);
+      }
+    };
+
+    loadBattleConfig();
+  }, []);
+
   // LÓGICA ORIGINAL: Join room com código
   const handleJoinRoomWithCode = () => {
     if (!playerName.trim()) return;
@@ -121,6 +221,7 @@ const Index = () => {
       navigate(`/lobby/${roomCode}`);
     }
   };
+
 
   // NOVA FUNÇÃO: Auto-join para sessionStorage
   const handleAutoJoinRoom = async () => {
@@ -181,6 +282,8 @@ const Index = () => {
     );
   }
 
+
+
   // MODO AUTO-JOIN: Quando vem do LobbyRedirectGuard para usuários não logados
   if (showAutoJoinForm && pendingRoomCode && !user) {
     return (
@@ -202,6 +305,11 @@ const Index = () => {
                 Galinheiro: <strong className="font-mono">{pendingRoomCode}</strong>
               </p>
             </div>
+
+            {/* ADICIONE AQUI: */}
+            {!isLoadingBattleSettings && battleMode === 'battle' && (
+                <BattleModeInfo battleSettings={battleSettings} />
+            )}
 
             <BarnCard variant="golden" className="max-w-md mx-auto">
               <div className="text-center">
@@ -268,6 +376,7 @@ const Index = () => {
     );
   }
 
+
   // MODO REDIRECT: Lógica original para roomCode na URL
   if (isRedirectMode && !user) {
     return (
@@ -289,6 +398,11 @@ const Index = () => {
                 Você foi convidado para o galinheiro <strong>{roomCode}</strong>
               </p>
             </div>
+
+            {/* ADICIONE AQUI: */}
+            {!isLoadingBattleSettings && battleMode === 'battle' && (
+                <BattleModeInfo battleSettings={battleSettings} />
+            )}
 
             <BarnCard variant="golden" className="max-w-md mx-auto">
               <div className="text-center">
@@ -402,6 +516,15 @@ const Index = () => {
                 {/*Teste seus conhecimentos musicais em um quiz multiplayer cheio de diversão*/}
               {/*</p>*/}
             </div>
+
+            {/* ADICIONE AQUI: */}
+            {!isLoadingBattleSettings && battleMode === 'battle' && (
+                <div className="max-w-2xl mx-auto mb-8">
+                  <BattleModeInfo battleSettings={battleSettings} />
+                </div>
+            )}
+
+
 
             {/* NOVA: Banner de auto-join para usuários não logados */}
             {showAutoJoinForm && pendingRoomCode && !user && (
