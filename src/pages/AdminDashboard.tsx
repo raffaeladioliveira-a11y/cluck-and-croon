@@ -11,7 +11,7 @@ import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import {Badge} from "@/components/ui/badge";
 import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {Music, Users, Egg, Settings, Plus, Trash2, Edit, LogOut} from "lucide-react";
+import {Music, Users, Egg, Settings, Plus, Trash2, Edit, LogOut, VolumeX} from "lucide-react";
 import {toast} from "@/hooks/use-toast";
 import {supabase} from "@/integrations/supabase/client";
 import {ArrowLeft, FolderOpen} from "lucide-react";
@@ -19,6 +19,7 @@ import {Switch} from "@/components/ui/switch";
 import {Separator} from "@/components/ui/separator";
 import {Music2, Disc3} from "lucide-react";
 import { BulkUploadComponent } from "@/components/BulkUploadComponent";
+import { AudioPlayer } from '@/components/AudioPlayer';
 
 interface Song {
     id: string;
@@ -1714,10 +1715,34 @@ export default function AdminDashboard() {
                                                             <Badge variant="secondary" className="text-xs">
                                                                 {song.duration_seconds}s
                                                             </Badge>
+                                                            {song.audio_file_url && (
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    🎵 MP3
+                                                                </Badge>
+                                                            )}
                                                         </div>
                                                     </div>
 
-                                                    <div className="flex gap-2">
+
+
+                                                    {/* Player e controles em linha */}
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Player de áudio maior para busca - apenas MP3 */}
+                                                        {song.audio_file_url ? (
+                                                            <div className="min-w-48">
+                                                                <AudioPlayer
+                                                                    audioUrl={song.audio_file_url}
+                                                                    songTitle={song.title}
+                                                                    size="md"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="min-w-48 flex items-center justify-center">
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    Sem arquivo MP3
+                                                                </Badge>
+                                                            </div>
+                                                        )}
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
@@ -2038,22 +2063,40 @@ export default function AdminDashboard() {
                                                                         song.difficulty_level === 2 ? '🐔 Médio' : '🐓 Difícil'}
                                                                 </Badge>
                                                                 {song.audio_file_url && (
-                                                                    <Badge variant="secondary" className="text-xs">🎵 Áudio</Badge>
+                                                                    <Badge variant="secondary" className="text-xs">
+                                                                        🎵 MP3 Disponível
+                                                                    </Badge>
                                                                 )}
-                                                                {song.spotify_url && (
-                                                                    <Badge variant="secondary" className="text-xs">🎵 Spotify</Badge>
+                                                                {!song.audio_file_url && song.spotify_url && (
+                                                                    <Badge variant="outline" className="text-xs">
+                                                                        🎵 Apenas Spotify
+                                                                    </Badge>
                                                                 )}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <div className="flex gap-2">
+
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Player de áudio - apenas para arquivos MP3 */}
+                                                        {song.audio_file_url ? (
+                                                            <AudioPlayer
+                                                                audioUrl={song.audio_file_url}
+                                                                songTitle={song.title}
+                                                                size="sm"
+                                                            />
+                                                        ) : (
+                                                            <Button variant="outline" size="icon" disabled>
+                                                                <VolumeX className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
                                                             onClick={() => {
-                      setEditingSong(song);
-                      setIsEditSongModalOpen(true);
-                    }}
+                setEditingSong(song);
+                setIsEditSongModalOpen(true);
+              }}
                                                         >
                                                             <Edit className="w-4 h-4"/>
                                                         </Button>
@@ -2664,6 +2707,41 @@ export default function AdminDashboard() {
                                         </Select>
                                     </div>
                                 </div>
+
+                                {/* ADICIONE O CÓDIGO DO PLAYER AQUI - ANTES DOS BOTÕES */}
+                                {/* Prévia do Áudio - apenas para MP3 */}
+                                {editingSong?.audio_file_url && (
+                                <div className="border rounded-lg p-4 bg-muted/30">
+                                    <Label className="text-sm font-medium mb-3 block">Prévia do Arquivo MP3</Label>
+                                    <AudioPlayer
+                                        audioUrl={editingSong.audio_file_url}
+                                        songTitle={editingSong.title}
+                                        size="lg"
+                                        className="w-full"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                        Você pode reproduzir a música completa para verificar a qualidade
+                                    </p>
+                                </div>
+                                )}
+
+                                {/* Se não há arquivo MP3, mostrar aviso */}
+                                {editingSong && !editingSong.audio_file_url && (
+                                    <div className="border rounded-lg p-4 bg-yellow-50 border-yellow-200">
+                                        <div className="flex items-center gap-2">
+                                            <VolumeX className="w-5 h-5 text-yellow-600" />
+                                            <div>
+                                                <p className="text-sm font-medium text-yellow-800">
+                                                    Nenhum arquivo MP3 disponível
+                                                </p>
+                                                <p className="text-xs text-yellow-600">
+                                                    Faça upload de um arquivo .mp3 para habilitar a reprodução
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                {/* FIM DO CÓDIGO DO PLAYER */}
 
                                 {/*<div>*/}
                                 {/*<Label>URL do Spotify (opcional)</Label>*/}
