@@ -87,7 +87,6 @@ export function PlayerList({
     selectedMp3AlbumId: selectedMp3FromProp,
     roomStatus: roomStatusProp,
     showAlbumSelectorForHost = true,
-    selectedGenre,
 }: PlayerListProps) {
 
   console.log("PlayerList - roomCode recebido:", roomCode);
@@ -337,10 +336,7 @@ export function PlayerList({
           {/* SELETOR DE ÁLBUM PARA HOST - MP3 */}
           {shouldShowMp3AlbumSelector && (
               <div className="mt-6 sm:mt-8">
-                <HostMp3AlbumSelector
-                    roomCode={roomCode}
-                    genreId={selectedGenre} // ← ADICIONAR esta linha
-                />
+                <HostMp3AlbumSelector roomCode={roomCode} />
               </div>
           )}
         </div>

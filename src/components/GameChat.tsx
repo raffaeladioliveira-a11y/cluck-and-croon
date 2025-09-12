@@ -45,14 +45,12 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
     const { user } = useAuthSession();
     const { toast } = useToast();
 
-    // Scroll para a última mensagem
     const scrollToBottom = () => {
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
     };
 
-    // Carregar room_id e mensagens iniciais
     useEffect(() => {
         const loadChatData = async () => {
             try {
@@ -87,7 +85,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
         }
     }, [roomCode]);
 
-    // Configurar canal realtime para chat
     useEffect(() => {
         if (!sessionId || !roomId) return;
 
@@ -95,12 +92,10 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
             config: { broadcast: { ack: true } }
         });
 
-        // Listener para novas mensagens
         channel.on('broadcast', { event: 'NEW_MESSAGE' }, (msg) => {
             const { message } = msg.payload;
             setMessages(prev => [...prev, message]);
 
-            // Se não é a sua mensagem e o chat está fechado ou minimizado
             if (message.client_id !== clientId.current && (isMinimized || !isVisible)) {
                 setUnreadCount(prev => {
                     const newCount = prev + 1;
@@ -115,10 +110,7 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
             setTimeout(scrollToBottom, 100);
         });
 
-        channel.subscribe((status) => {
-            console.log('[realtime] chat channel status:', status);
-        });
-
+        channel.subscribe();
         chatChannelRef.current = channel;
 
         return () => {
@@ -230,10 +222,7 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
 
     return (
         <div className={`fixed bottom-4 right-4 w-80 max-w-[90vw] z-50 ${className} ${isBlinking ? 'animate-pulse' : ''}`}>
-            {/* Chat container com altura fixa e fundo transparente */}
             <div className="bg-black/20 backdrop-blur-md rounded-lg shadow-2xl border border-white/20 overflow-hidden" style={{ height: '400px' }}>
-
-                {/* Header com fundo transparente */}
                 <div className="bg-black/30 backdrop-blur-sm text-white p-3 flex items-center justify-between border-b border-white/10">
                     <div className="flex items-center gap-2">
                         <MessageCircle className="h-4 w-4" />
@@ -264,7 +253,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
 
                 {!isMinimized && (
                     <>
-                    {/* Messages area - altura fixa com scroll e fundo transparente */}
                     <div
                         ref={messagesContainerRef}
                         className="bg-black/10 backdrop-blur-sm p-3 overflow-y-auto"
@@ -321,7 +309,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
                         )}
                     </div>
 
-                    {/* Input area - altura fixa com fundo transparente */}
                     <div className="bg-black/20 backdrop-blur-sm border-t border-white/10 p-3" style={{ height: '72px' }}>
                         <div className="flex gap-2 mb-1">
                             <input
@@ -353,7 +340,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
     );
 }
 
-// Botão para toggle do chat
 interface ChatToggleButtonProps {
     onClick: () => void;
     unreadCount?: number;

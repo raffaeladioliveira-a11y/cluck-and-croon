@@ -54,6 +54,10 @@ export function RoomLobby() {
     // Estados do chat
     const [showChat, setShowChat] = useState(false);
     const [chatUnreadCount, setChatUnreadCount] = useState(0);
+    const [isSpectator, setIsSpectator] = useState(() => {
+        const modeParam = searchParams.get("mode");
+        return modeParam === "spectator";
+    });
 
 
 
@@ -72,6 +76,16 @@ export function RoomLobby() {
     const [loadingGameMode, setLoadingGameMode] = useState(true);
     const [selectedMp3AlbumId, setSelectedMp3AlbumId] = useState<string | null>(null);
     const [selectedSpotifyAlbumId, setSelectedSpotifyAlbumId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const modeParam = searchParams.get("mode");
+        const shouldBeSpectator = modeParam === "spectator";
+
+        if (shouldBeSpectator !== isSpectator) {
+            setIsSpectator(shouldBeSpectator);
+            console.log('🔄 Spectator mode updated:', shouldBeSpectator);
+        }
+    }, [searchParams, isSpectator]);
 
     // DEBUG:
     console.log('AUTH STATUS:', {
@@ -141,11 +155,13 @@ export function RoomLobby() {
             }
 
             // Sempre tentar fazer join na sala, independente do status
+            // 🔧 CORREÇÃO: Usar o estado atual de isSpectator
             const { error: joinError } = await supabase.rpc('join_room', {
                     p_room_code: roomCode.trim(),
                     p_display_name: userProfile.displayName || `Galinha ${Math.floor(Math.random() * 1000)}`,
                     p_avatar: user?.user_metadata?.avatar_url || userProfile.avatar || '🐔',
-                p_client_id: clientId
+                p_client_id: clientId,
+                p_is_spectator: isSpectator // ✅ Agora vai usar o valor correto
         });
 
             if (joinError && joinError.message !== 'ALREADY_IN_ROOM') {
@@ -510,8 +526,46 @@ export function RoomLobby() {
         }
     };
 
-    const handleLeaveRoom = () => {
-        navigate('/');
+    const handleLeaveRoom = async () => {
+        try {
+            // Buscar a sala atual
+            const { data: roomData, error: roomError } = await supabase
+                .from("game_rooms")
+                .select("id")
+                .or(`code.eq.${roomCode},room_code.eq.${roomCode}`)
+                .maybeSingle();
+
+            if (roomError) {
+                console.error("Erro ao buscar sala para sair:", roomError);
+            } else if (roomData) {
+                // Remover jogador da tabela room_participants
+                const { error: deleteError } = await supabase
+                    .from("room_participants")
+                    .delete()
+                    .eq("room_id", roomData.id)
+                    .eq("client_id", clientId);
+
+                if (deleteError) {
+                    console.error("Erro ao remover jogador da sala:", deleteError);
+                } else {
+                    console.log(`🐔 Jogador ${clientId} removido da sala ${roomCode}`);
+                }
+            }
+
+            // Limpar dados locais
+            localStorage.removeItem(`room_${roomCode}_session`);
+            localStorage.removeItem(`room_${roomCode}_player`);
+
+            toast({
+                title: "🐔 Saiu da Sala",
+                description: "Você saiu do galinheiro com sucesso",
+            });
+
+            navigate("/");
+        } catch (err) {
+            console.error("Erro no handleLeaveRoom:", err);
+            navigate("/");
+        }
     };
 
     if (isLoading || loadingGameMode) {

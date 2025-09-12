@@ -618,13 +618,17 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
 
     if (!room) throw new Error('Sala não encontrada');
 
+    // 🔥 IMPORTANTE: Apenas jogadores ativos recebem ovos de batalha
     await supabase
         .from('room_participants')
         .update({
           current_eggs: battleSettings.initialEggs,
           battle_eggs: battleSettings.initialEggs
         })
-        .eq('room_id', room.id);
+        .eq('room_id', room.id)
+        .eq('is_spectator', false); // ← Excluir espectadores
+
+    console.log('🥚 Ovos de batalha inicializados apenas para jogadores ativos');
   };
 
 // Função para redistribuir ovos
@@ -825,9 +829,11 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
     });
   }, []);
 
+  // 2. CORRIGIR broadcastAnswer para bloquear espectadores
   const broadcastAnswer = useCallback(async (answerIndex: number) => {
-
+    // 🔥 VERIFICAÇÃO RIGOROSA
     if (isSpectator) {
+      console.log('🚫 SPECTATOR: Bloqueando broadcastAnswer');
       return;
     }
 
@@ -836,11 +842,12 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
     const responseTime = currentSettings.time_per_question - timeLeft;
     const loggedPlayer = players?.find((p) => p.id === clientId.current);
 
-    console.log('🎯 [broadcastAnswer] Enviando resposta:', {
+    console.log('🎯 [broadcastAnswer] Enviando resposta (jogador ativo):', {
       answerIndex,
       responseTime,
       participantId: clientId.current,
-      battleMode
+      battleMode,
+      isSpectator // ← deve ser false
     });
 
     await gameChannelRef.current.send({
@@ -848,13 +855,13 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       event: 'ANSWER',
       payload: {
         answerIndex,
-        responseTime, // ADICIONE: Include responseTime
+        responseTime,
         participantId: clientId.current,
         name: profile.current.displayName || 'Jogador',
         avatar: loggedPlayer?.avatar,
     },
   });
-  }, [sessionId, players, currentSettings, timeLeft, battleMode, isSpectator]);
+  }, [sessionId, players, currentSettings, timeLeft, battleMode, isSpectator]); // ← Adicionar isSpectator
 
   /* --------------------------------- AÇÕES -------------------------------- */
 
@@ -908,19 +915,23 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
     startRoundTimer(currentSettings.time_per_question);
   }, [sessionId, isHost, gameState, startRoundTimer, currentSettings.time_per_question, broadcastRoundStart, toast]);
 
+  // 1. CORRIGIR handleAnswerSelect - a verificação deve ser MAIS rigorosa
   const handleAnswerSelect = useCallback((idx: number) => {
-
+    // 🔥 VERIFICAÇÃO RIGOROSA - parar TUDO se for espectador
     if (isSpectator) {
-      // Apenas atualizar o estado local para mostrar visualmente, mas não enviar para o servidor
-      setSelectedAnswer(idx);
-      return;
+      console.log('🚫 SPECTATOR: Bloqueando handleAnswerSelect completamente');
+      setSelectedAnswer(idx); // Apenas feedback visual
+      return; // PARAR AQUI - não executar mais nada
     }
+
+    // Verificações normais do jogo
     if (gameState !== 'playing' || selectedAnswer !== null) return;
 
-    console.log('🎯 [handleAnswerSelect] CHAMADO:', {
+    console.log('🎯 [handleAnswerSelect] CHAMADO (jogador ativo):', {
       idx,
       battleMode,
-      sessionId: !!sessionId
+      sessionId: !!sessionId,
+      isSpectator // ← deve ser false aqui
     });
 
     setSelectedAnswer(idx);
@@ -943,8 +954,6 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
         return updated;
       });
 
-      // NO MODO BATALHA: NÃO APLICAR PONTUAÇÃO LOCAL
-
     } else {
       console.log('🎯 [handleAnswerSelect] MODO CLÁSSICO - aplicando pontuação');
 
@@ -956,8 +965,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       }
     }
 
-    // Salvar estatísticas no Supabase (modo multiplayer)
-    if (sessionId) {
+    // 🔥 IMPORTANTE: Só salvar estatísticas se NÃO for espectador
+    if (sessionId && !isSpectator) { // ← Adicionar verificação !isSpectator
       (async () => {
         try {
           const { data: room } = await supabase
@@ -969,22 +978,23 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
           if (room?.id) {
             const { data: participant } = await supabase
                 .from('room_participants')
-                .select('current_eggs, correct_answers, total_answers, total_response_time')
+                .select('current_eggs, correct_answers, total_answers, total_response_time, is_spectator')
                 .eq('room_id', room.id)
                 .eq('client_id', clientId.current)
                 .maybeSingle();
 
-            if (participant) {
+            if (participant && !participant.is_spectator) { // ← Verificação dupla
               // IMPORTANTE: No modo batalha, NÃO aplicar pontuação aqui
               const eggGain = (battleMode === 'classic' && isCorrect)
                   ? currentSettings.eggs_per_correct + (timeLeft > (currentSettings.time_per_question * 0.8) ? currentSettings.speed_bonus : 0)
                   : 0; // Zero para modo batalha
 
-              console.log('🎯 [handleAnswerSelect] Salvando no banco:', {
+              console.log('🎯 [handleAnswerSelect] Salvando no banco (jogador ativo):', {
                 battleMode,
                 isCorrect,
                 eggGain,
-                currentEggs: participant.current_eggs
+                currentEggs: participant.current_eggs,
+                participantIsSpectator: participant.is_spectator
               });
 
               const newEggs = participant.current_eggs + eggGain;
@@ -999,11 +1009,14 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
                     correct_answers: newCorrectAnswers,
                     total_answers: newTotalAnswers,
                     total_response_time: newTotalResponseTime
+                    // 🔥 NÃO atualizar is_spectator aqui!
                   })
                   .eq('room_id', room.id)
                   .eq('client_id', clientId.current);
 
               console.log('🎯 [handleAnswerSelect] Dados salvos no banco');
+            } else {
+              console.log('🚫 [handleAnswerSelect] Participante é espectador, não salvando estatísticas');
             }
           }
         } catch (error) {
@@ -1012,27 +1025,28 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       })();
     }
 
-    // avatar local
-    setAnswersByOption(prev => {
-      const next = { ...prev };
-      const list = next[idx] ? [...next[idx]] : [];
-      if (!list.find(p => p.id === clientId.current)) {
-        const loggedPlayer = players?.find((p) => p.id === clientId.current);
-        if (loggedPlayer?.avatar?.startsWith("/")) {
-          list.push({
-            id: clientId.current,
-            name: loggedPlayer.name,
-            avatar: loggedPlayer.avatar
-          });
+    // avatar local - só adicionar se não for espectador
+    if (!isSpectator) {
+      setAnswersByOption(prev => {
+        const next = { ...prev };
+        const list = next[idx] ? [...next[idx]] : [];
+        if (!list.find(p => p.id === clientId.current)) {
+          const loggedPlayer = players?.find((p) => p.id === clientId.current);
+          if (loggedPlayer?.avatar?.startsWith("/")) {
+            list.push({
+              id: clientId.current,
+              name: loggedPlayer.name,
+              avatar: loggedPlayer.avatar
+            });
+          }
         }
-      }
-      next[idx] = list;
-      return next;
-    });
+        next[idx] = list;
+        return next;
+      });
 
-    broadcastAnswer(idx);
-  }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode, battleMode, players, clientId]);
-
+      broadcastAnswer(idx);
+    }
+  }, [gameState, selectedAnswer, currentSettings, timeLeft, currentQuestion, broadcastAnswer, sessionId, roomCode, battleMode, players, clientId, isSpectator]); // ← Adicionar isSpectator nas dependências
 
 
 
@@ -1047,7 +1061,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       if (room?.id) {
         const { data: participants, error } = await supabase
             .from('room_participants')
-            .select('client_id, display_name, avatar, current_eggs')
+            .select('client_id, display_name, avatar, current_eggs, is_spectator')
             .eq('room_id', room.id);
 
         if (!error && participants) {
@@ -1055,16 +1069,30 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
             id: p.client_id,
             name: p.display_name || 'Jogador',
             avatar: p.avatar,
-            eggs: p.current_eggs || 0
+            eggs: p.current_eggs || 0,
+            is_spectator: p.is_spectator || false // ← Preservar valor do banco
           }));
 
           setPlayers(playerList);
+
+          // 🔥 ATUALIZAR playerEggs local se for o jogador atual e NÃO for espectador
+          const currentPlayerData = playerList.find(p => p.id === clientId.current);
+          if (currentPlayerData && !currentPlayerData.is_spectator && !isSpectator) {
+            setPlayerEggs(currentPlayerData.eggs);
+          }
+
+          console.log('🔍 [loadPlayersFromRoom] Players carregados:', {
+            total: playerList.length,
+            spectators: playerList.filter(p => p.is_spectator).length,
+            currentPlayer: currentPlayerData,
+            localIsSpectator: isSpectator
+          });
         }
       }
     } catch (e) {
-      // console.error('[loadPlayersFromRoom] erro ao carregar jogadores:', e);
+      console.error('[loadPlayersFromRoom] erro ao carregar jogadores:', e);
     }
-  }, [roomCode]);
+  }, [roomCode, clientId, isSpectator]); // ← Adicionar isSpectator
 
 
 
@@ -1268,25 +1296,32 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
         return;
       }
 
-      // Processar TANTO em 'reveal' quanto em 'transition' para garantir execução
       if (gameState === 'reveal' || gameState === 'transition') {
         const processRoundEnd = async () => {
           try {
-            // Verificar se já tem respostas suficientes
-            const answerCount = Object.keys(roundAnswers).length;
+            // 🔥 FILTRAR respostas de espectadores
+            const activePlayerAnswers = Object.fromEntries(
+                Object.entries(roundAnswers).filter(([playerId]) => {
+                  const player = players?.find(p => p.id === playerId);
+                  return player && !player.is_spectator; // ← Excluir espectadores
+                })
+            );
+
+            const answerCount = Object.keys(activePlayerAnswers).length;
 
             if (answerCount === 0) {
-
+              console.log('🚫 Nenhuma resposta de jogador ativo encontrada');
               return;
             }
 
-            // MARCAR COMO PROCESSADO ANTES de executar
+            console.log('🎯 Processando respostas apenas de jogadores ativos:', {
+              total: Object.keys(roundAnswers).length,
+              activeOnly: answerCount
+            });
+
             setRedistributionProcessed(prev => ({ ...prev, [currentRound]: true }));
 
-            // CRIAR lista de espectadores para excluir
-            const spectatorIds: string[] = []; // Adicionar lógica para identificar espectadores se necessário
-
-            await redistributeEggs(roomCode, currentQuestion.correctAnswer, roundAnswers, battleSettings);
+            await redistributeEggs(roomCode, currentQuestion.correctAnswer, activePlayerAnswers, battleSettings);
 
             await loadPlayersFromRoom();
 
@@ -1299,7 +1334,6 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
             }
 
           } catch (error) {
-            // REMOVER flag em caso de erro para permitir retry
             setRedistributionProcessed(prev => ({ ...prev, [currentRound]: false }));
           }
         };
@@ -1307,8 +1341,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
         processRoundEnd();
       }
     }
-  }, [gameState, battleMode, isHost, currentQuestion, sessionId, roomCode, roundAnswers, battleSettings, currentRound, redistributionProcessed]);
-
+  }, [gameState, battleMode, isHost, currentQuestion, sessionId, roomCode, roundAnswers, battleSettings, currentRound, redistributionProcessed, players]); // ← Adicionar players
 
   // 4. ADICIONAR um useEffect SEPARADO (não mexer no principal)
 // Adicione este useEffect separado, não mexa no seu useEffect principal:
@@ -1373,7 +1406,13 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   // Adicionar nova função para atualizar ovos no final da rodada
   // 2. ADICIONAR nova função para atualizar scores no final da rodada
   const updateScoresAtRoundEnd = useCallback(async () => {
-    console.log('🎯 Atualizando scores no final da rodada...');
+    console.log('🎯 Atualizando scores no final da rodada...', { isSpectator });
+
+    // 🔥 NÃO atualizar scores se for espectador
+    if (isSpectator) {
+      console.log('🚫 SPECTATOR: Não atualizando scores');
+      return;
+    }
 
     if (sessionId) {
       // Multiplayer: recarregar do banco
@@ -1381,7 +1420,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
 
       // Atualizar score local baseado no banco
       const currentPlayerData = players?.find(p => p.id === clientId.current);
-      if (currentPlayerData) {
+      if (currentPlayerData && !currentPlayerData.is_spectator) {
         const bankEggs = (currentPlayerData as any).eggs || 0;
         console.log('🥚 Atualizando ovos locais:', playerEggs, '->', bankEggs);
         setPlayerEggs(bankEggs);
@@ -1394,8 +1433,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
         setPlayerEggs(e => e + base + bonus);
       }
     }
-  }, [sessionId, loadPlayersFromRoom, players, clientId, selectedAnswer, currentQuestion, currentSettings, timeLeft, playerEggs]);
-
+  }, [sessionId, loadPlayersFromRoom, players, clientId, selectedAnswer, currentQuestion, currentSettings, timeLeft, playerEggs, isSpectator]); // ← Adicionar isSpectator
 
 
 
@@ -1428,6 +1466,22 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       try {
         const nextRound = currentRound + 1;
         if (nextRound > 10) {
+
+          try {
+            // 🔥 Atualiza status da sala via função do banco
+            const { data, error } = await supabase.rpc("end_round_allow_album_selection", {
+              p_room_code: roomCode,
+              p_winner_profile_id: null // ou id do vencedor se tiver
+            });
+
+            if (error) {
+              console.error("❌ Erro ao chamar end_round_allow_album_selection:", error);
+            } else {
+              console.log("✅ Sala atualizada para round_lobby:", data);
+            }
+          } catch (err) {
+            console.error("❌ Exceção ao chamar função RPC:", err);
+          }
           // Ao final da 10ª pergunta, host dispara evento para todos redirecionarem
           // console.log('[host] Fim das 10 perguntas, enviando broadcast para redirecionar todos');
           await broadcastEndOfRound(roomCode, playerEggs, sessionId);

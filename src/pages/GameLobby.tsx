@@ -134,11 +134,16 @@ export default function GameLobby() {
             const avatarFromLogin = user?.user_metadata?.avatar_url;
             const finalAvatar = avatarFromLogin || userProfile.avatar;
 
+            // Verifica se a URL tem ?mode=spectator
+            const mode = searchParams.get("mode");
+            const isSpectator = mode === "spectator";
+
             const { data: participantId, error: joinError } = await supabase.rpc("join_room", {
                 p_room_code: roomCode.trim(),
                 p_display_name: userProfile.displayName,
                 p_avatar: finalAvatar,
                 p_client_id: clientId,
+                p_is_spectator: isSpectator
             });
 
             if (joinError) {

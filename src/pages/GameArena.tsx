@@ -13,6 +13,7 @@ import {useAuthSession} from "@/hooks/useAuthSession";
 import {getOrCreateClientId} from "@/utils/clientId";
 import {GameChat, ChatToggleButton} from "@/components/GameChat";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 /** Util: extrai o trackId a partir de uma URL de embed do Spotify */
 function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
@@ -31,10 +32,13 @@ function GameArenaContent() {
     const clientId = useRef(getOrCreateClientId());
 
     // NOVO: Estado para espectador
-    const [isSpectator, setIsSpectator] = useState(false);
-    const [spectatorCheckComplete, setSpectatorCheckComplete] = useState(false); // ADICIONAR esta linha
+    const [isSpectator, setIsSpectator] = useState(() => {
+        const modeParam = searchParams.get("mode");
+        return modeParam === "spectator";
+    });
+    const [spectatorCheckComplete, setSpectatorCheckComplete] = useState(false);
 
-    const { toast } = useToast(); // Adicionar se não existir
+    const { toast } = useToast();
 
     const [countdown, setCountdown] = useState<number | null>(null);
     const [showCountdown, setShowCountdown] = useState(false);
@@ -45,41 +49,185 @@ function GameArenaContent() {
     const [showChat, setShowChat] = useState(false);
     const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
-    // No GameArena.tsx, adicionar este useEffect:
-    useEffect(() => {
-        const checkIfSpectator = async () => {
-            const mode = searchParams.get("mode");
+    const updatePlayerStatus = async (roomId: string, isSpectatorMode: boolean) => {
+        console.log('🔧 DEBUG COMPLETO - updatePlayerStatus');
+        console.log('roomId:', roomId);
+        console.log('clientId:', clientId.current);
+        console.log('isSpectatorMode:', isSpectatorMode);
 
-            if (mode === "spectator") {
-                setIsSpectator(true);
-                return;
+        try {
+            // PRIMEIRO: Verificar se o registro existe
+            const { data: existingData, error: selectError } = await supabase
+                .from("room_participants")
+                .select('*')
+                .eq("room_id", roomId)
+                .eq("client_id", clientId.current);
+
+            console.log('🔍 Registro existente:', existingData);
+            console.log('🔍 Erro na busca:', selectError);
+
+            if (selectError) {
+                console.error('❌ Erro ao buscar registro:', selectError);
+                return false;
             }
 
-            // Se jogo em progresso e não veio pelo fluxo normal, é espectador
-            if (sid && roomCode) {
-                const { data: room } = await supabase
-                    .from('game_rooms')
-                    .select('status, current_round')
-                    .eq('room_code', roomCode)
-                    .single();
+            if (!existingData || existingData.length === 0) {
+                console.error('❌ PROBLEMA: Nenhum registro encontrado com esses filtros');
+                console.error('Verifique se room_id e client_id estão corretos');
+                return false;
+            }
 
-                if (room && room.status === 'in_progress' && room.current_round > 1) {
-                    setIsSpectator(true);
-                    toast({
-                        title: "Modo Espectador",
-                        description: "Jogo em andamento. Você participará da próxima rodada!",
-                        variant: "default",
-                    });
+            console.log('📊 Valor atual de is_spectator:', existingData[0].is_spectator);
+
+            // SEGUNDO: Tentar atualizar
+            const { data: updateData, error: updateError } = await supabase
+                .from("room_participants")
+                .update({ is_spectator: isSpectatorMode })
+                .eq("room_id", roomId)
+                .eq("client_id", clientId.current)
+                .select();
+
+            console.log('📊 Dados após update:', updateData);
+            console.log('📊 Erro no update:', updateError);
+
+            if (updateError) {
+                console.error('❌ Erro ao atualizar:', updateError);
+                return false;
+            }
+
+            if (!updateData || updateData.length === 0) {
+                console.error('❌ Update não afetou nenhuma linha');
+                return false;
+            }
+
+            console.log(`✅ Sucesso! is_spectator atualizado de ${existingData[0].is_spectator} para ${updateData[0].is_spectator}`);
+
+            // TERCEIRO: Atualizar game_sessions se necessário
+            if (sid) {
+                const { error: sessionError } = await supabase
+                    .from("game_sessions")
+                    .update({
+                        status: isSpectatorMode ? "spectator" : "active"
+                    })
+                    .eq("room_code", roomCode)
+                    .eq("session_id", sid);
+
+                if (sessionError) {
+                    console.error('❌ Erro ao atualizar game_sessions:', sessionError);
+                } else {
+                    console.log('✅ game_sessions também atualizado');
                 }
             }
-            setSpectatorCheckComplete(true);
+
+            return true;
+
+        } catch (error) {
+            console.error('❌ Erro geral em updatePlayerStatus:', error);
+            return false;
+        }
+    };
+
+    useEffect(() => {
+        const checkIfSpectator = async () => {
+            try {
+                const mode = searchParams.get("mode");
+
+                if (mode === "spectator") {
+                    setIsSpectator(true);
+                    setSpectatorCheckComplete(true);
+
+                    if (sid && roomCode) {
+                        const { data: room } = await supabase
+                            .from("game_rooms")
+                            .select("id")
+                            .eq("room_code", roomCode)
+                            .single();
+
+                        if (room) {
+                            await updatePlayerStatus(room.id, true);
+                        }
+                    }
+                    return;
+                }
+
+                if (!sid || !roomCode) {
+                    setIsSpectator(false);
+                    setSpectatorCheckComplete(true);
+                    return;
+                }
+
+                const { data: room, error: roomError } = await supabase
+                    .from("game_rooms")
+                    .select("id, status, current_round, host_id, game_session_id")
+                    .eq("room_code", roomCode)
+                    .single();
+
+                if (roomError || !room) {
+                    setIsSpectator(false);
+                    setSpectatorCheckComplete(true);
+                    navigate("/");
+                    return;
+                }
+
+                if (room.status === "lobby" || room.status === "waiting") {
+                    setIsSpectator(false);
+                    await updatePlayerStatus(room.id, false);
+
+                } else if (room.status === "round_lobby") {
+                    setIsSpectator(false);
+                    await updatePlayerStatus(room.id, false);
+                    navigate(`/round-lobby/${roomCode}?sid=${room.game_session_id || "current"}`);
+
+                } else if (room.status === "in_progress") {
+                    const { data: participant } = await supabase
+                        .from("room_participants")
+                        .select("id, client_id, is_host")
+                        .eq("room_id", room.id)
+                        .eq("client_id", clientId.current)
+                        .maybeSingle();
+
+                    const isHost = room.host_id === clientId.current;
+                    const wasAlreadyInRoom = !!participant;
+
+                    if (isHost || wasAlreadyInRoom) {
+                        setIsSpectator(false);
+                        await updatePlayerStatus(room.id, false);
+
+                    } else {
+                        setIsSpectator(true);
+                        await updatePlayerStatus(room.id, true);
+
+                        if (!participant) {
+                            await supabase.rpc('join_room', {
+                                p_room_code: roomCode,
+                                p_display_name: user?.user_metadata?.display_name || "Espectador",
+                                p_avatar: user?.user_metadata?.avatar_url || "👀",
+                                p_client_id: clientId.current,
+                                p_is_spectator: true
+                        });
+                        }
+
+                        toast({
+                            title: "Modo Espectador",
+                            description: "Jogo em andamento. Você participará da próxima partida!",
+                            variant: "default",
+                        });
+                    }
+                } else {
+                    setIsSpectator(false);
+                    await updatePlayerStatus(room.id, false);
+                }
+
+            } catch (error) {
+                setIsSpectator(false);
+            } finally {
+                setSpectatorCheckComplete(true);
+            }
         };
 
         checkIfSpectator();
-    }, [searchParams, sid, roomCode]);
+    }, [searchParams, sid, roomCode, navigate, user, toast, updatePlayerStatus]);
 
-
-    // navegação pós-set
     useEffect(() => {
         const handleNavigateToLobby = (event: CustomEvent) => {
             const {roomCode: navRoomCode, setComplete, eggs} = event.detail;
@@ -119,32 +267,20 @@ function GameArenaContent() {
         isHost,
         activeGenre,
         selectedAlbumInfo,
-        battleMode, // ADICIONE ESTA LINHA
-        battleSettings, // ADICIONE ESTA LINHA
-    } = useGameLogic(roomCode || "", sid, isSpectator); // ADICIONAR o parâmetro isSpectator
+        battleMode,
+        battleSettings,
+    } = useGameLogic(roomCode || "", sid, isSpectator);
 
-    // Função para iniciar o countdown
-    // Função para iniciar o countdown
     const startCountdown = () => {
-        console.log("🔍 startCountdown chamado:", {
-            countdownStarted: countdownStartedRef.current,
-            showCountdown,
-            countdown
-        });
-
         if (countdownStartedRef.current) {
-            console.log("⛔ Countdown já iniciado, ignorando chamada");
             return;
         }
 
-        console.log("✅ Iniciando countdown pela primeira vez");
         countdownStartedRef.current = true;
         setShowCountdown(true);
         setCountdown(5);
     };
 
-
-    // Effect para gerenciar o countdown
     useEffect(() => {
         if (countdown === null) return;
 
@@ -154,18 +290,13 @@ function GameArenaContent() {
             }, 1000);
             return () => clearTimeout(timer);
         } else {
-            // Countdown chegou a 0, iniciar o jogo
-            console.log("🎯 Countdown terminou, iniciando jogo");
             setShowCountdown(false);
             setCountdown(null);
-            // countdownStartedRef.current = false; // Reset para permitir novo countdown se necessário
 
-            // ADICIONAR: Ativar autoplay para todo o jogo
             if (typeof window !== 'undefined' && window.navigator) {
-                // Tentar reproduzir um áudio silencioso para "unlock" autoplay
                 const silentAudio = new Audio();
                 silentAudio.src = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IAAAAAEAAQAAQBoAAEAaAAABAAgAZGF0YQAAAAA=";
-                silentAudio.play().catch(() => console.log('Silent audio failed'));
+                silentAudio.play().catch(() => {});
             }
 
             startFirstRound();
@@ -173,56 +304,24 @@ function GameArenaContent() {
     }, [countdown, startFirstRound]);
 
     useEffect(() => {
-        // Reset o flag quando voltar ao estado idle SEM sid
         if (gameState === "idle" && !sid && countdownStartedRef.current) {
-            console.log("🔄 Resetando countdown flag - voltou ao idle sem sid");
             countdownStartedRef.current = false;
         }
     }, [gameState, sid]);
 
-
-    // NOVA LÓGICA: Auto-iniciar countdown se já tem sessionId
     useEffect(() => {
-        console.log("🔍 Auto-start useEffect:", {
-            sid: !!sid,
-            isLoading,
-            gameState,
-            gameStarted,
-            showCountdown,
-            countdown,
-            countdownStarted: countdownStartedRef.current
-        });
         if (sid && !isLoading && gameState === "idle" && !gameStarted && !showCountdown && countdown === null && !countdownStartedRef.current) {
-            console.log("🚀 Auto-starting countdown because session ID is present:", sid);
             startCountdown();
         }
     }, [sid, isLoading, gameState, gameStarted, showCountdown, countdown]);
 
-    console.log("=== DEBUG COMPLETO ===");
-    console.log("1. clientId.current:", clientId.current);
-    console.log("2. players array completo:", players);
-    console.log("3. jogador encontrado:", players ?.find((p) => p.id === clientId.current)
-)
-    ;
-    console.log("4. user do supabase:", user);
-    console.log("5. user.user_metadata:", user ?.user_metadata
-)
-    ;
-    console.log("6. answersByOption:", answersByOption);
-    console.log("7. countdown:", countdown);
-    console.log("8. showCountdown:", showCountdown);
-
-    const debugPlayer = players ?.find((p) => p.id === clientId.current);
-
-    // ---------- helpers ----------
     const currentPlayer = (() => {
         const loggedPlayer = players ?.find((p) => p.id === clientId.current);
         return {
             id: "current",
             name: loggedPlayer ?.name || user ?.user_metadata ?.display_name || "Você",
             avatar:loggedPlayer ?.avatar || "🐔", eggs:playerEggs, selectedAnswer:selectedAnswer,
-    }
-        ;
+    };
     })();
 
     const playersOnOption = (optionIndex: number) => {
@@ -232,9 +331,7 @@ function GameArenaContent() {
             const loggedPlayer = players ?.find((p) => p.id === clientId.current);
             const isAlreadyInList = playersOnThisOption.some(p => p.id === clientId.current);
 
-            if (!isAlreadyInList && loggedPlayer ?.avatar ?.startsWith("/")
-        )
-            {
+            if (!isAlreadyInList && loggedPlayer ?.avatar ?.startsWith("/")) {
                 return [...playersOnThisOption, {
                     id: clientId.current,
                     name: loggedPlayer.name,
@@ -255,37 +352,26 @@ function GameArenaContent() {
         return "bg-muted text-muted-foreground";
     };
 
-
     const loadGameMode = async() => {
         try {
-            const {data, error} = await supabase
+            const {data} = await supabase
                 .from("game_settings")
                 .select("value")
                 .eq("key", "game_mode")
                 .maybeSingle();
 
-            console.log('🎮 Game mode from DB:', data);
-
-            if (!error && data ?.
-            value
-        )
-            {
+            if (data ?.value) {
                 const mode = typeof data.value === 'string' ? data.value.replace(/"/g, '') : 'mp3';
                 const finalMode = mode === 'spotify' ? 'spotify' : 'mp3';
-                console.log('🎮 Setting game mode to:', finalMode);
                 setSystemGameMode(finalMode);
             }
-        } catch (error) {
-            console.error("Error loading game mode:", error);
-        }
+        } catch (error) {}
     };
 
-    // Chamar no useEffect
     useEffect(() => {
         loadGameMode();
     }, []);
 
-    // ---------- DECISÃO: Spotify vs MP3 para a música atual ----------
     const song = currentQuestion?.song ?? {};
 
     const rawSpotifyTrackId: string | undefined =
@@ -302,18 +388,52 @@ function GameArenaContent() {
     const preferSpotify = !!rawSpotifyTrackId || !!spotifyEmbedUrl;
     const finalGameMode: "mp3" | "spotify" = preferSpotify ? "spotify" : "mp3";
 
-    // ---------- LOADING ----------
-    if (isLoading) {
+    if (isLoading || !spectatorCheckComplete) {
         return (
             <div className="min-h-screen bg-gradient-sky flex items-center justify-center p-4">
                 <BarnCard variant="golden" className="text-center p-6 sm:p-8 w-full max-w-md">
                     <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🐔</div>
                     <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-4 text-white"/>
-                    <p className="text-white text-sm sm:text-lg">{sid ? "Entrando no jogo..." : "Preparando o galinheiro musical..."}</p>
+                    <p className="text-white text-sm sm:text-lg">
+                        {!spectatorCheckComplete
+                            ? "Verificando modo de participação..."
+                            : sid ? "Entrando no jogo..." : "Preparando o galinheiro musical..."
+                        }
+                    </p>
                 </BarnCard>
             </div>
         );
     }
+
+    const handleLeaveRoom = async () => {
+        try {
+            const { data: roomData } = await supabase
+                .from("game_rooms")
+                .select("id")
+                .or(`code.eq.${roomCode},room_code.eq.${roomCode}`)
+                .maybeSingle();
+
+            if (roomData) {
+                await supabase
+                    .from("room_participants")
+                    .delete()
+                    .eq("room_id", roomData.id)
+                    .eq("client_id", clientId.current);
+            }
+
+            localStorage.removeItem(`room_${roomCode}_session`);
+            localStorage.removeItem(`room_${roomCode}_player`);
+
+            toast({
+                title: "🐔 Saiu da Sala",
+                description: "Você saiu do galinheiro com sucesso",
+            });
+
+            navigate("/");
+        } catch (err) {
+            navigate("/");
+        }
+    };
 
     // ---------- COUNTDOWN SCREEN ----------
     if (showCountdown && countdown !== null) {
@@ -345,15 +465,16 @@ function GameArenaContent() {
         );
     }
 
+
     // ---------- RENDER ----------
     return (
         <div className="min-h-screen bg-gradient-sky p-2 sm:p-4">
-
-            {/* NOVO: Banner de espectador */}
+            {/* Banner de espectador */}
             {isSpectator && (
-                <div className="bg-blue-500/20 p-3 rounded-lg mb-4 border border-blue-500/30">
-                    <p className="text-center text-blue-200">
-                        👀 Assistindo como espectador - Você jogará na próxima rodada!
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-[9999] bg-blue-500/90 backdrop-blur-sm p-3 rounded-lg border border-blue-400/50 shadow-lg">
+                    <p className="text-center text-white font-semibold flex items-center gap-2">
+                        <span className="text-xl">👀</span>
+                        <span>Modo Espectador - Após o fim desta partida que em andamento, você poderá jogar na próxima partida. Aguarde!</span>
                     </p>
                 </div>
             )}
@@ -408,7 +529,8 @@ function GameArenaContent() {
 
                             {/* Botão sair sempre na direita */}
                             <div className="flex-shrink-0 ml-4">
-                                <GameNavigation showLeaveRoom={true} />
+                                <GameNavigation showLeaveRoom={true}
+                                                customLeaveAction={handleLeaveRoom} />
                             </div>
                         </div>
                     </div>
@@ -488,10 +610,17 @@ function GameArenaContent() {
                                                 </div>
 
                                                 {/* Contador de Ovos */}
-                                                <div className="flex items-center gap-1 text-xs font-bold text-white">
-                                                    <span>{(player as any).eggs || 0}</span>
-                                                    <span>🥚</span>
-                                                </div>
+                                                {/* Contador de Ovos OU Espectador */}
+                                                {player.is_spectator ? (
+                                                    <div className="text-xs font-bold text-yellow-300 text-center">
+                                                        👀 Espectador<br />Próxima partida
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1 text-xs font-bold text-white">
+                                                        <span>{(player as any).eggs || 0}</span>
+                                                        <span>🥚</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })
@@ -637,18 +766,17 @@ function GameArenaContent() {
                                         variant="default"
                                         className={`cursor-pointer transition-all duration-300 p-2 sm:p-3 relative ${getAnswerColor(index)}`}
                                         onClick={() => {
-            // VERIFICAÇÃO SIMPLES: só executar se NÃO for espectador
-            if (!isSpectator) {
-                handleAnswerSelect(index);
-            } else {
-                // Mostrar aviso apenas para espectador
-                toast({
-                    title: "Modo Espectador",
-                    description: "Você poderá responder na próxima rodada!",
-                    variant: "default",
-                });
-            }
-        }}
+    if (!isSpectator) {
+        handleAnswerSelect(index);
+    } else {
+        console.log('🚫 Spectator tried to answer');
+        toast({
+            title: "Modo Espectador",
+            description: "Você poderá responder na próxima partida!",
+            variant: "default",
+        });
+    }
+}}
                                     >
                                         {/* Avatares posicionados na borda superior direita */}
                                         {playersOnOption(index).length > 0 && (
@@ -724,7 +852,11 @@ function GameArenaContent() {
                                     )}
 
                                     <p className="font-semibold text-sm sm:text-lg mb-2">{currentPlayer.name}</p>
-                                    <EggCounter count={playerEggs} size="lg" variant="golden"/>
+                                    {currentPlayer.is_spectator ? (
+                                        <p className="text-sm text-yellow-300">👀 Você é espectador nesta rodada</p>
+                                    ) : (
+                                        <EggCounter count={playerEggs} size="lg" variant="golden"/>
+                                    )}
 
                                     {selectedAnswer !== null && (
                                         <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-muted/50 rounded-lg w-full">
