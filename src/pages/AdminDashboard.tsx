@@ -20,6 +20,12 @@ import {Separator} from "@/components/ui/separator";
 import {Music2, Disc3} from "lucide-react";
 import { BulkUploadComponent } from "@/components/BulkUploadComponent";
 import { AudioPlayer } from '@/components/AudioPlayer';
+// Adicione estas importações no topo do seu AdminDashboard
+import { SongAlbumManager, MoveSongDialog } from '@/components/SongAlbumManager';
+import { ArrowRight, Link } from 'lucide-react';
+// Adicione estas linhas nos imports
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreHorizontal } from 'lucide-react';
 
 interface Song {
     id: string;
@@ -102,6 +108,69 @@ export default function AdminDashboard() {
     const [isLoadingSettings, setIsLoadingSettings] = useState(false);
     const [showBulkUpload, setShowBulkUpload] = useState(false);
 
+    // Estados para genrenciar músicas para mais de um álbum
+    const [isSongAlbumManagerOpen, setIsSongAlbumManagerOpen] = useState(false);
+    const [isMoveSongDialogOpen, setIsMoveSongDialogOpen] = useState(false);
+    const [selectedSongForManager, setSelectedSongForManager] = useState<Song | null>(null);
+    const [currentAlbumIdForMove, setCurrentAlbumIdForMove] = useState<string>('');
+
+    // Função para abrir o gerenciador de álbuns de uma música
+    const openSongAlbumManager = (song: Song) => {
+        setSelectedSongForManager(song);
+        setIsSongAlbumManagerOpen(true);
+    };
+
+    // Função para abrir o diálogo de mover música
+    const openMoveSongDialog = (song: Song, currentAlbumId: string) => {
+        setSelectedSongForManager(song);
+        setCurrentAlbumIdForMove(currentAlbumId);
+        setIsMoveSongDialogOpen(true);
+    };
+
+    // Função atualizada para carregar músicas dos álbuns com relacionamentos N:N
+    const loadAlbumSongsWithRelationships = async (albumId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('album_songs')
+                .select(`
+        track_order,
+        songs (
+          *,
+          album_songs (
+            album_id,
+            albums (name)
+          )
+        )
+      `)
+                .eq('album_id', albumId)
+                .order('track_order', { ascending: true });
+
+            if (error) throw error;
+
+            // Transformar dados para o formato esperado
+            const songsWithAlbumInfo = (data || []).map(item => ({
+                ...item.songs,
+                track_order: item.track_order,
+                // Adicionar informação sobre todos os álbuns desta música
+                all_albums: item.songs.album_songs?.map((as: any) => ({
+                id: as.album_id,
+                name: as.albums.name
+            })) || []
+        }));
+
+            setAlbumSongs(songsWithAlbumInfo);
+        } catch (error) {
+            toast({
+                title: "Erro",
+                description: "Não foi possível carregar as músicas do álbum",
+                variant: "destructive",
+            });
+        }
+    };
+
+
+
+
     const [battleMode, setBattleMode] = useState<'classic' | 'battle'>('classic');
     const [battleSettings, setBattleSettings] = useState({
         eggsPerRound: 10,
@@ -136,8 +205,9 @@ export default function AdminDashboard() {
     const [filteredSongs, setFilteredSongs] = useState<Song[]>([]);
     const [allSongs, setAllSongs] = useState<Song[]>([]);
 
-    const searchSongs = useCallback(async() => {
-        // Se não há filtros, limpa os resultados
+
+    // Função para buscar músicas com informações de múltiplos álbuns
+    const searchSongsWithAlbums = useCallback(async () => {
         if (!filters.artist && !filters.song && !filters.year) {
             setSearchResults([]);
             return;
@@ -149,38 +219,47 @@ export default function AdminDashboard() {
                 .from('songs')
                 .select(`
         *,
-        albums (
-          name,
-          artist_name,
-          release_year,
-          cover_image_url
+        album_songs (
+          album_id,
+          albums (
+            name,
+            artist_name,
+            release_year,
+            cover_image_url
+          )
         )
       `);
 
-            // Filtro por artista da música
             if (filters.artist) {
                 query = query.ilike('artist', `%${filters.artist}%`);
             }
 
-            // Filtro por nome da música
             if (filters.song) {
                 query = query.ilike('title', `%${filters.song}%`);
             }
 
-            const {data, error} = await query.order('created_at', {ascending: false});
+            const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
 
             let filtered = data || [];
 
-            // Filtro por ano (do álbum) - feito após a query
+            // Filtro por ano (considerando álbuns)
             if (filters.year) {
                 filtered = filtered.filter(song =>
-                    song.albums ?.release_year ?.toString().includes(filters.year)
+                    song.album_songs?.some((as: any) =>
+                    as.albums?.release_year?.toString().includes(filters.year)
             )
+            );
             }
 
-            setSearchResults(filtered as Song[]);
+            // Transformar dados para incluir informação dos álbuns
+            const songsWithAlbumInfo = filtered.map(song => ({
+                ...song,
+                albums_info: song.album_songs?.map((as: any) => as.albums) || []
+        }));
+
+            setSearchResults(songsWithAlbumInfo);
         } catch (error) {
             toast({
                 title: "Erro",
@@ -191,6 +270,62 @@ export default function AdminDashboard() {
             setIsSearching(false);
         }
     }, [filters]);
+
+    // const searchSongs = useCallback(async() => {
+    //     // Se não há filtros, limpa os resultados
+    //     if (!filters.artist && !filters.song && !filters.year) {
+    //         setSearchResults([]);
+    //         return;
+    //     }
+    //
+    //     setIsSearching(true);
+    //     try {
+    //         let query = supabase
+    //             .from('songs')
+    //             .select(`
+    //     *,
+    //     albums (
+    //       name,
+    //       artist_name,
+    //       release_year,
+    //       cover_image_url
+    //     )
+    //   `);
+    //
+    //         // Filtro por artista da música
+    //         if (filters.artist) {
+    //             query = query.ilike('artist', `%${filters.artist}%`);
+    //         }
+    //
+    //         // Filtro por nome da música
+    //         if (filters.song) {
+    //             query = query.ilike('title', `%${filters.song}%`);
+    //         }
+    //
+    //         const {data, error} = await query.order('created_at', {ascending: false});
+    //
+    //         if (error) throw error;
+    //
+    //         let filtered = data || [];
+    //
+    //         // Filtro por ano (do álbum) - feito após a query
+    //         if (filters.year) {
+    //             filtered = filtered.filter(song =>
+    //                 song.albums ?.release_year ?.toString().includes(filters.year)
+    //         )
+    //         }
+    //
+    //         setSearchResults(filtered as Song[]);
+    //     } catch (error) {
+    //         toast({
+    //             title: "Erro",
+    //             description: "Erro ao buscar músicas",
+    //             variant: "destructive",
+    //         });
+    //     } finally {
+    //         setIsSearching(false);
+    //     }
+    // }, [filters]);
 
 
     // 1. PRIMEIRO: Adicione esta função no seu componente AdminDashboard, junto com as outras funções:
@@ -240,10 +375,10 @@ export default function AdminDashboard() {
 
             // Recarregar dados
             if (selectedAlbum) {
-                await loadAlbumSongs(selectedAlbum.id);
+                await loadAlbumSongsWithRelationships(selectedAlbum.id);
             }
             await loadTotalSongsCount();
-            await loadAlbums();
+            await loadAlbumSongsWithRelationships();
 
         } catch (error) {
             console.error('Erro ao atualizar música:', error);
@@ -331,11 +466,11 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
-            searchSongs();
+            searchSongsWithAlbums();
         }, 500); // Debounce de 500ms
 
         return () => clearTimeout(timeoutId);
-    }, [searchSongs]);
+    }, [searchSongsWithAlbums]);
 
 // Estado para álbuns filtrados
     const [filteredAlbums, setFilteredAlbums] = useState<Album[]>([]);
@@ -607,30 +742,30 @@ export default function AdminDashboard() {
         }
     };
 
-    const loadAlbumSongs = async(albumId: string) => {
-        try {
-            const {data, error} = await supabase
-                .from('songs')
-                .select('*')
-                .eq('album_id', albumId)
-                .order('created_at', {ascending: false});
-
-            if (error) throw error;
-            setAlbumSongs(data || []);
-        } catch (error) {
-            toast({
-                title: "Erro",
-                description: "Não foi possível carregar as músicas do álbum",
-                variant: "destructive",
-            });
-        }
-    };
+    // const loadAlbumSongs = async(albumId: string) => {
+    //     try {
+    //         const {data, error} = await supabase
+    //             .from('songs')
+    //             .select('*')
+    //             .eq('album_id', albumId)
+    //             .order('created_at', {ascending: false});
+    //
+    //         if (error) throw error;
+    //         setAlbumSongs(data || []);
+    //     } catch (error) {
+    //         toast({
+    //             title: "Erro",
+    //             description: "Não foi possível carregar as músicas do álbum",
+    //             variant: "destructive",
+    //         });
+    //     }
+    // };
 
     // Funções de navegação
     const openAlbum = async(album: Album) => {
         setSelectedAlbum(album);
         setCurrentView('album-detail');
-        await loadAlbumSongs(album.id);
+        await loadAlbumSongsWithRelationships(album.id);
     };
 
     const backToAlbums = () => {
@@ -1107,7 +1242,8 @@ export default function AdminDashboard() {
         });
     };
 
-    const handleAddSong = async() => {
+    // Atualize a função handleAddSong para usar a nova estrutura
+    const handleAddSongWithRelationship = async () => {
         if (!newSong.title || !newSong.artist || !selectedAlbum) {
             toast({
                 title: "Campos obrigatórios",
@@ -1124,11 +1260,11 @@ export default function AdminDashboard() {
                 if (!audioFileUrl) return;
             }
 
+            // Primeiro, criar a música
             const songData = {
                 title: newSong.title,
                 artist: newSong.artist,
-                album_id: selectedAlbum.id, // <- ASSOCIA AO ÁLBUM AUTOMATICAMENTE
-                genre_id: selectedAlbum.genre_id, // <- HERDA O GÊNERO DO ÁLBUM
+                genre_id: selectedAlbum.genre_id,
                 duration_seconds: parseInt(newSong.duration_seconds) || 10,
                 spotify_url: newSong.spotify_url || null,
                 youtube_url: newSong.youtube_url || null,
@@ -1137,11 +1273,24 @@ export default function AdminDashboard() {
                 is_active: true
             };
 
-            const {error} = await supabase
+            const { data: insertedSong, error: songError } = await supabase
                 .from('songs')
-                .insert([songData]);
+                .insert([songData])
+                .select()
+                .single();
 
-            if (error) throw error;
+            if (songError) throw songError;
+
+            // Depois, criar o relacionamento com o álbum
+            const { error: relationshipError } = await supabase
+                .from('album_songs')
+                .insert([{
+                    album_id: selectedAlbum.id,
+                    song_id: insertedSong.id,
+                    track_order: albumSongs.length + 1
+                }]);
+
+            if (relationshipError) throw relationshipError;
 
             toast({
                 title: "Música adicionada!",
@@ -1164,8 +1313,8 @@ export default function AdminDashboard() {
             });
 
             setAudioFile(null);
-            await loadAlbumSongs(selectedAlbum.id); // <- RECARREGA AS MÚSICAS DO ÁLBUM
-            await loadTotalSongsCount(); // Adicione esta linha
+            await loadAlbumSongsWithRelationships(selectedAlbum.id);
+            await loadTotalSongsCount();
             await loadAlbums();
         } catch (error) {
             toast({
@@ -1240,7 +1389,7 @@ export default function AdminDashboard() {
 
             toast({title: "Música removida"});
             if (selectedAlbum) {
-                await loadAlbumSongs(selectedAlbum.id); // <- RECARREGA MÚSICAS DO ÁLBUM ATUAL
+                await loadAlbumSongsWithRelationships(selectedAlbum.id); // <- RECARREGA MÚSICAS DO ÁLBUM ATUAL
             }
             await loadTotalSongsCount();
             await loadAlbums();
@@ -1999,7 +2148,7 @@ export default function AdminDashboard() {
                                         <BulkUploadComponent
                                             selectedAlbum={selectedAlbum}
                                             onComplete={() => {
-        loadAlbumSongs(selectedAlbum.id);
+        loadAlbumSongsWithRelationships(selectedAlbum.id);
         loadTotalSongsCount();
         loadAlbums();
         setShowBulkUpload(false);
@@ -2078,7 +2227,7 @@ export default function AdminDashboard() {
 
                                                 <ChickenButton
                                                     variant="corn"
-                                                    onClick={handleAddSong}
+                                                    onClick={handleAddSongWithRelationship}
                                                     disabled={isUploading}
                                                     className="w-full"
                                                 >
@@ -2153,25 +2302,52 @@ export default function AdminDashboard() {
                                                             </Button>
                                                         )}
 
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            onClick={() => {
-                setEditingSong(song);
-                setIsEditSongModalOpen(true);
-              }}
-                                                        >
-                                                            <Edit className="w-4 h-4"/>
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            onClick={() => handleDeleteSong(song.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4"/>
-                                                        </Button>
+                                                        {/* Informação sobre múltiplos álbuns */}
+                                                        {song.all_albums && song.all_albums.length > 1 && (
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                {song.all_albums.length} álbuns
+                                                            </Badge>
+                                                        )}
+
+                                                        {/* Dropdown com opções */}
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="outline" size="icon">
+                                                                    <MoreHorizontal className="w-4 h-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="w-56">
+                                                                <DropdownMenuItem onClick={() => {
+        setEditingSong(song);
+        setIsEditSongModalOpen(true);
+      }}>
+                                                                    <Edit className="w-4 h-4 mr-2" />
+                                                                    Editar Música
+                                                                </DropdownMenuItem>
+
+                                                                <DropdownMenuItem onClick={() => openSongAlbumManager(song)}>
+                                                                    <Link className="w-4 h-4 mr-2" />
+                                                                    Gerenciar Álbuns
+                                                                </DropdownMenuItem>
+
+                                                                <DropdownMenuItem onClick={() => openMoveSongDialog(song, selectedAlbum.id)}>
+                                                                    <ArrowRight className="w-4 h-4 mr-2" />
+                                                                    Mover para Outro Álbum
+                                                                </DropdownMenuItem>
+
+                                                                <DropdownMenuSeparator />
+
+                                                                <DropdownMenuItem
+                                                                    onClick={() => handleDeleteSong(song.id)}
+                                                                    className="text-destructive"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 mr-2" />
+                                                                    Remover Música
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </div>
-                                                </div>
+                                                    </div>
                                             ))}
                                         </div>
                                     )}
@@ -2827,6 +3003,44 @@ export default function AdminDashboard() {
                         )}
                     </DialogContent>
                 </Dialog>
+
+                {/* Modal de Gerenciamento de Álbuns da Música */}
+                <SongAlbumManager
+                    isOpen={isSongAlbumManagerOpen}
+                    onClose={() => {
+    setIsSongAlbumManagerOpen(false);
+    setSelectedSongForManager(null);
+  }}
+                    song={selectedSongForManager}
+                    onUpdate={() => {
+    if (selectedAlbum) {
+      loadAlbumSongsWithRelationships(selectedAlbum.id);
+    }
+    loadTotalSongsCount();
+    loadAlbums();
+    if (filters.artist || filters.song || filters.year) {
+      searchSongsWithAlbums();
+    }
+  }}
+                />
+
+                {/* Modal de Mover Música */}
+                <MoveSongDialog
+                    isOpen={isMoveSongDialogOpen}
+                    onClose={() => {
+    setIsMoveSongDialogOpen(false);
+    setSelectedSongForManager(null);
+    setCurrentAlbumIdForMove('');
+  }}
+                    song={selectedSongForManager}
+                    currentAlbumId={currentAlbumIdForMove}
+                    onMove={() => {
+    if (selectedAlbum) {
+      loadAlbumSongsWithRelationships(selectedAlbum.id);
+    }
+    loadAlbums();
+  }}
+                />
             </div>
         </div>
     );
