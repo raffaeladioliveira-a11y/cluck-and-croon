@@ -256,7 +256,13 @@ export default function AdminDashboard() {
             // Transformar dados para incluir informação dos álbuns
             const songsWithAlbumInfo = filtered.map(song => ({
                 ...song,
-                albums_info: song.album_songs?.map((as: any) => as.albums) || []
+                albums_info: song.album_songs?.map((as: any) => ({
+                ...as.albums,
+                album_id: as.album_id  // <-- Adicione esta linha
+            })) || [],
+
+                album_songs: song.album_songs
+
         }));
 
             setSearchResults(songsWithAlbumInfo);
@@ -537,11 +543,18 @@ export default function AdminDashboard() {
             if (error && error.code !== 'PGRST116') throw error;
 
             if (data?.value) {
-                const mode = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-                setGameMode(mode);
+                try {
+                    const mode = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                    setGameMode(mode);
+                } catch (parseError) {
+                    console.warn("Erro ao fazer parse do game_mode, usando valor padrão");
+                    setGameMode("mp3");
+                }
             }
         } catch (error) {
             console.error("Error loading game mode:", error);
+            // Use valor padrão em caso de erro
+            setGameMode("mp3");
         }
     };
 
@@ -1885,6 +1898,7 @@ export default function AdminDashboard() {
                                     </BarnCard>
                                 )}
 
+                                {/* Seção de resultados da busca - VERSÃO ATUALIZADA */}
                                 {(filters.artist || filters.song || filters.year) && (
                                     <BarnCard variant="default" className="p-6">
                                         <h4 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -1904,10 +1918,12 @@ export default function AdminDashboard() {
                                             {searchResults.map((song, index) => (
                                                 <div key={song.id}
                                                      className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
-                                                    {song.albums ?.cover_image_url && (
+
+                                                    {/* Capa do primeiro álbum (se houver) */}
+                                                    {song.albums_info && song.albums_info[0]?.cover_image_url && (
                                                     <img
-                                                        src={song.albums.cover_image_url}
-                                                        alt={song.albums.name}
+                                                        src={song.albums_info[0].cover_image_url}
+                                                        alt={song.albums_info[0].name}
                                                         className="w-16 h-16 object-cover rounded-lg"
                                                     />
                                                     )}
@@ -1915,18 +1931,36 @@ export default function AdminDashboard() {
                                                     <div className="flex-1">
                                                         <h5 className="font-semibold text-lg">{song.title}</h5>
                                                         <p className="text-muted-foreground">{song.artist}</p>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <Badge variant="outline" className="text-xs">
-                                                                Álbum: {song.albums ?.name}
-                                                            </Badge>
-                                                            {song.albums ?.release_year && (
-                                                            <Badge variant="outline" className="text-xs">
-                                                                {song.albums.release_year}
-                                                            </Badge>
+
+                                                        {/* Informações dos álbuns */}
+                                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                                            {/* Mostrar álbuns */}
+                                                            {song.albums_info && song.albums_info.length > 0 ? (
+                                                                <>
+                                                                {song.albums_info.slice(0, 2).map((albumInfo: any, idx: number) => (
+                                                                    <Badge key={idx} variant="outline" className="text-xs">
+                                                                        📁 {albumInfo.name}
+                                                                        {albumInfo.release_year && ` (${albumInfo.release_year})`}
+                                                                    </Badge>
+                                                                ))}
+                                                                {song.albums_info.length > 2 && (
+                                                                    <Badge variant="secondary" className="text-xs">
+                                                                        +{song.albums_info.length - 2} álbuns
+                                                                    </Badge>
+                                                                )}
+                                                                </>
+                                                            ) : (
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    Sem álbum
+                                                                </Badge>
                                                             )}
+
+                                                            {/* Duração */}
                                                             <Badge variant="secondary" className="text-xs">
                                                                 {song.duration_seconds}s
                                                             </Badge>
+
+                                                            {/* Tipo de arquivo */}
                                                             {song.audio_file_url && (
                                                                 <Badge variant="secondary" className="text-xs">
                                                                     🎵 MP3
@@ -1935,11 +1969,9 @@ export default function AdminDashboard() {
                                                         </div>
                                                     </div>
 
-
-
-                                                    {/* Player e controles em linha */}
+                                                    {/* Player e controles */}
                                                     <div className="flex items-center gap-2">
-                                                        {/* Player de áudio maior para busca - apenas MP3 */}
+                                                        {/* Player de áudio - apenas MP3 */}
                                                         {song.audio_file_url ? (
                                                             <div className="min-w-48">
                                                                 <AudioPlayer
@@ -1955,30 +1987,73 @@ export default function AdminDashboard() {
                                                                 </Badge>
                                                             </div>
                                                         )}
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            onClick={() => {
-                setEditingSong(song);
-                setIsEditSongModalOpen(true);
-              }}
-                                                        >
-                                                            <Edit className="w-4 h-4"/>
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="icon"
-                                                            onClick={() => handleDeleteSong(song.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4"/>
-                                                        </Button>
+
+                                                        {/* Dropdown de ações */}
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="outline" size="icon">
+                                                                    <MoreHorizontal className="w-4 h-4" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="w-56">
+                                                                <DropdownMenuItem onClick={() => {
+                  setEditingSong(song);
+                  setIsEditSongModalOpen(true);
+                }}>
+                                                                    <Edit className="w-4 h-4 mr-2" />
+                                                                    Editar Música
+                                                                </DropdownMenuItem>
+
+                                                                <DropdownMenuItem onClick={() => openSongAlbumManager(song)}>
+                                                                    <Link className="w-4 h-4 mr-2" />
+                                                                    Gerenciar Álbuns ({song.albums_info?.length || 0})
+                                                                </DropdownMenuItem>
+
+                                                                {/* Só mostra "Mover" se a música estiver em pelo menos um álbum */}
+                                                                {song.albums_info && song.albums_info.length > 0 && (
+                                                                    <DropdownMenuItem onClick={() => {
+  console.log('Tentando mover música da busca:', song);
+  console.log('Album songs:', song.album_songs);
+  console.log('Albums info:', song.albums_info);
+
+  // Pegar o primeiro album_id disponível
+  const firstAlbumId = song.album_songs?.[0]?.album_id ||
+                      song.albums_info?.[0]?.album_id;
+
+  console.log('Album ID encontrado:', firstAlbumId);
+
+  if (firstAlbumId) {
+    openMoveSongDialog(song, firstAlbumId);
+  } else {
+    toast({
+      title: "Erro",
+      description: "Esta música não está vinculada a nenhum álbum ou não foi possível identificar o álbum",
+      variant: "destructive",
+    });
+  }
+}}>
+                                                                        <ArrowRight className="w-4 h-4 mr-2" />
+                                                                        Mover para Outro Álbum
+                                                                    </DropdownMenuItem>
+                                                                )}
+
+                                                                <DropdownMenuSeparator />
+
+                                                                <DropdownMenuItem
+                                                                    onClick={() => handleDeleteSong(song.id)}
+                                                                    className="text-destructive"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 mr-2" />
+                                                                    Remover Música
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                     </BarnCard>
                                 )}
-
 
                                 {/* Grid de Álbuns - só mostra quando NÃO há filtros */}
                                 {!filters.artist && !filters.song && !filters.year && (
@@ -2330,7 +2405,27 @@ export default function AdminDashboard() {
                                                                     Gerenciar Álbuns
                                                                 </DropdownMenuItem>
 
-                                                                <DropdownMenuItem onClick={() => openMoveSongDialog(song, selectedAlbum.id)}>
+                                                                <DropdownMenuItem onClick={() => {
+  console.log('Tentando mover música da busca:', song);
+  console.log('Album songs:', song.album_songs);
+  console.log('Albums info:', song.albums_info);
+
+  // Pegar o primeiro album_id disponível
+  const firstAlbumId = song.album_songs?.[0]?.album_id ||
+                      song.albums_info?.[0]?.album_id;
+
+  console.log('Album ID encontrado:', firstAlbumId);
+
+  if (firstAlbumId) {
+    openMoveSongDialog(song, firstAlbumId);
+  } else {
+    toast({
+      title: "Erro",
+      description: "Esta música não está vinculada a nenhum álbum ou não foi possível identificar o álbum",
+      variant: "destructive",
+    });
+  }
+}}>
                                                                     <ArrowRight className="w-4 h-4 mr-2" />
                                                                     Mover para Outro Álbum
                                                                 </DropdownMenuItem>

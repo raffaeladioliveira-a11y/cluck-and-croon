@@ -1,6 +1,3 @@
-/**
- * Created by rafaela on 12/09/25.
- */
 import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,7 +14,7 @@ interface Song {
     id: string;
     title: string;
     artist: string;
-    album_ids?: string[]; // Álbuns aos quais a música pertence
+    album_ids?: string[];
 }
 
 interface Album {
@@ -44,14 +41,22 @@ export function SongAlbumManager({ isOpen, onClose, song, onUpdate }: SongAlbumM
     // Carregar álbuns disponíveis
     const loadAlbums = async () => {
         try {
+            console.log('Carregando álbuns disponíveis...');
+
             const { data, error } = await supabase
                 .from('albums')
                 .select('id, name, artist_name, cover_image_url')
                 .order('name');
 
-            if (error) throw error;
+            if (error) {
+                console.error('Erro ao carregar álbuns:', error);
+                throw error;
+            }
+
+            console.log('Álbuns carregados:', data?.length);
             setAlbums(data || []);
         } catch (error) {
+            console.error('Erro completo:', error);
             toast({
                 title: "Erro",
                 description: "Não foi possível carregar os álbuns",
@@ -66,14 +71,23 @@ export function SongAlbumManager({ isOpen, onClose, song, onUpdate }: SongAlbumM
 
         setIsLoading(true);
         try {
+            console.log('Carregando álbuns atuais para música:', song.id);
+
             const { data, error } = await supabase
                 .from('album_songs')
                 .select('album_id')
                 .eq('song_id', song.id);
 
-            if (error) throw error;
-            setCurrentAlbums(data?.map(item => item.album_id) || []);
+            if (error) {
+                console.error('Erro ao carregar álbuns atuais:', error);
+                throw error;
+            }
+
+            const albumIds = data?.map(item => item.album_id) || [];
+            console.log('Álbuns atuais:', albumIds);
+            setCurrentAlbums(albumIds);
         } catch (error) {
+            console.error('Erro completo:', error);
             toast({
                 title: "Erro",
                 description: "Não foi possível carregar os álbuns atuais",
@@ -99,13 +113,19 @@ export function SongAlbumManager({ isOpen, onClose, song, onUpdate }: SongAlbumM
 
         setIsSaving(true);
         try {
+            console.log('Salvando alterações para música:', song.id);
+            console.log('Álbuns selecionados:', currentAlbums);
+
             // Primeiro, remover todos os relacionamentos existentes
             const { error: deleteError } = await supabase
                 .from('album_songs')
                 .delete()
                 .eq('song_id', song.id);
 
-            if (deleteError) throw deleteError;
+            if (deleteError) {
+                console.error('Erro ao deletar relacionamentos:', deleteError);
+                throw deleteError;
+            }
 
             // Depois, adicionar os novos relacionamentos
             if (currentAlbums.length > 0) {
@@ -115,11 +135,16 @@ export function SongAlbumManager({ isOpen, onClose, song, onUpdate }: SongAlbumM
                     track_order: index + 1
                 }));
 
+                console.log('Inserindo novos relacionamentos:', albumSongsData);
+
                 const { error: insertError } = await supabase
                     .from('album_songs')
                     .insert(albumSongsData);
 
-                if (insertError) throw insertError;
+                if (insertError) {
+                    console.error('Erro ao inserir relacionamentos:', insertError);
+                    throw insertError;
+                }
             }
 
             toast({
@@ -130,6 +155,7 @@ export function SongAlbumManager({ isOpen, onClose, song, onUpdate }: SongAlbumM
             onUpdate();
             onClose();
         } catch (error) {
+            console.error('Erro ao salvar:', error);
             toast({
                 title: "Erro",
                 description: "Não foi possível salvar as alterações",
@@ -147,7 +173,8 @@ export function SongAlbumManager({ isOpen, onClose, song, onUpdate }: SongAlbumM
     );
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen && song) {
+            console.log('Modal aberto para música:', song);
             loadAlbums();
             loadCurrentAlbums();
             setSearchTerm('');
@@ -274,8 +301,7 @@ export function SongAlbumManager({ isOpen, onClose, song, onUpdate }: SongAlbumM
     );
 }
 
-// ============= COMPONENTE AUXILIAR PARA MOVER MÚSICAS =============
-
+// MoveSongDialog Component
 interface MoveSongDialogProps {
     isOpen: boolean;
     onClose: () => void;
@@ -292,15 +318,23 @@ export function MoveSongDialog({ isOpen, onClose, song, currentAlbumId, onMove }
 
     const loadAlbums = async () => {
         try {
+            console.log('Carregando álbuns para mover, excluindo:', currentAlbumId);
+
             const { data, error } = await supabase
                 .from('albums')
                 .select('id, name, artist_name, cover_image_url')
-                .neq('id', currentAlbumId) // Excluir o álbum atual
+                .neq('id', currentAlbumId || 'invalid-id')
                 .order('name');
 
-            if (error) throw error;
+            if (error) {
+                console.error('Erro ao carregar álbuns para mover:', error);
+                throw error;
+            }
+
+            console.log('Álbuns carregados para mover:', data?.length);
             setAlbums(data || []);
         } catch (error) {
+            console.error('Erro completo:', error);
             toast({
                 title: "Erro",
                 description: "Não foi possível carregar os álbuns",
@@ -314,14 +348,18 @@ export function MoveSongDialog({ isOpen, onClose, song, currentAlbumId, onMove }
 
         setIsMoving(true);
         try {
-            // Atualizar o relacionamento na tabela album_songs
+            console.log('Movendo música:', song.id, 'de', currentAlbumId, 'para', selectedAlbumId);
+
             const { error } = await supabase
                 .from('album_songs')
                 .update({ album_id: selectedAlbumId })
                 .eq('song_id', song.id)
                 .eq('album_id', currentAlbumId);
 
-            if (error) throw error;
+            if (error) {
+                console.error('Erro ao mover música:', error);
+                throw error;
+            }
 
             const targetAlbum = albums.find(album => album.id === selectedAlbumId);
             toast({
@@ -332,6 +370,7 @@ export function MoveSongDialog({ isOpen, onClose, song, currentAlbumId, onMove }
             onMove();
             onClose();
         } catch (error) {
+            console.error('Erro ao mover:', error);
             toast({
                 title: "Erro",
                 description: "Não foi possível mover a música",
@@ -353,7 +392,7 @@ export function MoveSongDialog({ isOpen, onClose, song, currentAlbumId, onMove }
             setSelectedAlbumId('');
             setSearchTerm('');
         }
-    }, [isOpen]);
+    }, [isOpen, currentAlbumId]);
 
     if (!song) return null;
 
@@ -371,7 +410,6 @@ export function MoveSongDialog({ isOpen, onClose, song, currentAlbumId, onMove }
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    {/* Busca */}
                     <div className="relative">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -382,43 +420,47 @@ export function MoveSongDialog({ isOpen, onClose, song, currentAlbumId, onMove }
                         />
                     </div>
 
-                    {/* Lista de álbuns */}
                     <div className="max-h-64 overflow-y-auto space-y-2 border rounded-lg p-2">
-                        {filteredAlbums.map(album => (
-                            <div
-                                key={album.id}
-                                className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${
-                  selectedAlbumId === album.id
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
-                }`}
-                                onClick={() => setSelectedAlbumId(album.id)}
-                            >
-                                {album.cover_image_url ? (
-                                    <img
-                                        src={album.cover_image_url}
-                                        alt={album.name}
-                                        className="w-12 h-12 object-cover rounded"
-                                    />
-                                ) : (
-                                    <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                                        <Music className="w-6 h-6 text-muted-foreground" />
-                                    </div>
-                                )}
-
-                                <div className="flex-1">
-                                    <h4 className="font-medium">{album.name}</h4>
-                                    <p className="text-sm text-muted-foreground">{album.artist_name}</p>
-                                </div>
-
-                                {selectedAlbumId === album.id && (
-                                    <Badge variant="default">Selecionado</Badge>
-                                )}
+                        {filteredAlbums.length === 0 ? (
+                            <div className="text-center py-8">
+                                <p className="text-muted-foreground">Nenhum outro álbum disponível</p>
                             </div>
-                        ))}
+                        ) : (
+                            filteredAlbums.map(album => (
+                                <div
+                                    key={album.id}
+                                    className={`flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all hover:shadow-sm ${
+                    selectedAlbumId === album.id
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:border-primary/50'
+                  }`}
+                                    onClick={() => setSelectedAlbumId(album.id)}
+                                >
+                                    {album.cover_image_url ? (
+                                        <img
+                                            src={album.cover_image_url}
+                                            alt={album.name}
+                                            className="w-12 h-12 object-cover rounded"
+                                        />
+                                    ) : (
+                                        <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
+                                            <Music className="w-6 h-6 text-muted-foreground" />
+                                        </div>
+                                    )}
+
+                                    <div className="flex-1">
+                                        <h4 className="font-medium">{album.name}</h4>
+                                        <p className="text-sm text-muted-foreground">{album.artist_name}</p>
+                                    </div>
+
+                                    {selectedAlbumId === album.id && (
+                                        <Badge variant="default">Selecionado</Badge>
+                                    )}
+                                </div>
+                            ))
+                        )}
                     </div>
 
-                    {/* Botões */}
                     <div className="flex gap-2 pt-4 border-t">
                         <ChickenButton
                             variant="corn"
