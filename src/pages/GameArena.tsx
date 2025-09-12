@@ -18,9 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
     if (!url) return undefined;
     const m = url.match(/spotify\.com\/(?:embed\/)?track\/([A-Za-z0-9]+)/i);
-    return m ?
-.
-    [1];
+    return m ?.[1];
 }
 
 function GameArenaContent() {
@@ -214,52 +212,27 @@ function GameArenaContent() {
     console.log("7. countdown:", countdown);
     console.log("8. showCountdown:", showCountdown);
 
-    const debugPlayer = players ?
-.
-    find((p) => p.id === clientId.current);
+    const debugPlayer = players ?.find((p) => p.id === clientId.current);
 
     // ---------- helpers ----------
     const currentPlayer = (() => {
-        const loggedPlayer = players ?
-        .
-        find((p) => p.id === clientId.current);
+        const loggedPlayer = players ?.find((p) => p.id === clientId.current);
         return {
             id: "current",
-            name: loggedPlayer ?.name || user ?
-        .
-        user_metadata ?
-        .
-        display_name || "Você",
-            avatar
-        :
-        loggedPlayer ?
-        .
-        avatar || "🐔",
-            eggs
-        :
-        playerEggs,
-            selectedAnswer
-        :
-        selectedAnswer,
+            name: loggedPlayer ?.name || user ?.user_metadata ?.display_name || "Você",
+            avatar:loggedPlayer ?.avatar || "🐔", eggs:playerEggs, selectedAnswer:selectedAnswer,
     }
         ;
     })();
 
     const playersOnOption = (optionIndex: number) => {
-        const playersOnThisOption = answersByOption ?
-        .
-        [optionIndex] || [];
+        const playersOnThisOption = answersByOption ?.[optionIndex] || [];
 
         if (selectedAnswer === optionIndex) {
-            const loggedPlayer = players ?
-        .
-            find((p) => p.id === clientId.current);
+            const loggedPlayer = players ?.find((p) => p.id === clientId.current);
             const isAlreadyInList = playersOnThisOption.some(p => p.id === clientId.current);
 
-            if (!isAlreadyInList && loggedPlayer ?.
-            avatar ?
-        .
-            startsWith("/")
+            if (!isAlreadyInList && loggedPlayer ?.avatar ?.startsWith("/")
         )
             {
                 return [...playersOnThisOption, {
