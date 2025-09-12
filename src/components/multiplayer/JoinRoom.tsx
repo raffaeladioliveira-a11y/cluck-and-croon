@@ -44,6 +44,9 @@ export function JoinRoom({
     // salva a identidade; o join efetivo acontece no Lobby via RPC join_room
     saveProfile({ displayName: playerName, avatar: selectedAvatar });
 
+    // ADICIONAR esta linha para garantir que o salvamento seja processado
+    await new Promise(resolve => setTimeout(resolve, 0));
+
     toast({
       title: "🚪 Entrando no Galinheiro!",
       description: `Conectando ao galinheiro ${code}...`,

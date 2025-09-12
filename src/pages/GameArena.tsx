@@ -12,6 +12,7 @@ import GameArenaGuard from "./GameArenaGuard";
 import {useAuthSession} from "@/hooks/useAuthSession";
 import {getOrCreateClientId} from "@/utils/clientId";
 import {GameChat, ChatToggleButton} from "@/components/GameChat";
+import { useToast } from "@/hooks/use-toast";
 
 /** Util: extrai o trackId a partir de uma URL de embed do Spotify */
 function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
@@ -31,6 +32,12 @@ function GameArenaContent() {
     const {user} = useAuthSession();
     const clientId = useRef(getOrCreateClientId());
 
+    // NOVO: Estado para espectador
+    const [isSpectator, setIsSpectator] = useState(false);
+    const [spectatorCheckComplete, setSpectatorCheckComplete] = useState(false); // ADICIONAR esta linha
+
+    const { toast } = useToast(); // Adicionar se não existir
+
     const [countdown, setCountdown] = useState<number | null>(null);
     const [showCountdown, setShowCountdown] = useState(false);
     const countdownStartedRef = useRef(false);
@@ -39,6 +46,40 @@ function GameArenaContent() {
     // Estados do chat
     const [showChat, setShowChat] = useState(false);
     const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+    // No GameArena.tsx, adicionar este useEffect:
+    useEffect(() => {
+        const checkIfSpectator = async () => {
+            const mode = searchParams.get("mode");
+
+            if (mode === "spectator") {
+                setIsSpectator(true);
+                return;
+            }
+
+            // Se jogo em progresso e não veio pelo fluxo normal, é espectador
+            if (sid && roomCode) {
+                const { data: room } = await supabase
+                    .from('game_rooms')
+                    .select('status, current_round')
+                    .eq('room_code', roomCode)
+                    .single();
+
+                if (room && room.status === 'in_progress' && room.current_round > 1) {
+                    setIsSpectator(true);
+                    toast({
+                        title: "Modo Espectador",
+                        description: "Jogo em andamento. Você participará da próxima rodada!",
+                        variant: "default",
+                    });
+                }
+            }
+            setSpectatorCheckComplete(true);
+        };
+
+        checkIfSpectator();
+    }, [searchParams, sid, roomCode]);
+
 
     // navegação pós-set
     useEffect(() => {
@@ -82,7 +123,7 @@ function GameArenaContent() {
         selectedAlbumInfo,
         battleMode, // ADICIONE ESTA LINHA
         battleSettings, // ADICIONE ESTA LINHA
-    } = useGameLogic(roomCode || "", sid);
+    } = useGameLogic(roomCode || "", sid, isSpectator); // ADICIONAR o parâmetro isSpectator
 
     // Função para iniciar o countdown
     // Função para iniciar o countdown
@@ -334,7 +375,16 @@ function GameArenaContent() {
     // ---------- RENDER ----------
     return (
         <div className="min-h-screen bg-gradient-sky p-2 sm:p-4">
-            
+
+            {/* NOVO: Banner de espectador */}
+            {isSpectator && (
+                <div className="bg-blue-500/20 p-3 rounded-lg mb-4 border border-blue-500/30">
+                    <p className="text-center text-blue-200">
+                        👀 Assistindo como espectador - Você jogará na próxima rodada!
+                    </p>
+                </div>
+            )}
+
             <div className="flex justify-center mb-4">
                 <div className="w-full max-w-4xl sticky top-0 z-50 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-2">
                     <div className="px-4 py-3">
@@ -613,7 +663,19 @@ function GameArenaContent() {
                                         key={index}
                                         variant="default"
                                         className={`cursor-pointer transition-all duration-300 p-2 sm:p-3 relative ${getAnswerColor(index)}`}
-                                        onClick={() => handleAnswerSelect(index)}
+                                        onClick={() => {
+            // VERIFICAÇÃO SIMPLES: só executar se NÃO for espectador
+            if (!isSpectator) {
+                handleAnswerSelect(index);
+            } else {
+                // Mostrar aviso apenas para espectador
+                toast({
+                    title: "Modo Espectador",
+                    description: "Você poderá responder na próxima rodada!",
+                    variant: "default",
+                });
+            }
+        }}
                                     >
                                         {/* Avatares posicionados na borda superior direita */}
                                         {playersOnOption(index).length > 0 && (

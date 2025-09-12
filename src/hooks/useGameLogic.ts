@@ -299,7 +299,7 @@ function buildOptionsFromTitles(correctTitle: string, poolTitles: string[] = [])
 
 /* ----------------------------- HOOK PRINCIPAL ------------------------------ */
 
-export const useGameLogic = (roomCode: string, sessionId?: string) => {
+export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: boolean = false) => {
   const { toast } = useToast();
 
   // identidade local
@@ -629,14 +629,11 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 
 // Função para redistribuir ovos
   const redistributeEggs = async (roomCode: string, correctAnswerIndex: number, answersData: any, battleSettings: any) => {
-    console.log('🎯 [redistributeEggs] ===================');
-    console.log('🎯 [redistributeEggs] Iniciando redistribuição:', {
-      roomCode,
-      correctAnswerIndex,
-      answersData,
-      battleSettings,
-      totalAnswers: Object.keys(answersData).length
-    });
+    const playersWhoAnswered = Object.keys(answersData); // USAR answersData diretamente
+
+    if (playersWhoAnswered.length === 0) {
+      return;
+    }
 
     try {
       const { data: room, error: roomError } = await supabase
@@ -646,35 +643,25 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           .single();
 
       if (roomError) {
-        console.error('🎯 [redistributeEggs] Erro ao buscar sala:', roomError);
         return;
       }
 
       if (!room) {
-        console.error('🎯 [redistributeEggs] Sala não encontrada');
         return;
       }
-
-      console.log('🎯 [redistributeEggs] Sala encontrada:', room);
-
       const { data: participants, error: participantsError } = await supabase
           .from('room_participants')
           .select('client_id, current_eggs, display_name')
           .eq('room_id', room.id);
 
       if (participantsError) {
-        console.error('🎯 [redistributeEggs] Erro ao buscar participantes:', participantsError);
         return;
       }
 
       if (!participants) {
-        console.error('🎯 [redistributeEggs] Participantes não encontrados');
         return;
       }
 
-      console.log('🎯 [redistributeEggs] Participantes ANTES da redistribuição:', participants);
-
-      const playersWhoAnswered = Object.keys(answersData);
       const correctPlayers = playersWhoAnswered.filter(
           playerId => answersData[playerId].answer === correctAnswerIndex
       );
@@ -682,12 +669,6 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
           playerId => answersData[playerId].answer !== correctAnswerIndex
       );
 
-      console.log('🎯 [redistributeEggs] Análise das respostas:', {
-        playersWhoAnswered,
-        correctPlayers,
-        incorrectPlayers,
-        correctAnswerIndex
-      });
 
       if (incorrectPlayers.length === 0) {
         console.log('🎯 [redistributeEggs] Nenhum jogador errou, sem redistribuição');
@@ -845,6 +826,11 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   }, []);
 
   const broadcastAnswer = useCallback(async (answerIndex: number) => {
+
+    if (isSpectator) {
+      return;
+    }
+
     if (!sessionId || !gameChannelRef.current) return;
 
     const responseTime = currentSettings.time_per_question - timeLeft;
@@ -868,7 +854,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
         avatar: loggedPlayer?.avatar,
     },
   });
-  }, [sessionId, players, currentSettings, timeLeft, battleMode]);
+  }, [sessionId, players, currentSettings, timeLeft, battleMode, isSpectator]);
 
   /* --------------------------------- AÇÕES -------------------------------- */
 
@@ -923,6 +909,12 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
   }, [sessionId, isHost, gameState, startRoundTimer, currentSettings.time_per_question, broadcastRoundStart, toast]);
 
   const handleAnswerSelect = useCallback((idx: number) => {
+
+    if (isSpectator) {
+      // Apenas atualizar o estado local para mostrar visualmente, mas não enviar para o servidor
+      setSelectedAnswer(idx);
+      return;
+    }
     if (gameState !== 'playing' || selectedAnswer !== null) return;
 
     console.log('🎯 [handleAnswerSelect] CHAMADO:', {
@@ -1272,49 +1264,32 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
 // Substitua o useEffect atual por este:
   useEffect(() => {
     if (battleMode === 'battle' && isHost && currentQuestion && sessionId) {
-      console.log('🎯 [useEffect battle] Verificando estado para redistribuição:', {
-        gameState,
-        battleMode,
-        isHost,
-        sessionId,
-        roundAnswersCount: Object.keys(roundAnswers).length,
-        currentQuestion: currentQuestion.correctAnswer,
-        currentRound,
-        alreadyProcessed: redistributionProcessed[currentRound]
-      });
-
-
-      // ADICIONE: Verificar se já foi processado
       if (redistributionProcessed[currentRound]) {
-        console.log('🎯 [useEffect battle] Rodada já processada, ignorando');
         return;
       }
 
       // Processar TANTO em 'reveal' quanto em 'transition' para garantir execução
       if (gameState === 'reveal' || gameState === 'transition') {
-        console.log('🎯 [useEffect battle] Estado adequado detectado, processando...');
-
         const processRoundEnd = async () => {
           try {
             // Verificar se já tem respostas suficientes
             const answerCount = Object.keys(roundAnswers).length;
-            console.log('🎯 [processRoundEnd] Respostas disponíveis:', answerCount);
 
             if (answerCount === 0) {
-              console.log('🎯 [processRoundEnd] Nenhuma resposta registrada, pulando redistribuição');
+
               return;
             }
 
             // MARCAR COMO PROCESSADO ANTES de executar
             setRedistributionProcessed(prev => ({ ...prev, [currentRound]: true }));
 
-            console.log('🎯 [processRoundEnd] Chamando redistributeEggs...');
+            // CRIAR lista de espectadores para excluir
+            const spectatorIds: string[] = []; // Adicionar lógica para identificar espectadores se necessário
+
             await redistributeEggs(roomCode, currentQuestion.correctAnswer, roundAnswers, battleSettings);
 
-            console.log('🎯 [processRoundEnd] Recarregando jogadores...');
             await loadPlayersFromRoom();
 
-            console.log('🎯 [processRoundEnd] Enviando broadcast...');
             if (gameChannelRef.current) {
               await gameChannelRef.current.send({
                 type: 'broadcast',
@@ -1323,10 +1298,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string) => {
               });
             }
 
-            console.log('🎯 [processRoundEnd] Processamento completo!');
-
           } catch (error) {
-            console.error('🎯 [processRoundEnd] Erro ao processar final da rodada:', error);
             // REMOVER flag em caso de erro para permitir retry
             setRedistributionProcessed(prev => ({ ...prev, [currentRound]: false }));
           }

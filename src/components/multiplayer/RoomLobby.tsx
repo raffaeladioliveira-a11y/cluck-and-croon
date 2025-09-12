@@ -102,7 +102,7 @@ export function RoomLobby() {
                 profile: userProfile
             });
 
-            // PRIMEIRO: Verificar se a sala existe antes de tentar entrar
+            // Verificar se a sala existe
             const { data: existingRoom, error: checkError } = await supabase
                 .from('game_rooms')
                 .select('code, room_code, status, game_session_id, id, host_id')
@@ -114,33 +114,33 @@ export function RoomLobby() {
                 throw checkError;
             }
 
-            // Se a sala não existe, mostrar erro específico
             if (!existingRoom) {
                 console.error('Room not found:', roomCode);
                 toast({
                     title: "Sala não encontrada",
-                    description: `A sala com código ${roomCode} não foi encontrada. Verifique o código e tente novamente.`,
+                    description: `A sala com código ${roomCode} não foi encontrada.`,
                     variant: "destructive",
                 });
                 navigate('/');
                 return;
             }
 
-            // Verificar se a sala está em estado válido para entrada
-            if (existingRoom.status !== 'lobby' && existingRoom.status !== 'waiting') {
-                console.error('Room not available for joining:', existingRoom.status);
-                toast({
-                    title: "Sala não disponível",
-                    description: "Esta sala não está disponível para novos jogadores.",
-                    variant: "destructive",
-                });
-                navigate('/');
-                return;
+            console.log('✅ Room found:', existingRoom);
+
+            // NOVA LÓGICA: Permitir entrada em qualquer status da sala
+            let shouldRedirectToGame = false;
+            let redirectMessage = "";
+
+            if (existingRoom.status === 'in_progress' && existingRoom.game_session_id) {
+                shouldRedirectToGame = true;
+                redirectMessage = "Jogo em andamento! Entrando como espectador...";
+            } else if (existingRoom.status === 'round_lobby') {
+                redirectMessage = "Entrando no lobby da rodada...";
+            } else if (existingRoom.status === 'lobby' || existingRoom.status === 'waiting') {
+                redirectMessage = "Entrando na sala...";
             }
 
-            console.log('✅ Room found and available:', existingRoom);
-
-            // Use RPC to join room with preserved identity
+            // Sempre tentar fazer join na sala, independente do status
             const { error: joinError } = await supabase.rpc('join_room', {
                     p_room_code: roomCode.trim(),
                     p_display_name: userProfile.displayName || `Galinha ${Math.floor(Math.random() * 1000)}`,
@@ -148,23 +148,42 @@ export function RoomLobby() {
                 p_client_id: clientId
         });
 
-            if (joinError) {
+            if (joinError && joinError.message !== 'ALREADY_IN_ROOM') {
                 console.error('Error joining room:', joinError);
 
-                if (joinError.message === 'ROOM_NOT_IN_LOBBY') {
+                // Se não conseguiu entrar, mas a sala existe, ainda assim redirecionar
+                if (shouldRedirectToGame) {
                     toast({
-                        title: "Sala não disponível",
-                        description: "Esta sala não está disponível ou já começou.",
-                        variant: "destructive",
+                        title: "Entrando como espectador",
+                        description: "Redirecionando para o jogo em andamento...",
+                        variant: "default",
                     });
-                    navigate('/');
+                    navigate(`/game/${roomCode}?sid=${existingRoom.game_session_id}&mode=spectator`);
                     return;
                 }
 
                 throw joinError;
             }
 
-            // Agora buscar os dados atualizados da sala após o join
+            // Mostrar mensagem apropriada
+            if (redirectMessage) {
+                toast({
+                    title: "Entrando na sala",
+                    description: redirectMessage,
+                    variant: "default",
+                });
+            }
+
+            // Redirecionar conforme o status da sala
+            if (existingRoom.status === 'in_progress' && existingRoom.game_session_id) {
+                navigate(`/game/${roomCode}?sid=${existingRoom.game_session_id}&mode=spectator`);
+                return;
+            } else if (existingRoom.status === 'round_lobby') {
+                navigate(`/round-lobby/${roomCode}?sid=${existingRoom.game_session_id || 'current'}`);
+                return;
+            }
+
+            // Continuar com a lógica normal para lobby
             const { data: roomData, error: roomError } = await supabase
                 .from('game_rooms')
                 .select('code, room_code, status, game_session_id, id, host_id')
@@ -182,7 +201,7 @@ export function RoomLobby() {
                 game_session_id: roomData.game_session_id
             });
 
-            // Subscribe to real-time changes with unique channel per user
+            // Subscribe to real-time changes (código existente...)
             const channel = supabase.channel(`room_${roomCode}_${clientId}_${Date.now()}`)
                 .on('postgres_changes', {
                     event: '*',
@@ -191,7 +210,6 @@ export function RoomLobby() {
                     filter: `room_id=eq.${roomData.id}`
                 }, (payload) => {
                     console.log('🔄 Room participants changed:', payload);
-                    // Small delay to ensure DB consistency
                     setTimeout(() => loadRoomData(roomData.id), 100);
                 })
                 .on('postgres_changes', {
@@ -201,13 +219,6 @@ export function RoomLobby() {
                     filter: `id=eq.${roomData.id}`
                 }, (payload: any) => {
                     console.log('🏠 Room status changed:', payload.new);
-                    console.log('🎯 Navigation check:', {
-                        navigatedRef: navigatedRef.current,
-                        status: payload.new.status,
-                        sessionId: payload.new.game_session_id,
-                        gameMode,
-                        gameModeRef: gameModeRef.current
-                    });
 
                     const updatedRoom = payload.new;
                     setRoom(prev => ({
@@ -216,28 +227,23 @@ export function RoomLobby() {
                         game_session_id: updatedRoom.game_session_id
                     }));
 
-                    // Atualizar álbuns selecionados
                     setSelectedMp3AlbumId(updatedRoom.selected_mp3_album_id);
                     setSelectedSpotifyAlbumId(updatedRoom.selected_spotify_album_id);
 
-                    // Navigate to game when it starts
-                    if (!navigatedRef.current && updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
-                        navigatedRef.current = true;
-                        const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
-                        console.log('🔗 Navigating to:', `/game/${roomCode}?sid=${updatedRoom.game_session_id}&mode=${mode}`);
-                        navigate(`/game/${roomCode}?sid=${updatedRoom.game_session_id}&mode=${mode}`);
+                    // Navegação inteligente baseada no status
+                    if (!navigatedRef.current) {
+                        if (updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
+                            navigatedRef.current = true;
+                            const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
+                            navigate(`/game/${roomCode}?sid=${updatedRoom.game_session_id}&mode=${mode}`);
+                        } else if (updatedRoom.status === 'round_lobby' && updatedRoom.game_session_id) {
+                            navigatedRef.current = true;
+                            navigate(`/round-lobby/${roomCode}?sid=${updatedRoom.game_session_id}`);
+                        }
                     }
                 })
-                .subscribe((status) => {
-                    console.log('📡 Realtime subscription status:', status);
-                    if (status === 'SUBSCRIBED') {
-                        console.log('✅ Successfully subscribed to room updates');
-                    } else if (status === 'CHANNEL_ERROR') {
-                        console.error('❌ Error subscribing to room updates');
-                    }
-                });
+                .subscribe();
 
-            // Load initial participants
             loadRoomData(roomData.id);
 
             return () => {
@@ -247,16 +253,12 @@ export function RoomLobby() {
         } catch (error: any) {
             console.error('Error joining room:', error);
 
-            // Mensagens de erro mais específicas
             let errorMessage = "Não foi possível entrar na sala. Tente novamente.";
             let errorTitle = "Erro ao entrar na sala";
 
             if (error.code === 'PGRST116') {
-                errorMessage = `A sala com código ${roomCode} não foi encontrada. Verifique se o código está correto.`;
+                errorMessage = `A sala com código ${roomCode} não foi encontrada.`;
                 errorTitle = "Sala não encontrada";
-            } else if (error.message?.includes('ROOM_NOT_IN_LOBBY')) {
-                errorMessage = "Esta sala não está mais aceitando novos jogadores.";
-                errorTitle = "Sala indisponível";
             }
 
             toast({

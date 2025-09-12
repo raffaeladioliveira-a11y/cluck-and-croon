@@ -213,10 +213,32 @@ export default function RoundLobby() {
   useEffect(() => {
     if (!sessionId) return;
 
+    // UMA ÚNICA declaração do canal
     const channel = supabase.channel(`round-lobby:${sessionId}`, {
       config: { broadcast: { ack: true }, presence: { key: clientId.current } }
     });
 
+    // Adicionar listener para novos participantes
+    channel.on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'room_participants'
+    }, (payload) => {
+      console.log('🆕 New player joined during round lobby:', payload);
+      // Recarregar dados dos participantes
+      setTimeout(() => {
+        loadInitialData();
+      }, 500);
+
+      // Mostrar notificação
+      toast({
+        title: "Novo jogador entrou!",
+        description: "Um novo jogador se juntou e participará da próxima rodada.",
+        variant: "default",
+      });
+    });
+
+    // Listeners para broadcasts (usando o MESMO canal)
     channel.on('broadcast', { event: 'GENRE_SELECTED' }, (msg) => {
       const { genreId, genreName } = msg.payload;
       setSelectedGenre(genreId);
@@ -259,6 +281,7 @@ export default function RoundLobby() {
       }
     };
   }, [sessionId, roomCode, navigate, toast]);
+
 
   const handleGenreSelect = async (genreId: string, genreName: string) => {
     if (!gameChannelRef.current) return;
