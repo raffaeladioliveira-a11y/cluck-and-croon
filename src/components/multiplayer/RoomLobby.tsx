@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+// import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { getOrCreateClientId, loadProfile } from "@/utils/clientId";
@@ -9,6 +10,7 @@ import { ChickenButton } from "@/components/ChickenButton";
 import { useAuthSession } from "@/hooks/useAuthSession";
 // Adicionar esta importação no topo do arquivo RoomLobby
 import { SelectedAlbumDisplay } from "@/components/SelectedAlbumDisplay";
+import { GameChat, ChatToggleButton } from "@/components/GameChat";
 
 interface Room {
     code: string;
@@ -47,6 +49,11 @@ export function RoomLobby() {
     const [isLoading, setIsLoading] = useState(true);
     const [room, setRoom] = useState<Room | null>(null);
     const [gameMode, setGameMode] = useState<'solo' | 'multiplayer'>('solo');
+    const [searchParams] = useSearchParams();
+    const sid = (searchParams.get("sid") || "").trim();
+    // Estados do chat
+    const [showChat, setShowChat] = useState(false);
+    const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
 
 
@@ -623,6 +630,31 @@ export function RoomLobby() {
                             }
                         </ChickenButton>
                     )}
+
+                    {/* Chat */}
+                    <GameChat
+                        roomCode={roomCode || ""}
+                        sessionId={sid}
+                        isVisible={showChat}
+                        onToggle={() => {
+                setShowChat(false);
+                setChatUnreadCount(0);
+            }}
+                        onUnreadChange={(count) => setChatUnreadCount(count)}
+                    />
+
+                    {/* Botão do chat */}
+                    {!showChat && (
+                        <ChatToggleButton
+                            onClick={() => {
+                    setShowChat(true);
+                    setChatUnreadCount(0);
+                }}
+                            unreadCount={chatUnreadCount}
+                        />
+                    )}
+
+
                 </div>
 
                 {/* Game Info */}

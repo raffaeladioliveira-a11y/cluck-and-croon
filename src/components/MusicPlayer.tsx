@@ -244,7 +244,7 @@ export const MusicPlayer = ({
   return (
       <div className={cn("relative overflow-hidden", className)}>
         {/* Background com gradiente moderno */}
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/30 via-blue-800/20 to-indigo-900/30 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-glass from-purple-900/30 via-blue-800/20 to-indigo-900/30 backdrop-blur-sm" />
         <div className="absolute inset-0 bg-black/10" />
 
         {/* Conteúdo */}
@@ -320,22 +320,22 @@ export const MusicPlayer = ({
                   {/* Controles MP3 */}
                   {gameMode === "mp3" && (
                       <div className="flex items-center gap-2">
-                        <Button
-                            onClick={togglePlay}
-                            size="sm"
-                            className="bg-white/20 hover:bg-white/30 border-white/30 text-white h-8 w-8 p-0 rounded-full transition-all duration-300 hover:scale-110 shadow-lg"
-                        >
-                          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                        </Button>
+                        {/*<Button*/}
+                            {/*onClick={togglePlay}*/}
+                            {/*size="sm"*/}
+                            {/*className="bg-white/20 hover:bg-white/30 border-white/30 text-white h-8 w-8 p-0 rounded-full transition-all duration-300 hover:scale-110 shadow-lg"*/}
+                        {/*>*/}
+                          {/*{isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}*/}
+                        {/*</Button>*/}
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-white/10 hover:bg-white/20 border-white/20 text-white h-8 w-8 p-0 rounded-full"
-                            onClick={() => setIsMuted((m) => !m)}
-                        >
-                          {isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}
-                        </Button>
+                        {/*<Button*/}
+                            {/*variant="outline"*/}
+                            {/*size="sm"*/}
+                            {/*className="bg-white/10 hover:bg-white/20 border-white/20 text-white h-8 w-8 p-0 rounded-full"*/}
+                            {/*onClick={() => setIsMuted((m) => !m)}*/}
+                        {/*>*/}
+                          {/*{isMuted ? <VolumeX className="h-3 w-3" /> : <Volume2 className="h-3 w-3" />}*/}
+                        {/*</Button>*/}
 
                         {!audioUnlocked && (
                             <div className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded-full">
@@ -395,9 +395,9 @@ export const MusicPlayer = ({
           {/* Estados de resultado */}
           {(gameState === "reveal" || gameState === "transition") && (
               <div className="text-center py-6">
-                <div className="w-12 h-12 mx-auto bg-white/10 rounded-full flex items-center justify-center mb-3">
-                  <Pause className="w-6 h-6 text-white/70" />
-                </div>
+                {/*<div className="w-12 h-12 mx-auto bg-white/10 rounded-full flex items-center justify-center mb-3">*/}
+                  {/*<Pause className="w-6 h-6 text-white/70" />*/}
+                {/*</div>*/}
                 <p className="text-white/60 text-sm">Preparando próxima música...</p>
               </div>
           )}

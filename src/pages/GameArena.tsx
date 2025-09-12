@@ -1,32 +1,34 @@
-import { useEffect, useRef, useState } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { BarnCard } from "@/components/BarnCard";
-import { ChickenAvatar } from "@/components/ChickenAvatar";
-import { EggCounter } from "@/components/EggCounter";
-import { MusicPlayer } from "@/components/MusicPlayer";
-import { ChickenButton } from "@/components/ChickenButton";
-import { GameNavigation } from "@/components/GameNavigation";
-import { useGameLogic } from "@/hooks/useGameLogic";
-import { Loader2 } from "lucide-react";
+import {useEffect, useRef, useState} from "react";
+import {useParams, useNavigate, useSearchParams} from "react-router-dom";
+import {BarnCard} from "@/components/BarnCard";
+import {ChickenAvatar} from "@/components/ChickenAvatar";
+import {EggCounter} from "@/components/EggCounter";
+import {MusicPlayer} from "@/components/MusicPlayer";
+import {ChickenButton} from "@/components/ChickenButton";
+import {GameNavigation} from "@/components/GameNavigation";
+import {useGameLogic} from "@/hooks/useGameLogic";
+import {Loader2} from "lucide-react";
 import GameArenaGuard from "./GameArenaGuard";
-import { useAuthSession } from "@/hooks/useAuthSession";
-import { getOrCreateClientId } from "@/utils/clientId";
-import { GameChat, ChatToggleButton } from "@/components/GameChat";
+import {useAuthSession} from "@/hooks/useAuthSession";
+import {getOrCreateClientId} from "@/utils/clientId";
+import {GameChat, ChatToggleButton} from "@/components/GameChat";
 
 /** Util: extrai o trackId a partir de uma URL de embed do Spotify */
 function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
     if (!url) return undefined;
     const m = url.match(/spotify\.com\/(?:embed\/)?track\/([A-Za-z0-9]+)/i);
-    return m?.[1];
+    return m ?
+.
+    [1];
 }
 
 function GameArenaContent() {
-    const { roomCode } = useParams<{ roomCode: string }>();
+    const {roomCode} = useParams<{ roomCode: string }>();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const sid = (searchParams.get("sid") || "").trim();
 
-    const { user } = useAuthSession();
+    const {user} = useAuthSession();
     const clientId = useRef(getOrCreateClientId());
 
     const [countdown, setCountdown] = useState<number | null>(null);
@@ -41,12 +43,12 @@ function GameArenaContent() {
     // navegação pós-set
     useEffect(() => {
         const handleNavigateToLobby = (event: CustomEvent) => {
-            const { roomCode: navRoomCode, setComplete, eggs } = event.detail;
+            const {roomCode: navRoomCode, setComplete, eggs} = event.detail;
             navigate(`/game/lobby/${navRoomCode}?setComplete=${setComplete}&eggs=${eggs}`);
         };
 
         const handleNavigateToRoundLobby = (event: CustomEvent) => {
-            const { roomCode: navRoomCode, playerEggs, sessionId } = event.detail;
+            const {roomCode: navRoomCode, playerEggs, sessionId} = event.detail;
             navigate(`/round-lobby/${navRoomCode}?sid=${sessionId}&eggs=${playerEggs}`);
         };
 
@@ -160,35 +162,65 @@ function GameArenaContent() {
     console.log("=== DEBUG COMPLETO ===");
     console.log("1. clientId.current:", clientId.current);
     console.log("2. players array completo:", players);
-    console.log("3. jogador encontrado:", players?.find((p) => p.id === clientId.current));
+    console.log("3. jogador encontrado:", players ?.find((p) => p.id === clientId.current)
+)
+    ;
     console.log("4. user do supabase:", user);
-    console.log("5. user.user_metadata:", user?.user_metadata);
+    console.log("5. user.user_metadata:", user ?.user_metadata
+)
+    ;
     console.log("6. answersByOption:", answersByOption);
     console.log("7. countdown:", countdown);
     console.log("8. showCountdown:", showCountdown);
 
-    const debugPlayer = players?.find((p) => p.id === clientId.current);
+    const debugPlayer = players ?
+.
+    find((p) => p.id === clientId.current);
 
     // ---------- helpers ----------
     const currentPlayer = (() => {
-        const loggedPlayer = players?.find((p) => p.id === clientId.current);
+        const loggedPlayer = players ?
+        .
+        find((p) => p.id === clientId.current);
         return {
             id: "current",
-            name: loggedPlayer?.name || user?.user_metadata?.display_name || "Você",
-            avatar: loggedPlayer?.avatar || "🐔",
-            eggs: playerEggs,
-            selectedAnswer: selectedAnswer,
-    };
+            name: loggedPlayer ?.name || user ?
+        .
+        user_metadata ?
+        .
+        display_name || "Você",
+            avatar
+        :
+        loggedPlayer ?
+        .
+        avatar || "🐔",
+            eggs
+        :
+        playerEggs,
+            selectedAnswer
+        :
+        selectedAnswer,
+    }
+        ;
     })();
 
     const playersOnOption = (optionIndex: number) => {
-        const playersOnThisOption = answersByOption?.[optionIndex] || [];
+        const playersOnThisOption = answersByOption ?
+        .
+        [optionIndex] || [];
 
         if (selectedAnswer === optionIndex) {
-            const loggedPlayer = players?.find((p) => p.id === clientId.current);
+            const loggedPlayer = players ?
+        .
+            find((p) => p.id === clientId.current);
             const isAlreadyInList = playersOnThisOption.some(p => p.id === clientId.current);
 
-            if (!isAlreadyInList && loggedPlayer?.avatar?.startsWith("/")) {
+            if (!isAlreadyInList && loggedPlayer ?.
+            avatar ?
+        .
+            startsWith("/")
+        )
+            {
                 return [...playersOnThisOption, {
                     id: clientId.current,
                     name: loggedPlayer.name,
@@ -210,9 +242,9 @@ function GameArenaContent() {
     };
 
 
-    const loadGameMode = async () => {
+    const loadGameMode = async() => {
         try {
-            const { data, error } = await supabase
+            const {data, error} = await supabase
                 .from("game_settings")
                 .select("value")
                 .eq("key", "game_mode")
@@ -220,7 +252,10 @@ function GameArenaContent() {
 
             console.log('🎮 Game mode from DB:', data);
 
-            if (!error && data?.value) {
+            if (!error && data ?.
+            value
+        )
+            {
                 const mode = typeof data.value === 'string' ? data.value.replace(/"/g, '') : 'mp3';
                 const finalMode = mode === 'spotify' ? 'spotify' : 'mp3';
                 console.log('🎮 Setting game mode to:', finalMode);
@@ -259,7 +294,7 @@ function GameArenaContent() {
             <div className="min-h-screen bg-gradient-sky flex items-center justify-center p-4">
                 <BarnCard variant="golden" className="text-center p-6 sm:p-8 w-full max-w-md">
                     <div className="text-4xl sm:text-6xl mb-4 animate-chicken-walk">🐔</div>
-                    <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-4 text-white" />
+                    <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin mx-auto mb-4 text-white"/>
                     <p className="text-white text-sm sm:text-lg">{sid ? "Entrando no jogo..." : "Preparando o galinheiro musical..."}</p>
                 </BarnCard>
             </div>
@@ -299,73 +334,181 @@ function GameArenaContent() {
     // ---------- RENDER ----------
     return (
         <div className="min-h-screen bg-gradient-sky p-2 sm:p-4">
+            
+            <div className="flex justify-center mb-4">
+                <div className="w-full max-w-4xl sticky top-0 z-50 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-2">
+                    <div className="px-4 py-3">
+
+                        {/* Linha principal */}
+                        <div className="flex items-center justify-between">
+
+                            {/* Itens (esquerda no mobile, centralizados + espaçados no desktop) */}
+                            <div className="flex flex-1 justify-start sm:justify-center gap-4 sm:gap-12">
+                                {/* Rodada */}
+                                <div className="flex flex-col items-center">
+                                    <span className="text-sm mb-1">🔢</span>
+                                    <p className="text-xs text-white/80">Rodada</p>
+                                    <p className="text-sm font-bold text-white">{currentRound}/10</p>
+                                </div>
+
+                                {/* Tempo */}
+                                <div className="flex flex-col items-center">
+                                    <span className="text-sm mb-1 animate-chicken-walk">🐓</span>
+                                    <p className="text-xs text-white/80">Tempo</p>
+                                    <p className="text-sm font-bold text-white">{timeLeft}s</p>
+                                </div>
+
+                                {/* Valendo */}
+                                <div className="flex flex-col items-center">
+                                    <span className="text-sm mb-1 animate-egg-bounce">🥚</span>
+                                    <p className="text-xs text-white/80">Valendo</p>
+                                    <p className="text-sm font-bold text-white">
+                                        {currentSettings?.eggs_per_correct || 10}
+                                    </p>
+                                </div>
+
+                                {/* Estilo */}
+                                {activeGenre ? (
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-sm mb-1">{activeGenre.emoji}</span>
+                                        <p className="text-xs text-white/80">Estilo</p>
+                                        <p className="text-xs font-bold text-white">{activeGenre.name}</p>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-sm mb-1">🎵</span>
+                                        <p className="text-xs text-white/80">Estilo</p>
+                                        <p className="text-xs font-bold text-white">-</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Botão sair sempre na direita */}
+                            <div className="flex-shrink-0 ml-4">
+                                <GameNavigation showLeaveRoom={true} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+
+
             {/* Header fixo com informações do jogo - CENTRALIZADO */}
             <div className="flex justify-center mb-4">
                 <div className="w-full max-w-4xl sticky top-0 z-50 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-2">
                     <div className="px-4 py-3">
-                        {/* Container principal com 3 seções: vazio | conteúdo central | botão sair */}
-                        <div className="flex items-center justify-between mb-3">
-                            {/* Espaço vazio à esquerda para equilibrar */}
-                            <div className="w-16 sm:w-20"></div>
 
-                            {/* Conteúdo central - Grid das informações */}
-                            <div className="flex-1 flex justify-start sm:justify-center">
-                                <div className="bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-2">
-                                    <div className="grid grid-cols-4 gap-2 text-center">
-                                        {/* Rodada */}
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-sm mb-1">🔢</span>
-                                            <p className="text-xs text-white/80">Rodada</p>
-                                            <p className="text-sm font-bold text-white">{currentRound}/10</p>
-                                        </div>
 
-                                        {/* Tempo */}
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-sm mb-1 animate-chicken-walk">🐓</span>
-                                            <p className="text-xs text-white/80">Tempo</p>
-                                            <p className="text-sm font-bold text-white">{timeLeft}s</p>
-                                        </div>
+            {/* RANKING - SEMPRE ACIMA EM TODAS AS RESOLUÇÕES */}
+            <div className="space-y-4 pt-2 sm:pt-4">
+                {/* RANKING HORIZONTAL COM SCROLL */}
+                <div className="w-full">
+                    <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
+                        🏆 Ranking da Partida
+                    </h3>
 
-                                        {/* Valendo */}
-                                        <div className="flex flex-col items-center">
-                                            <span className="text-sm mb-1 animate-egg-bounce">🥚</span>
-                                            <p className="text-xs text-white/80">Valendo</p>
-                                            <p className="text-sm font-bold text-white">{currentSettings?.eggs_per_correct || 10}</p>
-                                        </div>
+                    {/* Container com scroll horizontal */}
+                    <div className="overflow-x-auto pb-2">
+                        <div className="flex gap-1 min-w-max px-2">
+                            {Array.isArray(players) && players.length > 0 ? (
+                                players
+                                    .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
+                                    .map((player, index) => {
+                                        const isCurrentPlayer = player.id === clientId.current;
+                                        const position = index + 1;
 
-                                        {/* Gênero ativo como 4ª coluna */}
-                                        {activeGenre ? (
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-sm mb-1">{activeGenre.emoji}</span>
-                                                <p className="text-xs text-white/80">Estilo</p>
-                                                <p className="text-xs font-bold text-white">{activeGenre.name}</p>
+                                        // Cores para as 3 primeiras posições
+                                        const badgeColor =
+                                            position === 1
+                                                ? "bg-yellow-500"
+                                                : position === 2
+                                                ? "bg-gray-500"
+                                                : position === 3
+                                                ? "bg-orange-500"
+                                                : "bg-muted text-muted-foreground";
+
+                                        return (
+                                            <div
+                                                key={player.id}
+                                                className="relative flex flex-col items-center p-3 rounded-lg min-w-[90px] sm:min-w-[110px]"
+
+                                            >
+                                                {/* Avatar com medalha de posição */}
+                                                <div className="relative mb-2">
+                                                    {player.avatar ?.startsWith("/") ? (
+                                                    <img
+                                                        src={player.avatar}
+                                                        alt={player.name}
+                                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white"
+                                                    />
+                                                    ) : (
+                                                    <div
+                                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl bg-primary/20 border-2 border-white">
+                                                        {player.avatar || "🐔"}
+                                                    </div>
+                                                    )}
+
+                                                    {/* Medalha */}
+                                                    <div
+                                                        className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${badgeColor}`}
+                                                    >
+                                                        {position}
+                                                    </div>
+                                                </div>
+
+                                                {/* Nome do jogador */}
+                                                <div
+                                                    className="text-xs font-medium text-white truncate max-w-[80px] mb-1 text-center">
+                                                    {player.name || "Jogador"}
+                                                </div>
+
+                                                {/* Contador de Ovos */}
+                                                <div className="flex items-center gap-1 text-xs font-bold text-white">
+                                                    <span>{(player as any).eggs || 0}</span>
+                                                    <span>🥚</span>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-sm mb-1">🎵</span>
-                                                <p className="text-xs text-white/80">Estilo</p>
-                                                <p className="text-xs font-bold text-white">-</p>
-                                            </div>
-                                        )}
-                                    </div>
+                                        );
+                                    })
+                            ) : (
+                                <div className="w-full text-center py-8">
+                                    <p className="text-sm text-muted-foreground">
+                                        Ranking ainda não disponível...
+                                    </p>
                                 </div>
-                            </div>
-
-                            {/* Botão sair à direita - com mais espaço */}
-                            <div className="w-16 sm:w-20 flex justify-end">
-                                <div className="relative">
-                                    <GameNavigation showLeaveRoom={true} />
-                                </div>
-                            </div>
+                            )}
                         </div>
+                    </div>
+
+                    {/* Indicador de scroll (opcional) */}
+                    {Array.isArray(players) && players.length > 4 && (
+                        <div className="text-center mt-2">
+                            <p className="text-xs text-muted-foreground">
+                                ← Role para ver mais jogadores →
+                            </p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+                    </div>
+                </div>
+            </div>
+
+            {/* Header fixo com informações do jogo - CENTRALIZADO */}
+            <div className="flex justify-center mb-4">
+                <div className="w-full max-w-4xl sticky top-0 z-50 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10 p-2">
+                    <div className="px-4 py-3">
 
                         {/* Barra de progresso do áudio - centralizada */}
                         {gameState !== "idle" && currentQuestion && (
-                            <div className="bg-black/20 rounded-lg p-2">
+                            <div className="bg-black/20 rounded-lg p-0">
                                 <MusicPlayer
                                     songTitle={currentQuestion?.song.title || ""}
-                                artist={currentQuestion?.song.artist || ""}
-                                audioUrl={currentQuestion?.song.audioUrl}
+                                artist={currentQuestion ?.song.artist || ""}
+                                audioUrl={currentQuestion ?.song.audioUrl}
                                 duration={currentSettings.song_duration}
                                     gameState={gameState}
                                     autoPlay={true}
@@ -375,9 +518,9 @@ function GameArenaContent() {
                                     />
                             </div>
                         )}
-                    </div>
-                </div>
-            </div>
+                        </div>
+                        </div>
+                        </div>
 
             {/* Container principal centralizado */}
             <div className="flex justify-center">
@@ -406,61 +549,61 @@ function GameArenaContent() {
 
 
                             {/*<BarnCard variant="coop" className="p-3 sm:p-4">*/}
-                                {/*<h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">*/}
-                                    {/*🏆 Ranking da Partida*/}
-                                {/*</h3>*/}
+                            {/*<h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">*/}
+                            {/*🏆 Ranking da Partida*/}
+                            {/*</h3>*/}
 
-                                {/*/!* Layout vertical para TODAS as resoluções *!/*/}
-                                {/*<div className="space-y-2 sm:space-y-3">*/}
-                                    {/*{Array.isArray(players) && players.length > 0 ? (*/}
-                                        {/*players*/}
-                                            {/*.sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))*/}
-                                            {/*.slice(0, 6)*/}
-                                            {/*.map((player, index) => {*/}
-                                                {/*const isCurrentPlayer = player.id === clientId.current;*/}
-                                                {/*return (*/}
-                                                    {/*<div*/}
-                                                        {/*key={player.id}*/}
-                                                        {/*className={`flex items-center gap-2 sm:gap-3 p-2 rounded-lg ${isCurrentPlayer ? 'bg-primary/10 border-2 border-primary' : 'bg-muted/10'}`}*/}
-                                                    {/*>*/}
+                            {/*/!* Layout vertical para TODAS as resoluções *!/*/}
+                            {/*<div className="space-y-2 sm:space-y-3">*/}
+                            {/*{Array.isArray(players) && players.length > 0 ? (*/}
+                            {/*players*/}
+                            {/*.sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))*/}
+                            {/*.slice(0, 6)*/}
+                            {/*.map((player, index) => {*/}
+                            {/*const isCurrentPlayer = player.id === clientId.current;*/}
+                            {/*return (*/}
+                            {/*<div*/}
+                            {/*key={player.id}*/}
+                            {/*className={`flex items-center gap-2 sm:gap-3 p-2 rounded-lg ${isCurrentPlayer ? 'bg-primary/10 border-2 border-primary' : 'bg-muted/10'}`}*/}
+                            {/*>*/}
                             {/*<span className="text-sm font-bold w-6 text-center">*/}
-                                {/*{index + 1}º*/}
+                            {/*{index + 1}º*/}
                             {/*</span>*/}
 
-                                                        {/*{player.avatar?.startsWith("/") ? (*/}
-                                                        {/*<img*/}
-                                                            {/*src={player.avatar}*/}
-                                                            {/*alt={player.name}*/}
-                                                            {/*className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-white flex-shrink-0"*/}
-                                                        {/*/>*/}
-                                                        {/*) : (*/}
-                                                        {/*<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 text-sm">*/}
-                                                            {/*{player.avatar || "🐔"}*/}
-                                                        {/*</div>*/}
-                                                        {/*)}*/}
+                            {/*{player.avatar?.startsWith("/") ? (*/}
+                            {/*<img*/}
+                            {/*src={player.avatar}*/}
+                            {/*alt={player.name}*/}
+                            {/*className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-white flex-shrink-0"*/}
+                            {/*/>*/}
+                            {/*) : (*/}
+                            {/*<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 text-sm">*/}
+                            {/*{player.avatar || "🐔"}*/}
+                            {/*</div>*/}
+                            {/*)}*/}
 
-                                                        {/*<div className="flex-1 min-w-0">*/}
-                                {/*<span className={`text-sm font-semibold truncate block ${isCurrentPlayer ? 'text-primary' : ''}`}>*/}
-                                    {/*{player.name || "Jogador"}*/}
-                                    {/*{isCurrentPlayer && <span className="ml-1">(Você)</span>}*/}
-                                {/*</span>*/}
-                                                        {/*</div>*/}
+                            {/*<div className="flex-1 min-w-0">*/}
+                            {/*<span className={`text-sm font-semibold truncate block ${isCurrentPlayer ? 'text-primary' : ''}`}>*/}
+                            {/*{player.name || "Jogador"}*/}
+                            {/*{isCurrentPlayer && <span className="ml-1">(Você)</span>}*/}
+                            {/*</span>*/}
+                            {/*</div>*/}
 
-                                                        {/*<EggCounter*/}
-                                                            {/*count={(player as any).eggs || 0}*/}
-                                                            {/*size="sm"*/}
-                                                            {/*variant={index === 0 ? "golden" : "default"}*/}
-                                                            {/*className="flex-shrink-0"*/}
-                                                        {/*/>*/}
-                                                    {/*</div>*/}
-                                                {/*);*/}
-                                            {/*})*/}
-                                    {/*) : (*/}
-                                        {/*<p className="text-sm text-muted-foreground text-center">*/}
-                                            {/*Ranking ainda não disponível...*/}
-                                        {/*</p>*/}
-                                    {/*)}*/}
-                                {/*</div>*/}
+                            {/*<EggCounter*/}
+                            {/*count={(player as any).eggs || 0}*/}
+                            {/*size="sm"*/}
+                            {/*variant={index === 0 ? "golden" : "default"}*/}
+                            {/*className="flex-shrink-0"*/}
+                            {/*/>*/}
+                            {/*</div>*/}
+                            {/*);*/}
+                            {/*})*/}
+                            {/*) : (*/}
+                            {/*<p className="text-sm text-muted-foreground text-center">*/}
+                            {/*Ranking ainda não disponível...*/}
+                            {/*</p>*/}
+                            {/*)}*/}
+                            {/*</div>*/}
                             {/*</BarnCard>*/}
 
                             {/* Opções de resposta */}
@@ -477,7 +620,7 @@ function GameArenaContent() {
                                             <div className="absolute -top-2 -right-2 flex -space-x-1 z-10">
                                                 {playersOnOption(index).slice(0, 3).map((p: any) => (
                                                     <div key={p.id} className="relative">
-                                                        {p.avatar?.startsWith("/") && (
+                                                        {p.avatar ?.startsWith("/") && (
                                                         <img
                                                             src={p.avatar}
                                                             alt={p.name}
@@ -488,8 +631,10 @@ function GameArenaContent() {
                                                     </div>
                                                 ))}
                                                 {playersOnOption(index).length > 3 && (
-                                                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-500 border-2 border-white flex items-center justify-center shadow-lg">
-                                                        <span className="text-xs font-bold text-white">+{playersOnOption(index).length - 3}</span>
+                                                    <div
+                                                        className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-500 border-2 border-white flex items-center justify-center shadow-lg">
+                                                        <span
+                                                            className="text-xs font-bold text-white">+{playersOnOption(index).length - 3}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -503,96 +648,7 @@ function GameArenaContent() {
                                 ))}
                             </div>
 
-                            {/* RANKING - SEMPRE ACIMA EM TODAS AS RESOLUÇÕES */}
 
-                            <div className="space-y-4 pt-4 sm:pt-4">
-                                {/* RANKING HORIZONTAL COM SCROLL */}
-                                <div className="w-full">
-                                    <h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">
-                                        🏆 Ranking da Partida
-                                    </h3>
-
-                                    {/* Container com scroll horizontal */}
-                                    <div className="overflow-x-auto pb-2">
-                                        <div className="flex gap-1 min-w-max px-2">
-                                            {Array.isArray(players) && players.length > 0 ? (
-                                                players
-                                                    .sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))
-                                                    .map((player, index) => {
-                                                        const isCurrentPlayer = player.id === clientId.current;
-                                                        const position = index + 1;
-
-                                                        // Cores para as 3 primeiras posições
-                                                        const badgeColor =
-                                                            position === 1
-                                                                ? "bg-yellow-500"
-                                                                : position === 2
-                                                                ? "bg-gray-500"
-                                                                : position === 3
-                                                                ? "bg-orange-500"
-                                                                : "bg-muted text-muted-foreground";
-
-                                                        return (
-                                                            <div
-                                                                key={player.id}
-                                                                className="relative flex flex-col items-center p-3 rounded-lg min-w-[90px] sm:min-w-[110px]"
-
-                                                            >
-                                                                {/* Avatar com medalha de posição */}
-                                                                <div className="relative mb-2">
-                                                                    {player.avatar?.startsWith("/") ? (
-                                                                    <img
-                                                                        src={player.avatar}
-                                                                        alt={player.name}
-                                                                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover border-2 border-white"
-                                                                    />
-                                                                    ) : (
-                                                                    <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl bg-primary/20 border-2 border-white">
-                                                                        {player.avatar || "🐔"}
-                                                                    </div>
-                                                                    )}
-
-                                                                    {/* Medalha */}
-                                                                    <div
-                                                                        className={`absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${badgeColor}`}
-                                                                    >
-                                                                        {position}
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* Nome do jogador */}
-                                                                <div className="text-xs font-medium text-white truncate max-w-[80px] mb-1 text-center">
-                                                                    {player.name || "Jogador"}
-                                                                </div>
-
-                                                                {/* Contador de Ovos */}
-                                                                <div className="flex items-center gap-1 text-xs font-bold text-white">
-                                                                    <span>{(player as any).eggs || 0}</span>
-                                                                    <span>🥚</span>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                            ) : (
-                                                <div className="w-full text-center py-8">
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Ranking ainda não disponível...
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Indicador de scroll (opcional) */}
-                                    {Array.isArray(players) && players.length > 4 && (
-                                        <div className="text-center mt-2">
-                                            <p className="text-xs text-muted-foreground">
-                                                ← Role para ver mais jogadores →
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
 
                             {/* Sua pontuação */}
                             <BarnCard variant="coop" className="p-3 sm:p-4">
@@ -605,19 +661,19 @@ function GameArenaContent() {
                                 </div>
 
                                 {/*{battleMode === 'battle' && isHost && (*/}
-                                    {/*<button onClick={() => {*/}
-                                    {/*console.log('🧪 Teste de redistribuição forçada');*/}
-                                    {/*redistributeEggs(roomCode, 0, {*/}
-                                      {/*'player1': { answer: 0, responseTime: 5 },*/}
-                                      {/*'player2': { answer: 1, responseTime: 3 }*/}
-                                    {/*}, battleSettings);*/}
+                                {/*<button onClick={() => {*/}
+                                {/*console.log('🧪 Teste de redistribuição forçada');*/}
+                                {/*redistributeEggs(roomCode, 0, {*/}
+                                {/*'player1': { answer: 0, responseTime: 5 },*/}
+                                {/*'player2': { answer: 1, responseTime: 3 }*/}
+                                {/*}, battleSettings);*/}
                                 {/*}}>*/}
-                                        {/*Testar Redistribuição*/}
-                                    {/*</button>*/}
+                                {/*Testar Redistribuição*/}
+                                {/*</button>*/}
                                 {/*)}*/}
 
                                 <div className="flex flex-col items-center text-center">
-                                    {currentPlayer.avatar?.startsWith("/") ? (
+                                    {currentPlayer.avatar ?.startsWith("/") ? (
                                     <img
                                         src={currentPlayer.avatar}
                                         alt={currentPlayer.name}
@@ -633,14 +689,15 @@ function GameArenaContent() {
                                     )}
 
                                     <p className="font-semibold text-sm sm:text-lg mb-2">{currentPlayer.name}</p>
-                                    <EggCounter count={playerEggs} size="lg" variant="golden" />
+                                    <EggCounter count={playerEggs} size="lg" variant="golden"/>
 
                                     {selectedAnswer !== null && (
                                         <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-muted/50 rounded-lg w-full">
                                             <p className="text-xs sm:text-sm font-medium">
                                                 <span className="sm:hidden">Resposta: </span>
                                                 <span className="hidden sm:inline">Sua resposta: </span>
-                                                <span className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
+                                                <span
+                                                    className="font-bold">{currentQuestion.options[selectedAnswer]}</span>
                                             </p>
                                             {answerTime && (
                                                 <p className="text-xs text-muted-foreground mt-1">
@@ -667,7 +724,8 @@ function GameArenaContent() {
                                                 {timeLeft > ((currentSettings.time_per_question || 15) * 0.8) && ` +${currentSettings.speed_bonus || 5}!`}
                                                 </span>
                                             <span className="hidden sm:inline">
-                                                    🥚 Parabéns! Você ganhou {currentSettings.eggs_per_correct || 10} ovos
+                                                    🥚 Parabéns! Você ganhou {currentSettings.eggs_per_correct || 10}
+                                                ovos
                                                 {timeLeft > ((currentSettings.time_per_question || 15) * 0.8)
                                                     ? ` + ${currentSettings.speed_bonus || 5} bônus velocidade!`
                                                     : "!"

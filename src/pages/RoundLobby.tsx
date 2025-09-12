@@ -11,6 +11,7 @@ import { getOrCreateClientId, loadProfile } from "@/utils/clientId";
 import { Loader2, Crown, Trophy, Music } from "lucide-react";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector";
+import { GameChat, ChatToggleButton } from "@/components/GameChat";
 
 interface PlayerRanking {
   id: string;
@@ -56,6 +57,10 @@ export default function RoundLobby() {
   const email = user?.email ?? "";
   const meta = (user?.user_metadata ?? {}) as Record<string, any>;
   const avatarUrl = (meta.avatar_url as string) || "";
+  const sid = (searchParams.get("sid") || "").trim();
+  // Estados do chat
+  const [showChat, setShowChat] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const [albumSelected, setAlbumSelected] = useState(false);
   const [showAlbumSelector, setShowAlbumSelector] = useState(false);
@@ -537,6 +542,30 @@ export default function RoundLobby() {
       </div>
   )}
 
+  {/* Chat */}
+  <GameChat
+      roomCode={roomCode || ""}
+      sessionId={sid}
+      isVisible={showChat}
+      onToggle={() => {
+                setShowChat(false);
+                setChatUnreadCount(0);
+            }}
+      onUnreadChange={(count) => setChatUnreadCount(count)}
+  />
+
+  {/* Botão do chat */}
+  {!showChat && (
+      <ChatToggleButton
+          onClick={() => {
+                    setShowChat(true);
+                    setChatUnreadCount(0);
+                }}
+          unreadCount={chatUnreadCount}
+      />
+  )}
+
+
   {/* Ações do Host */}
   {isHost && (
       <div className="text-center">
@@ -598,6 +627,7 @@ export default function RoundLobby() {
         </BarnCard>
       </div>
   )}
+
   </div>
   </div>
   );
