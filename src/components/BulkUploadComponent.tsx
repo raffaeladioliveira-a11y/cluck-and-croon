@@ -1,182 +1,103 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
+import { ChickenButton } from "@/components/ChickenButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import { ChickenButton } from "@/components/ChickenButton";
-import { BarnCard } from "@/components/BarnCard";
-import { Upload, Music, Check, X, Edit, AlertCircle } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Upload, X, CheckCircle, AlertCircle } from "lucide-react";
 
-interface AudioFile {
-    file: File;
-    id: string;
-    metadata: {
-        title: string;
-        artist: string;
-        duration: number;
+interface BulkUploadComponentProps {
+    selectedAlbum: {
+        id: string;
+        name: string;
+        genre_id: string;
     };
-    status: 'pending' | 'uploading' | 'success' | 'error';
-    url?: string;
-    error?: string;
-}
-
-interface BulkUploadProps {
-    selectedAlbum: any;
     onComplete: () => void;
 }
 
-export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadProps) => {
-    const [files, setFiles] = useState<AudioFile[]>([]);
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [currentStep, setCurrentStep] = useState<'select' | 'review' | 'upload' | 'complete'>('select');
+interface UploadFile {
+    file: File;
+    status: 'pending' | 'uploading' | 'processing' | 'success' | 'error';
+    progress: number;
+    error?: string;
+    title?: string;
+    artist?: string;
+}
+
+export const BulkUploadComponent: React.FC<BulkUploadComponentProps> = ({
+    selectedAlbum,
+    onComplete
+}) => {
+    const [files, setFiles] = useState<UploadFile[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const [currentFileIndex, setCurrentFileIndex] = useState(-1);
     const [isDragOver, setIsDragOver] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Função para extrair metadados básicos do arquivo
-    const extractMetadata = useCallback(async (file: File): Promise<{ title: string; artist: string; duration: number }> => {
-        return new Promise((resolve) => {
-            const audio = new Audio();
-            const url = URL.createObjectURL(file);
+    // Função para extrair título e artista do nome do arquivo
+    const extractTitleAndArtist = (filename: string) => {
+        // Remove a extensão
+        const nameWithoutExt = filename.replace(/\.[^/.]+$/, "");
 
-            const cleanup = () => {
-                URL.revokeObjectURL(url);
-                audio.removeEventListener('loadedmetadata', onLoad);
-                audio.removeEventListener('error', onError);
-            };
-
-            const onLoad = () => {
-                // Extrair nome do arquivo sem extensão
-                const fileName = file.name.replace(/\.[^/.]+$/, "");
-
-                // Tentar extrair artista e título do nome do arquivo
-                // Formato esperado: "Artista - Título" ou apenas "Título"
-                let title = fileName;
-                let artist = selectedAlbum?.artist_name || "Artista Desconhecido";
-
-                if (fileName.includes(' - ')) {
-                    const parts = fileName.split(' - ');
-                    artist = parts[0].trim();
-                    title = parts.slice(1).join(' - ').trim();
-                }
-
-                resolve({
-                    title,
-                    artist,
-                    duration: Math.round(audio.duration) || 30
-                });
-
-                cleanup();
-            };
-
-            const onError = () => {
-                resolve({
-                        title: file.name.replace(/\.[^/.]+$/, ""),
-                        artist: selectedAlbum?.artist_name || "Artista Desconhecido",
-                    duration: 30
-            });
-                cleanup();
-            };
-
-            audio.addEventListener('loadedmetadata', onLoad);
-            audio.addEventListener('error', onError);
-            audio.src = url;
-
-            // Timeout para casos onde o áudio não carrega
-            setTimeout(() => {
-                if (audio.readyState === 0) {
-                    onError();
-                }
-            }, 5000);
-        });
-    }, [selectedAlbum]);
-
-    // Função para processar arquivos (usada tanto para click quanto drag)
-    const processFiles = useCallback(async (fileList: FileList | File[]) => {
-        const selectedFiles = Array.from(fileList);
-        const mp3Files = selectedFiles.filter(file =>
-            file.type === 'audio/mpeg' ||
-            file.type === 'audio/mp3' ||
-            file.name.toLowerCase().endsWith('.mp3')
-        );
-
-        if (mp3Files.length === 0) {
-            toast({
-                title: "Nenhum arquivo MP3 encontrado",
-                description: "Selecione apenas arquivos .mp3",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        if (mp3Files.length > 20) {
-            toast({
-                title: "Muitos arquivos selecionados",
-                description: "Por favor, selecione no máximo 20 arquivos por vez",
-                variant: "destructive"
-            });
-            return;
-        }
-
-        setIsProcessing(true);
-        const audioFiles: AudioFile[] = [];
-
-        for (let i = 0; i < mp3Files.length; i++) {
-            const file = mp3Files[i];
-            try {
-                const metadata = await extractMetadata(file);
-
-                audioFiles.push({
-                    file,
-                    id: `${Date.now()}-${i}`,
-                    metadata,
-                    status: 'pending'
-                });
-            } catch (error) {
-                console.error(`Erro ao processar ${file.name}:`, error);
-                // Adiciona mesmo com erro, usando metadados básicos
-                audioFiles.push({
-                        file,
-                        id: `${Date.now()}-${i}`,
-                        metadata: {
-                            title: file.name.replace(/\.[^/.]+$/, ""),
-                            artist: selectedAlbum?.artist_name || "Artista Desconhecido",
-                        duration: 30
-                    },
-                    status: 'pending'
-            });
+        // Padrões comuns: "Artista - Título" ou "Título - Artista"
+        if (nameWithoutExt.includes(' - ')) {
+            const parts = nameWithoutExt.split(' - ');
+            if (parts.length >= 2) {
+                return {
+                    artist: parts[0].trim(),
+                    title: parts[1].trim()
+                };
             }
         }
 
-        setFiles(audioFiles);
-        setCurrentStep('review');
-        setIsProcessing(false);
+        // Se não houver padrão, usar nome como título
+        return {
+            artist: selectedAlbum.name, // Usar nome do álbum como artista padrão
+            title: nameWithoutExt.trim()
+        };
+    };
 
-        toast({
-            title: `${mp3Files.length} arquivos processados`,
-            description: "Revise os metadados antes de fazer upload"
-        });
-    }, [extractMetadata, selectedAlbum]);
+    // Função para processar arquivos (tanto de input quanto de drag)
+    const processSelectedFiles = useCallback((selectedFiles: FileList) => {
+        const newFiles: UploadFile[] = Array.from(selectedFiles)
+            .filter(file => file.type === 'audio/mpeg' || file.name.endsWith('.mp3'))
+            .map(file => {
+                const { title, artist } = extractTitleAndArtist(file.name);
+                return {
+                    file,
+                    status: 'pending' as const,
+                    progress: 0,
+                    title,
+                    artist
+                };
+            });
 
-    // Processar arquivos selecionados via input
-    const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
-        if (files && files.length > 0) {
-            await processFiles(files);
+        if (newFiles.length === 0) {
+            toast({
+                title: "Arquivos inválidos",
+                description: "Por favor, selecione apenas arquivos MP3",
+                variant: "destructive"
+            });
+            return;
         }
+
+        setFiles(prev => [...prev, ...newFiles]);
+    }, [selectedAlbum.name]);
+
+    const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = event.target.files;
+        if (!selectedFiles) return;
+
+        processSelectedFiles(selectedFiles);
+
         // Limpar o input para permitir selecionar os mesmos arquivos novamente
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    }, [processFiles]);
+    }, [processSelectedFiles]);
 
-    // Handlers para drag and drop
+    // Funções de Drag and Drop
     const handleDragEnter = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
@@ -186,10 +107,7 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
     const handleDragLeave = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        // Só remove o highlight se realmente saiu da área
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            setIsDragOver(false);
-        }
+        setIsDragOver(false);
     }, []);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -197,371 +115,354 @@ export const BulkUploadComponent = ({ selectedAlbum, onComplete }: BulkUploadPro
         e.stopPropagation();
     }, []);
 
-    const handleDrop = useCallback(async (e: React.DragEvent) => {
+    const handleDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         e.stopPropagation();
         setIsDragOver(false);
 
-        const droppedFiles = Array.from(e.dataTransfer.files);
+        const droppedFiles = e.dataTransfer.files;
         if (droppedFiles.length > 0) {
-            await processFiles(droppedFiles);
+            processSelectedFiles(droppedFiles);
         }
-    }, [processFiles]);
+    }, [processSelectedFiles]);
 
-    // Clique na área de upload
-    const handleUploadAreaClick = useCallback(() => {
-        if (fileInputRef.current) {
-            fileInputRef.current.click();
-        }
+    const handleDropZoneClick = useCallback(() => {
+        fileInputRef.current?.click();
     }, []);
 
-    // Atualizar metadados de um arquivo
-    const updateFileMetadata = useCallback((fileId: string, field: keyof AudioFile['metadata'], value: string) => {
-        setFiles(prev => prev.map(file =>
-            file.id === fileId
-                ? {
-                ...file,
-                metadata: {
-                    ...file.metadata,
-                    [field]: field === 'duration' ? parseInt(value) || 30 : value
-                }
-            }
-                : file
+    const removeFile = (index: number) => {
+        setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const updateFileTitle = (index: number, title: string) => {
+        setFiles(prev => prev.map((file, i) =>
+            i === index ? { ...file, title } : file
         ));
-    }, []);
+    };
 
-    // Upload individual de arquivo
-    const uploadSingleFile = useCallback(async (audioFile: AudioFile): Promise<boolean> => {
+    const updateFileArtist = (index: number, artist: string) => {
+        setFiles(prev => prev.map((file, i) =>
+            i === index ? { ...file, artist } : file
+        ));
+    };
+
+    const uploadFile = async (file: File, albumId: string): Promise<string | null> => {
         try {
-            // Upload para storage
             const timestamp = Date.now();
-            const slug = audioFile.metadata.title.toLowerCase().replace(/[^a-z0-9]/gi, '-');
-            const fileName = `${selectedAlbum.id}/${slug}-${timestamp}.mp3`;
+            const slug = file.name.toLowerCase().replace(/[^a-z0-9.]/gi, '-');
+            const fileName = `${albumId}/${timestamp}-${slug}`;
+
+            console.log(`Fazendo upload: ${fileName}`);
 
             const { error: uploadError } = await supabase.storage
                 .from('songs')
-                .upload(fileName, audioFile.file, {
+                .upload(fileName, file, {
                     cacheControl: '3600',
                     upsert: false
                 });
 
-            if (uploadError) throw uploadError;
+            if (uploadError) {
+                console.error('Erro no upload:', uploadError);
+                throw uploadError;
+            }
 
             const { data: { publicUrl } } = supabase.storage
                 .from('songs')
                 .getPublicUrl(fileName);
 
-            // Salvar no banco de dados
-            const songData = {
-                title: audioFile.metadata.title,
-                artist: audioFile.metadata.artist,
-                album_id: selectedAlbum.id,
-                genre_id: selectedAlbum.genre_id,
-                duration_seconds: audioFile.metadata.duration,
-                audio_file_url: publicUrl,
-                difficulty_level: 1,
-                is_active: true
-            };
-
-            const { error: dbError } = await supabase
-                .from('songs')
-                .insert([songData]);
-
-            if (dbError) throw dbError;
-
-            return true;
+            console.log(`URL gerada: ${publicUrl}`);
+            return publicUrl;
         } catch (error) {
-            console.error('Upload error:', error);
-            return false;
+            console.error('Erro completo no upload:', error);
+            throw error;
         }
-    }, [selectedAlbum]);
+    };
 
-    // Processo de upload em lote
-    const handleBulkUpload = useCallback(async () => {
-        setCurrentStep('upload');
-        setUploadProgress(0);
+    const processFiles = async () => {
+        if (files.length === 0) {
+            toast({
+                title: "Nenhum arquivo selecionado",
+                description: "Selecione arquivos MP3 para upload",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setIsUploading(true);
+        let successCount = 0;
+        let errorCount = 0;
 
         for (let i = 0; i < files.length; i++) {
-            const file = files[i];
+            setCurrentFileIndex(i);
+            const uploadFile = files[i];
 
-            // Atualizar status para "uploading"
-            setFiles(prev => prev.map(f =>
-                f.id === file.id ? { ...f, status: 'uploading' as const } : f
+            // Atualizar status para uploading
+            setFiles(prev => prev.map((file, index) =>
+                index === i ? { ...file, status: 'uploading', progress: 0 } : file
             ));
 
-            const success = await uploadSingleFile(file);
+            try {
+                // 1. Fazer upload do arquivo
+                console.log(`Processando arquivo ${i + 1}/${files.length}: ${uploadFile.file.name}`);
 
-            // Atualizar status final
-            setFiles(prev => prev.map(f =>
-                f.id === file.id
-                    ? { ...f, status: success ? 'success' as const : 'error' as const, error: success ? undefined : 'Erro no upload' }
-                    : f
-            ));
+                const audioUrl = await uploadFileToStorage(uploadFile.file, selectedAlbum.id);
 
-            // Atualizar progresso
-            setUploadProgress(((i + 1) / files.length) * 100);
+                if (!audioUrl) {
+                    throw new Error('Falha no upload do arquivo');
+                }
+
+                // Atualizar progresso para 50% (upload concluído)
+                setFiles(prev => prev.map((file, index) =>
+                    index === i ? { ...file, progress: 50 } : file
+                ));
+
+                // 2. Salvar no banco de dados
+                console.log(`Salvando no banco: ${uploadFile.title} por ${uploadFile.artist}`);
+
+                setFiles(prev => prev.map((file, index) =>
+                    index === i ? { ...file, status: 'processing', progress: 75 } : file
+                ));
+
+                // Criar a música
+                const songData = {
+                    title: uploadFile.title || uploadFile.file.name.replace(/\.[^/.]+$/, ""),
+                    artist: uploadFile.artist || selectedAlbum.name,
+                    genre_id: selectedAlbum.genre_id,
+                    duration_seconds: 10, // Valor padrão
+                    audio_file_url: audioUrl,
+                    difficulty_level: 1, // Valor padrão
+                    is_active: true
+                };
+
+                console.log('Dados da música:', songData);
+
+                const { data: createdSong, error: songError } = await supabase
+                    .from('songs')
+                    .insert([songData])
+                    .select()
+                    .single();
+
+                if (songError) {
+                    console.error('Erro ao criar música:', songError);
+                    throw songError;
+                }
+
+                console.log('Música criada:', createdSong);
+
+                // 3. Criar relacionamento com álbum
+                const relationshipData = {
+                    album_id: selectedAlbum.id,
+                    song_id: createdSong.id,
+                    track_order: i + 1
+                };
+
+                console.log('Criando relacionamento:', relationshipData);
+
+                const { error: relationshipError } = await supabase
+                    .from('album_songs')
+                    .insert([relationshipData]);
+
+                if (relationshipError) {
+                    console.error('Erro ao criar relacionamento:', relationshipError);
+                    throw relationshipError;
+                }
+
+                console.log('Relacionamento criado com sucesso');
+
+                // Sucesso - atualizar para 100%
+                setFiles(prev => prev.map((file, index) =>
+                    index === i ? { ...file, status: 'success', progress: 100 } : file
+                ));
+
+                successCount++;
+
+            } catch (error) {
+                console.error(`Erro ao processar arquivo ${uploadFile.file.name}:`, error);
+
+                setFiles(prev => prev.map((file, index) =>
+                    index === i ? {
+                        ...file,
+                        status: 'error',
+                        progress: 0,
+                        error: error instanceof Error ? error.message : 'Erro desconhecido'
+                    } : file
+                ));
+
+                errorCount++;
+            }
         }
 
-        setCurrentStep('complete');
-        onComplete();
+        setIsUploading(false);
+        setCurrentFileIndex(-1);
 
-        const successCount = files.filter(f => f.status === 'success').length;
-        toast({
-            title: "Upload concluído",
-            description: `${successCount} de ${files.length} músicas foram adicionadas ao álbum`
-        });
-    }, [files, uploadSingleFile, onComplete]);
-
-    // Resetar componente
-    const handleReset = useCallback(() => {
-        setFiles([]);
-        setCurrentStep('select');
-        setUploadProgress(0);
-        setIsProcessing(false);
-        setIsDragOver(false);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+        // Toast de resultado
+        if (successCount > 0 && errorCount === 0) {
+            toast({
+                title: "Upload concluído com sucesso!",
+                description: `${successCount} músicas foram adicionadas ao álbum`,
+            });
+        } else if (successCount > 0 && errorCount > 0) {
+            toast({
+                title: "Upload parcialmente concluído",
+                description: `${successCount} sucessos, ${errorCount} erros`,
+            });
+        } else if (errorCount > 0 && successCount === 0) {
+            toast({
+                title: "Falha no upload",
+                description: `Nenhuma música foi salva. ${errorCount} erros encontrados`,
+                variant: "destructive"
+            });
         }
-    }, []);
+
+        // Chamar callback se houver sucessos
+        if (successCount > 0) {
+            onComplete();
+        }
+    };
+
+    // Renomeando para evitar conflito de nomes
+    const uploadFileToStorage = uploadFile;
 
     return (
-        <BarnCard variant="golden" className="p-6">
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="text-center">
-                    <h3 className="text-2xl font-bold text-white mb-2">
-                        Upload em Lote - {selectedAlbum?.name}
-                    </h3>
-                    <p className="text-white/80">
-                        Adicione múltiplas músicas de uma vez ao álbum
+        <div className="space-y-6">
+            {/* Seleção de arquivos com Drag and Drop */}
+            <div
+                className={`border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer ${
+          isDragOver
+            ? 'border-primary bg-primary/5 scale-105'
+            : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+        }`}
+                onDragEnter={handleDragEnter}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={handleDropZoneClick}
+            >
+                <Upload className={`w-12 h-12 mx-auto mb-4 transition-colors ${
+          isDragOver ? 'text-primary' : 'text-muted-foreground'
+        }`} />
+                <div className="space-y-2">
+                    <p className="text-lg font-semibold">
+                        {isDragOver ? 'Solte os arquivos aqui!' : 'Selecionar Arquivos MP3'}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                        {isDragOver
+                            ? 'Solte para fazer upload dos arquivos MP3'
+                            : 'Clique aqui ou arraste arquivos MP3 para fazer upload em massa'
+                        }
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        Suporta múltiplos arquivos • Apenas .mp3
                     </p>
                 </div>
+                <Input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".mp3,audio/mpeg"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                />
+            </div>
 
-                {/* Step 1: Seleção de arquivos */}
-                {currentStep === 'select' && (
-                    <div className="space-y-4">
-                        <div
-                            className={`text-center py-8 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ${
-                                isDragOver
-                                    ? 'border-white bg-white/20 scale-105'
-                                    : 'border-white/30 hover:border-white/50 hover:bg-white/10'
-                            } ${isProcessing ? 'pointer-events-none opacity-50' : ''}`}
-                            onDragEnter={handleDragEnter}
-                            onDragLeave={handleDragLeave}
-                            onDragOver={handleDragOver}
-                            onDrop={handleDrop}
-                            onClick={handleUploadAreaClick}
+            {/* Lista de arquivos */}
+            {files.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h4 className="text-lg font-semibold">
+                            Arquivos Selecionados ({files.length})
+                        </h4>
+                        <ChickenButton
+                            variant="corn"
+                            onClick={processFiles}
+                            disabled={isUploading}
                         >
-                            <Upload className={`w-12 h-12 mx-auto mb-4 transition-colors ${
-                                isDragOver ? 'text-white' : 'text-white/60'
-                            }`} />
-
-                            {isProcessing ? (
-                                <div className="text-white">
-                                    <div className="animate-spin w-6 h-6 border-2 border-white border-t-transparent rounded-full mx-auto mb-2" />
-                                    Processando arquivos...
-                                </div>
-                            ) : (
-                                <>
-                                <div className={`mb-2 transition-colors ${
-                                        isDragOver ? 'text-white font-semibold' : 'text-white'
-                                    }`}>
-                                    {isDragOver ? 'Solte os arquivos aqui!' : 'Clique para selecionar arquivos MP3'}
-                                </div>
-                                <div className="text-white/60 text-sm">
-                                    Ou arraste e solte os arquivos aqui
-                                </div>
-                                </>
-                            )}
-
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                multiple
-                                accept=".mp3,audio/mpeg,audio/mp3"
-                                onChange={handleFileSelect}
-                                className="hidden"
-                                disabled={isProcessing}
-                            />
-                        </div>
-
-                        <div className="bg-white/10 rounded-lg p-4">
-                            <h4 className="text-white font-semibold mb-2">Dicas para melhor resultado:</h4>
-                            <ul className="text-white/80 text-sm space-y-1">
-                                <li>• Nomeie os arquivos como: "Artista - Título.mp3"</li>
-                                <li>• Use apenas arquivos MP3</li>
-                                <li>• Máximo recomendado: 20 arquivos por vez</li>
-                                <li>• Você poderá editar os metadados antes do upload</li>
-                            </ul>
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 2: Revisão de metadados */}
-                {currentStep === 'review' && (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-xl font-bold text-white">
-                                Revisar Metadados ({files.length} arquivos)
-                            </h4>
-                            <div className="space-x-2">
-                                <ChickenButton variant="feather" size="sm" onClick={handleReset}>
-                                    Cancelar
-                                </ChickenButton>
-                                <ChickenButton variant="corn" onClick={handleBulkUpload}>
-                                    Fazer Upload
-                                </ChickenButton>
-                            </div>
-                        </div>
-
-                        <div className="max-h-96 overflow-y-auto space-y-3">
-                            {files.map((audioFile, index) => (
-                                <div key={audioFile.id} className="bg-white/10 rounded-lg p-4">
-                                    <div className="flex items-center gap-3 mb-3">
-                                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-white font-bold">
-                                            {index + 1}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="text-white font-medium text-sm truncate">
-                                                {audioFile.file.name}
-                                            </div>
-                                            <div className="text-white/60 text-xs">
-                                                {(audioFile.file.size / 1024 / 1024).toFixed(2)} MB
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        <div>
-                                            <Label className="text-white/90 text-xs">Título</Label>
-                                            <Input
-                                                value={audioFile.metadata.title}
-                                                onChange={(e) => updateFileMetadata(audioFile.id, 'title', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white text-sm"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-white/90 text-xs">Artista</Label>
-                                            <Input
-                                                value={audioFile.metadata.artist}
-                                                onChange={(e) => updateFileMetadata(audioFile.id, 'artist', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white text-sm"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label className="text-white/90 text-xs">Duração (s)</Label>
-                                            <Input
-                                                type="number"
-                                                value={audioFile.metadata.duration}
-                                                onChange={(e) => updateFileMetadata(audioFile.id, 'duration', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white text-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 3: Upload em progresso */}
-                {currentStep === 'upload' && (
-                    <div className="space-y-4">
-                        <div className="text-center">
-                            <h4 className="text-xl font-bold text-white mb-2">
-                                Fazendo Upload...
-                            </h4>
-                            <Progress value={uploadProgress} className="w-full" />
-                            <p className="text-white/80 text-sm mt-2">
-                                {Math.round(uploadProgress)}% concluído
-                            </p>
-                        </div>
-
-                        <div className="max-h-64 overflow-y-auto space-y-2">
-                            {files.map((audioFile) => (
-                                <div key={audioFile.id} className="flex items-center gap-3 p-3 bg-white/10 rounded-lg">
-                                    <div className="flex-shrink-0">
-                                        {audioFile.status === 'pending' && (
-                                            <div className="w-5 h-5 rounded-full border-2 border-white/40" />
-                                        )}
-                                        {audioFile.status === 'uploading' && (
-                                            <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                                        )}
-                                        {audioFile.status === 'success' && (
-                                            <Check className="w-5 h-5 text-green-400" />
-                                        )}
-                                        {audioFile.status === 'error' && (
-                                            <X className="w-5 h-5 text-red-400" />
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="text-white font-medium truncate">
-                                            {audioFile.metadata.title}
-                                        </div>
-                                        <div className="text-white/60 text-sm truncate">
-                                            {audioFile.metadata.artist}
-                                        </div>
-                                    </div>
-                                    <div className="flex-shrink-0">
-                                        <Badge
-                                            variant={
-                        audioFile.status === 'success' ? 'default' :
-                        audioFile.status === 'error' ? 'destructive' :
-                        'secondary'
-                      }
-                                            className="text-xs"
-                                        >
-                                            {audioFile.status === 'pending' && 'Aguardando'}
-                                            {audioFile.status === 'uploading' && 'Enviando...'}
-                                            {audioFile.status === 'success' && 'Concluído'}
-                                            {audioFile.status === 'error' && 'Erro'}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Step 4: Conclusão */}
-                {currentStep === 'complete' && (
-                    <div className="text-center space-y-4">
-                        <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto">
-                            <Check className="w-8 h-8 text-white" />
-                        </div>
-
-                        <div>
-                            <h4 className="text-xl font-bold text-white mb-2">
-                                Upload Concluído!
-                            </h4>
-                            <p className="text-white/80">
-                                {files.filter(f => f.status === 'success').length} de {files.length} músicas
-                foram adicionadas ao álbum "{selectedAlbum?.name}"
-                            </p>
-                        </div>
-
-                        {files.some(f => f.status === 'error') && (
-                            <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-4">
-                                <div className="flex items-center gap-2 text-red-200 mb-2">
-                                    <AlertCircle className="w-4 h-4" />
-                                    <span className="font-medium">Alguns arquivos falharam</span>
-                                </div>
-                                <div className="text-red-200/80 text-sm space-y-1">
-                                    {files.filter(f => f.status === 'error').map(file => (
-                                        <div key={file.id}>
-                                            • {file.metadata.title} - {file.error}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <ChickenButton variant="feather" onClick={handleReset}>
-                            Fazer Novo Upload
+                            {isUploading ? 'Processando...' : 'Iniciar Upload'}
                         </ChickenButton>
                     </div>
-                )}
-            </div>
-        </BarnCard>
+
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                        {files.map((file, index) => (
+                            <div
+                                key={index}
+                                className={`p-4 border rounded-lg ${
+                  index === currentFileIndex ? 'border-primary bg-primary/5' : 'border-muted'
+                }`}
+                            >
+                                <div className="flex items-start gap-3">
+                                    {/* Status Icon */}
+                                    <div className="mt-1">
+                                        {file.status === 'success' && (
+                                            <CheckCircle className="w-5 h-5 text-green-500" />
+                                        )}
+                                        {file.status === 'error' && (
+                                            <AlertCircle className="w-5 h-5 text-red-500" />
+                                        )}
+                                        {(file.status === 'uploading' || file.status === 'processing') && (
+                                            <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                        )}
+                                        {file.status === 'pending' && (
+                                            <div className="w-5 h-5 border-2 border-muted-foreground/25 rounded-full" />
+                                        )}
+                                    </div>
+
+                                    <div className="flex-1 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <p className="font-medium text-sm">{file.file.name}</p>
+                                            {!isUploading && (
+                                                <button
+                                                    onClick={() => removeFile(index)}
+                                                    className="text-muted-foreground hover:text-destructive"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Campos de edição */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Input
+                                                placeholder="Título da música"
+                                                value={file.title || ''}
+                                                onChange={(e) => updateFileTitle(index, e.target.value)}
+                                                disabled={isUploading}
+                                                className="text-xs"
+                                            />
+                                            <Input
+                                                placeholder="Artista"
+                                                value={file.artist || ''}
+                                                onChange={(e) => updateFileArtist(index, e.target.value)}
+                                                disabled={isUploading}
+                                                className="text-xs"
+                                            />
+                                        </div>
+
+                                        {/* Progress bar */}
+                                        {(file.status === 'uploading' || file.status === 'processing') && (
+                                            <div className="space-y-1">
+                                                <Progress value={file.progress} className="h-2" />
+                                                <p className="text-xs text-muted-foreground">
+                                                    {file.status === 'uploading' ? 'Fazendo upload...' : 'Salvando no banco...'}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Erro */}
+                                        {file.status === 'error' && file.error && (
+                                            <p className="text-xs text-red-500">{file.error}</p>
+                                        )}
+
+                                        {/* Sucesso */}
+                                        {file.status === 'success' && (
+                                            <p className="text-xs text-green-600">✓ Música adicionada com sucesso</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
     );
 };
