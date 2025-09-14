@@ -402,27 +402,44 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
           .single();
 
       if (roomData?.selected_mp3_album_id) {
-        // console.log('🎵 Álbum MP3 específico selecionado');
+        console.log('🎵 Álbum MP3 específico selecionado');
 
-        const { data: songs, error: songsError } = await supabase
-            .from('songs')
-            .select('*')
+        // CORREÇÃO: Buscar através da tabela album_songs (relacionamento N:N)
+        const { data: albumSongs, error: songsError } = await supabase
+            .from('album_songs')
+            .select(`
+            songs (
+              id,
+              title,
+              artist,
+              audio_file_url,
+              preview_url,
+              duration_seconds,
+              spotify_track_id,
+              embed_url
+            )
+          `)
             .eq('album_id', roomData.selected_mp3_album_id)
-            .not('id', 'in', `(${usedSongIds.length > 0 ? usedSongIds.join(',') : 'null'})`);
+            .not('song_id', 'in', `(${usedSongIds.length > 0 ? usedSongIds.join(',') : 'null'})`);
 
-        if (!songsError && songs && songs.length > 0) {
-          return songs.map(song => ({
-            id: song.id,
-            title: song.title,
-            artist: song.artist,
-            audio_file_url: song.audio_file_url,
-            preview_url: song.preview_url,
-            duration_seconds: song.duration_seconds || 15,
-            spotify_track_id: song.spotify_track_id || undefined,
-            embed_url: song.embed_url || undefined,
-          }));
+        if (!songsError && albumSongs && albumSongs.length > 0) {
+          // Transformar os dados para o formato esperado
+          return albumSongs
+              .map(item => item.songs)
+              .filter(song => song !== null)
+              .map(song => ({
+                id: song.id,
+                title: song.title,
+                artist: song.artist,
+                audio_file_url: song.audio_file_url,
+                preview_url: song.preview_url,
+                duration_seconds: song.duration_seconds || 15,
+                spotify_track_id: song.spotify_track_id || undefined,
+                embed_url: song.embed_url || undefined,
+              }));
         }
       }
+
       // Se não há álbum selecionado, usar o comportamento atual com filtro
       const { data: response, error } = await supabase.functions.invoke('game-manager', {
         body: {
@@ -434,7 +451,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       });
 
       if (error) {
-        // console.error('Erro ao buscar músicas:', error);
+        console.error('Erro ao buscar músicas:', error);
         throw error;
       }
 
@@ -443,7 +460,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       if (!songs || songs.length === 0) {
         // Se não há mais músicas disponíveis, reset o histórico
         if (usedSongIds.length > 0) {
-          // console.log('🔄 Todas as músicas foram usadas, resetando histórico...');
+          console.log('🔄 Todas as músicas foram usadas, resetando histórico...');
           setUsedSongIds([]);
           toast({
             title: '🔄 Reiniciando Músicas',
@@ -468,131 +485,308 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       }
 
       if (activeGenreId) {
-        // console.log(`🎵 ${songs.length} músicas disponíveis (${usedSongIds.length} já usadas) | ${usedFallback ? 'fallback' : 'gênero específico'}`);
+        console.log(`🎵 ${songs.length} músicas disponíveis (${usedSongIds.length} já usadas) | ${usedFallback ? 'fallback' : 'gênero específico'}`);
       }
 
       return songs;
     } catch (error) {
-      // console.error('Erro ao buscar músicas:', error);
+      console.error('Erro ao buscar músicas:', error);
       throw error;
     }
   };
+
+  // 1. ADICIONAR novas funções para buscar opções especificamente do álbum
+
+  /** Busca outras músicas do mesmo ÁLBUM para usar como opções incorretas (MP3) */
+  async function getOtherMP3TracksFromAlbum(albumId: string, excludeSongId: string, limit: number = 10): Promise<string[]> {
+    try {
+      console.log('🐛 [getOtherMP3TracksFromAlbum] INÍCIO:', { albumId, excludeSongId, limit });
+
+      const { data: albumSongs, error } = await supabase
+          .from('album_songs')
+          .select(`
+          songs (
+            id,
+            title
+          )
+        `)
+          .eq('album_id', albumId)
+          .neq('song_id', excludeSongId)
+          .limit(limit);
+
+      console.log('🐛 [getOtherMP3TracksFromAlbum] RESULTADO QUERY:', { albumSongs, error, count: albumSongs?.length });
+
+      if (error) {
+        console.error('🐛 [getOtherMP3TracksFromAlbum] ERRO:', error);
+        return [];
+      }
+
+      if (!albumSongs) {
+        console.log('🐛 [getOtherMP3TracksFromAlbum] Nenhum resultado');
+        return [];
+      }
+
+      const titles = albumSongs
+          .map(item => {
+            console.log('🐛 [getOtherMP3TracksFromAlbum] Item:', item);
+            return item.songs?.title;
+          })
+          .filter(title => {
+            console.log('🐛 [getOtherMP3TracksFromAlbum] Title filtrado:', title);
+            return title;
+          })
+          .slice(0, limit);
+
+      console.log('🐛 [getOtherMP3TracksFromAlbum] TÍTULOS FINAIS:', titles);
+      return titles;
+    } catch (error) {
+      console.error('🐛 [getOtherMP3TracksFromAlbum] CATCH ERROR:', error);
+      return [];
+    }
+  }
+
+  /** Busca outras músicas do mesmo ÁLBUM para usar como opções incorretas (Spotify) */
+  async function getOtherSpotifyTracksFromAlbum(spotifyAlbumId: string, excludeTrackId: string, limit: number = 10): Promise<string[]> {
+    try {
+      const { data: tracks, error } = await supabase
+          .from('spotify_tracks')
+          .select('track_name')
+          .eq('spotify_album_id', spotifyAlbumId)
+          .neq('id', excludeTrackId)
+          .limit(limit);
+
+      if (error || !tracks) return [];
+      return tracks.map(t => t.track_name);
+    } catch (error) {
+      console.error('[getOtherSpotifyTracksFromAlbum] Erro:', error);
+      return [];
+    }
+  }
+
+  /** Gera opções com músicas reais do mesmo ÁLBUM - VERSÃO DEBUG */
+  async function buildOptionsFromAlbum(
+      correctTitle: string,
+      albumId: string,
+      excludeId: string,
+      mode: 'mp3' | 'spotify'
+  ): Promise<string[]> {
+    try {
+      console.log('🐛 [buildOptionsFromAlbum] INÍCIO:', { correctTitle, albumId, excludeId, mode });
+
+      const options = [correctTitle];
+
+      // Busca outras músicas do mesmo ÁLBUM
+      let otherTracks: string[] = [];
+
+      if (mode === 'mp3') {
+        console.log('🐛 [buildOptionsFromAlbum] Buscando tracks MP3...');
+        otherTracks = await getOtherMP3TracksFromAlbum(albumId, excludeId, 10);
+      } else {
+        console.log('🐛 [buildOptionsFromAlbum] Buscando tracks Spotify...');
+        // Para Spotify, vamos manter simples por enquanto
+        otherTracks = [];
+      }
+
+      console.log('🐛 [buildOptionsFromAlbum] Other tracks encontradas:', otherTracks);
+
+      // Se temos outras músicas do álbum, usa elas
+      if (otherTracks.length >= 3) {
+        console.log('🐛 [buildOptionsFromAlbum] Usando 3+ tracks do álbum');
+        const shuffled = otherTracks.sort(() => Math.random() - 0.5);
+        options.push(...shuffled.slice(0, 3));
+      } else if (otherTracks.length > 0) {
+        console.log('🐛 [buildOptionsFromAlbum] Usando tracks disponíveis + fallback');
+        options.push(...otherTracks);
+        const needed = 4 - options.length;
+        const fallbackOptions = [`${correctTitle} (Remix)`, `${correctTitle} (Live)`, `${correctTitle} (Acoustic)`];
+        options.push(...fallbackOptions.slice(0, needed));
+      } else {
+        console.log('🐛 [buildOptionsFromAlbum] Nenhuma track encontrada, usando fallback completo');
+        const fallbackOptions = [`${correctTitle} (Remix)`, `${correctTitle} (Live)`, `${correctTitle} (Acoustic)`];
+        options.push(...fallbackOptions.slice(0, 3));
+      }
+
+      // Embaralha todas as opções para randomizar a posição da resposta correta
+      const finalOptions = options.sort(() => Math.random() - 0.5);
+      console.log('🐛 [buildOptionsFromAlbum] OPÇÕES FINAIS:', finalOptions);
+
+      return finalOptions;
+    } catch (error) {
+      console.error('🐛 [buildOptionsFromAlbum] CATCH ERROR:', error);
+      // Fallback completo em caso de erro
+      const fallbackOptions = [
+        correctTitle,
+        `${correctTitle} (Remix)`,
+        `${correctTitle} (Live)`,
+        `${correctTitle} (Acoustic)`
+      ];
+      return fallbackOptions.sort(() => Math.random() - 0.5);
+    }
+  }
 
   /** Monta a próxima questão priorizando Spotify quando game_mode = spotify */
+      // CORREÇÃO: Substitua a função buildQuestion() por esta versão corrigida:
+
+      // CORREÇÃO: Substitua a função buildQuestion() por esta versão corrigida:
+
   const buildQuestion = async (): Promise<GameQuestion> => {
-    console.log('🎯 [buildQuestion] Iniciando construção da questão...');
-    console.log('🎯 [buildQuestion] Músicas já usadas:', usedSongIds.length);
+        console.log('🎯 [buildQuestion] Iniciando construção da questão...');
+        console.log('🎯 [buildQuestion] Músicas já usadas:', usedSongIds.length);
 
-    try {
-      const mode = await getGameMode();
-      console.log('🎯 [buildQuestion] Modo do jogo:', mode);
+        try {
+          const mode = await getGameMode();
+          console.log('🎯 [buildQuestion] Modo do jogo:', mode);
 
-      const room = await getRoomByCode(roomCode);
-      console.log('🎯 [buildQuestion] Dados da sala:', room);
+          const room = await getRoomByCode(roomCode);
+          console.log('🎯 [buildQuestion] Dados da sala:', room);
 
-      if (mode === 'spotify') {
-        console.log('🎯 [buildQuestion] Tentando Spotify...');
-        const track = await pickOneSpotifyTrack(room, usedSongIds); // PASSAR EXCLUSÕES
+          if (mode === 'spotify') {
+            console.log('🎯 [buildQuestion] Tentando Spotify...');
+            const track = await pickOneSpotifyTrack(room, usedSongIds);
 
-        if (track) {
-          console.log('🎯 [buildQuestion] Track Spotify encontrada:', track);
+            if (track) {
+              console.log('🎯 [buildQuestion] Track Spotify encontrada:', track);
 
-          // REGISTRAR MÚSICA COMO USADA
-          setUsedSongIds(prev => [...prev, track.id]);
+              setUsedSongIds(prev => [...prev, track.id]);
 
-          const durationSec = Math.max(
-              5,
-              Math.round((track.duration_ms || currentSettings.song_duration * 1000) / 1000)
-          );
+              const durationSec = Math.max(
+                  5,
+                  Math.round((track.duration_ms || currentSettings.song_duration * 1000) / 1000)
+              );
 
-          const genreId = room?.selected_genre_id || track.genre_id;
-          let options: string[];
+              let options: string[];
 
-          if (genreId) {
-            try {
-              options = await buildOptionsFromGenre(track.track_name, genreId, track.id, 'spotify');
-            } catch (error) {
-              console.warn('[buildQuestion] Erro ao buscar opções do gênero, usando fallback:', error);
-              options = buildOptionsFromTitles(track.track_name);
+              // 🔥 CORREÇÃO: Verificar se há álbum selecionado primeiro
+              if (room?.selected_spotify_album_id) {
+                console.log('🎵 [buildQuestion] Gerando opções do álbum Spotify selecionado');
+                try {
+                  options = await buildOptionsFromAlbum(track.track_name, room.selected_spotify_album_id, track.id, 'spotify');
+                } catch (error) {
+                  console.warn('[buildQuestion] Erro ao buscar opções do álbum Spotify, usando gênero:', error);
+                  const genreId = room?.selected_genre_id || track.genre_id;
+                  options = genreId
+                      ? await buildOptionsFromGenre(track.track_name, genreId, track.id, 'spotify')
+                      : buildOptionsFromTitles(track.track_name);
+                }
+              } else {
+                // Fallback para gênero se não há álbum específico
+                const genreId = room?.selected_genre_id || track.genre_id;
+                options = genreId
+                    ? await buildOptionsFromGenre(track.track_name, genreId, track.id, 'spotify')
+                    : buildOptionsFromTitles(track.track_name);
+              }
+
+              const correctIdx = options.indexOf(track.track_name);
+
+              const q: GameQuestion = {
+                song: {
+                  id: track.id,
+                  title: track.track_name,
+                  artist: track.artist_name || '',
+                  duration_seconds: durationSec,
+                  spotify_track_id: track.spotify_track_id,
+                  embed_url: track.embed_url,
+                },
+                options,
+                correctAnswer: correctIdx >= 0 ? correctIdx : 0,
+              };
+
+              console.log('🎯 [buildQuestion] Questão Spotify criada:', q);
+              return q;
             }
-          } else {
-            options = buildOptionsFromTitles(track.track_name);
+
+            console.warn('🎯 [buildQuestion] Spotify ativo, mas sem faixas encontradas. Caindo para MP3...');
           }
 
-          const correctIdx = options.indexOf(track.track_name);
+          // MP3 Mode ou fallback
+          console.log('🎯 [buildQuestion] Tentando buscar músicas MP3...');
+          const songs = await fetchSongsWithGenre();
+          console.log('🎯 [buildQuestion] Músicas encontradas:', songs.length);
 
-          const q: GameQuestion = {
+          if (songs.length === 0) {
+            throw new Error('Nenhuma música encontrada');
+          }
+
+          const shuffled = [...songs].sort(() => Math.random() - 0.5);
+          const correct = shuffled[0];
+          console.log('🎯 [buildQuestion] Música selecionada:', correct);
+
+          // REGISTRAR MÚSICA COMO USADA
+          setUsedSongIds(prev => [...prev, correct.id]);
+
+          // 🔥 CORREÇÃO: Buscar dados da sala novamente para ter certeza que temos roomData
+          const roomForOptions = await getRoomByCode(roomCode);
+          console.log('🎯 [buildQuestion] Room data para opções:', roomForOptions);
+
+          let options: string[];
+
+          try {
+            // 🔥 USAR roomForOptions ao invés de roomData indefinido
+            if (roomForOptions?.selected_mp3_album_id) {
+              console.log('🎵 [buildQuestion] ÁLBUM SELECIONADO - usando buildOptionsFromAlbum');
+              console.log('🎵 [buildQuestion] Parâmetros:', {
+                correctTitle: correct.title,
+                albumId: roomForOptions.selected_mp3_album_id,
+                excludeId: correct.id,
+                mode: 'mp3'
+              });
+
+              options = await buildOptionsFromAlbum(correct.title, roomForOptions.selected_mp3_album_id, correct.id, 'mp3');
+              console.log('🎯 [buildQuestion] Opções do álbum criadas:', options);
+            } else {
+              console.log('🎯 [buildQuestion] SEM ÁLBUM - usando método original');
+              const genreId = roomForOptions?.selected_genre_id || roomForOptions?.next_genre_id;
+
+              if (genreId) {
+                try {
+                  options = await buildOptionsFromGenre(correct.title, genreId, correct.id, 'mp3');
+                } catch (error) {
+                  console.warn('[buildQuestion] Erro ao buscar opções do gênero, usando pool local:', error);
+                  const titlesPool = shuffled.map(s => s.title);
+                  options = buildOptionsFromTitles(correct.title, titlesPool);
+                }
+              } else {
+                console.log('🎯 [buildQuestion] Construindo opções do pool de músicas');
+                const titlesPool = shuffled.map(s => s.title);
+                options = buildOptionsFromTitles(correct.title, titlesPool);
+              }
+            }
+          } catch (optionsError) {
+            console.error('🎯 [buildQuestion] ERRO ao gerar opções:', optionsError);
+            // Fallback para opções simples
+            const titlesPool = shuffled.map(s => s.title);
+            options = buildOptionsFromTitles(correct.title, titlesPool);
+            console.log('🎯 [buildQuestion] Usando fallback options:', options);
+          }
+
+          const correctIndex = options.indexOf(correct.title);
+          console.log('🎯 [buildQuestion] Correct index:', correctIndex);
+
+          const question: GameQuestion = {
             song: {
-              id: track.id,
-              title: track.track_name,
-              artist: track.artist_name || '',
-              duration_seconds: durationSec,
-              spotify_track_id: track.spotify_track_id,
-              embed_url: track.embed_url,
+              ...correct,
+              audioUrl: getAudioUrl(correct),
+              duration_seconds: currentSettings.song_duration
             },
             options,
-            correctAnswer: correctIdx >= 0 ? correctIdx : 0,
+            correctAnswer: correctIndex >= 0 ? correctIndex : 0,
           };
 
-          console.log('🎯 [buildQuestion] Questão Spotify criada:', q);
-          return q;
-        }
+          console.log('🎯 [buildQuestion] Questão MP3 final criada:', {
+            songTitle: question.song.title,
+            options: question.options,
+            correctAnswer: question.correctAnswer
+          });
 
-        console.warn('🎯 [buildQuestion] Spotify ativo, mas sem faixas encontradas. Caindo para MP3...');
-      }
+          return question;
 
-      // MP3 Mode ou fallback
-      console.log('🎯 [buildQuestion] Tentando buscar músicas MP3...');
-      const songs = await fetchSongsWithGenre();
-      console.log('🎯 [buildQuestion] Músicas encontradas:', songs.length);
-
-      if (songs.length === 0) {
-        throw new Error('Nenhuma música encontrada');
-      }
-
-      const shuffled = [...songs].sort(() => Math.random() - 0.5);
-      const correct = shuffled[0];
-      console.log('🎯 [buildQuestion] Música selecionada:', correct);
-
-      // REGISTRAR MÚSICA COMO USADA
-      setUsedSongIds(prev => [...prev, correct.id]);
-
-      // Para MP3, tenta usar o gênero da sala ou busca no pool de músicas retornadas
-      const genreId = room?.selected_genre_id || room?.next_genre_id;
-
-      let options: string[];
-      if (genreId) {
-        try {
-          console.log('🎯 [buildQuestion] Construindo opções por gênero:', genreId);
-          options = await buildOptionsFromGenre(correct.title, genreId, correct.id, 'mp3');
         } catch (error) {
-          console.warn('[buildQuestion] Erro ao buscar opções do gênero (MP3), usando pool local:', error);
-          const titlesPool = shuffled.map(s => s.title);
-          options = buildOptionsFromTitles(correct.title, titlesPool);
+          console.error('🎯 [buildQuestion] ERRO na construção da questão:', error);
+          throw error;
         }
-      } else {
-        console.log('🎯 [buildQuestion] Construindo opções do pool de músicas');
-        const titlesPool = shuffled.map(s => s.title);
-        options = buildOptionsFromTitles(correct.title, titlesPool);
-      }
-
-      const correctIndex = options.indexOf(correct.title);
-
-      const question: GameQuestion = {
-        song: { ...correct, audioUrl: getAudioUrl(correct), duration_seconds: currentSettings.song_duration },
-        options,
-        correctAnswer: correctIndex >= 0 ? correctIndex : 0,
       };
 
-      console.log('🎯 [buildQuestion] Questão MP3 final criada:', question);
-      return question;
-
-    } catch (error) {
-      console.error('🎯 [buildQuestion] ERRO na construção da questão:', error);
-      throw error;
-    }
-  };
-
+      
   // Função para obter modo de batalha
   const getBattleMode = async (): Promise<'classic' | 'battle'> => {
     const { data, error } = await supabase
