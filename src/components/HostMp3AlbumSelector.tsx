@@ -18,6 +18,8 @@ interface Mp3Album {
     description?: string;
     cover_image_url?: string;
     song_count?: number;
+    album_songs?: { song_id: string }[]; // <-- Adicione esta linha se usar a versão otimizada
+
 }
 
 interface HostMp3AlbumSelectorProps {
@@ -41,9 +43,9 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                 const { data: albumsData, error: albumsError } = await supabase
                     .from("albums")
                     .select(`
-                        *,
-                        genres (id, name, emoji)
-                    `)
+                    *,
+                    genres (id, name, emoji)
+                `)
                     .order("artist_name", { ascending: true })
                     .order("name", { ascending: true });
 
@@ -52,13 +54,13 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                     return;
                 }
 
-                // Contar músicas por álbum
+                // VERSÃO CORRIGIDA: Contar músicas através da tabela album_songs
                 const albumsWithCount = await Promise.all(
                     (albumsData || []).map(async (album) => {
                         const { count } = await supabase
-                            .from("songs")
+                            .from("album_songs")  // <-- MUDANÇA: usar album_songs ao invés de songs
                             .select("*", { count: "exact", head: true })
-                            .eq("album_id", album.id);
+                            .eq("album_id", album.id);  // <-- Aqui sim existe album_id
 
                         return {
                             ...album,

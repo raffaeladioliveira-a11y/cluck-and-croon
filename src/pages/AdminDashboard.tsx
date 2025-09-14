@@ -730,22 +730,41 @@ export default function AdminDashboard() {
 
     const loadAlbums = async() => {
         try {
-            const {data, error} = await supabase
+            // Primeiro, buscar todos os álbuns
+            const {data: albumsData, error: albumsError} = await supabase
                 .from('albums')
                 .select(`
-      *,
-      genres (
-        id,
-        name,
-        emoji
-      ),
-      songs (count)
-    `)
+                *,
+                genres (
+                    id,
+                    name,
+                    emoji
+                )
+            `)
                 .order('created_at', {ascending: false});
 
-            if (error) throw error;
+            if (albumsError) throw albumsError;
 
-            setAlbums(data || []);
+            // Depois, buscar a contagem de músicas para cada álbum
+            const {data: songsCount, error: countError} = await supabase
+                .from('album_songs')
+                .select('album_id');
+
+            if (countError) throw countError;
+
+            // Contar músicas por álbum
+            const songsCounts = songsCount.reduce((acc, item) => {
+                acc[item.album_id] = (acc[item.album_id] || 0) + 1;
+                return acc;
+            }, {});
+
+            // Combinar dados dos álbuns com contagem de músicas
+            const albumsWithCount = (albumsData || []).map(album => ({
+                ...album,
+                songs_count: songsCounts[album.id] || 0
+            }));
+
+            setAlbums(albumsWithCount);
         } catch (error) {
             toast({
                 title: "Erro",
@@ -2095,7 +2114,7 @@ export default function AdminDashboard() {
                                                             </Badge>
 
                                                             <Badge variant="outline" className="text-xs">
-                                                                {album.songs ?.[0]?.count || 0} músicas
+                                                                {album.songs_count || 0} músicas
                                                             </Badge>
 
                                                         </div>
