@@ -786,7 +786,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
         }
       };
 
-      
+
   // Função para obter modo de batalha
   const getBattleMode = async (): Promise<'classic' | 'battle'> => {
     const { data, error } = await supabase

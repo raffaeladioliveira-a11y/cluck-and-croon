@@ -730,7 +730,7 @@ export default function AdminDashboard() {
 
     const loadAlbums = async() => {
         try {
-            // Primeiro, buscar todos os álbuns
+            // Buscar álbuns com contagem de músicas usando LEFT JOIN
             const {data: albumsData, error: albumsError} = await supabase
                 .from('albums')
                 .select(`
@@ -739,33 +739,31 @@ export default function AdminDashboard() {
                     id,
                     name,
                     emoji
+                ),
+                album_songs (
+                    song_id
                 )
             `)
                 .order('created_at', {ascending: false});
 
             if (albumsError) throw albumsError;
 
-            // Depois, buscar a contagem de músicas para cada álbum
-            const {data: songsCount, error: countError} = await supabase
-                .from('album_songs')
-                .select('album_id');
-
-            if (countError) throw countError;
-
-            // Contar músicas por álbum
-            const songsCounts = songsCount.reduce((acc, item) => {
-                acc[item.album_id] = (acc[item.album_id] || 0) + 1;
-                return acc;
-            }, {});
-
-            // Combinar dados dos álbuns com contagem de músicas
+            // Processar dados para calcular contagem correta
             const albumsWithCount = (albumsData || []).map(album => ({
                 ...album,
-                songs_count: songsCounts[album.id] || 0
+                songs_count: album.album_songs ? album.album_songs.length : 0,
+                // Remove album_songs do objeto final para não poluir o estado
+                album_songs: undefined
             }));
+
+            console.log('📊 Álbuns carregados com contagem:', albumsWithCount.map(a => ({
+                name: a.name,
+                count: a.songs_count
+            })));
 
             setAlbums(albumsWithCount);
         } catch (error) {
+            console.error('❌ Erro ao carregar álbuns:', error);
             toast({
                 title: "Erro",
                 description: "Não foi possível carregar os álbuns",
@@ -773,6 +771,7 @@ export default function AdminDashboard() {
             });
         }
     };
+
 
     // const loadAlbumSongs = async(albumId: string) => {
     //     try {
