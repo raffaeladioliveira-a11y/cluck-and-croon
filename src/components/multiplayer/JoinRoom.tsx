@@ -44,6 +44,9 @@ export function JoinRoom({
     // salva a identidade; o join efetivo acontece no Lobby via RPC join_room
     saveProfile({ displayName: playerName, avatar: selectedAvatar });
 
+    // 🔧 ADICIONAR ESTA LINHA - Define flag para o LobbyRedirectGuard
+    sessionStorage.setItem('justConfiguredProfile', 'true');
+
     // ADICIONAR esta linha para garantir que o salvamento seja processado
     await new Promise(resolve => setTimeout(resolve, 0));
 
