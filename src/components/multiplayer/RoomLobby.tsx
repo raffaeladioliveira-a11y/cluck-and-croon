@@ -84,16 +84,12 @@ export function RoomLobby() {
     const [selectedMp3AlbumId, setSelectedMp3AlbumId] = useState<string | null>(null);
     const [selectedSpotifyAlbumId, setSelectedSpotifyAlbumId] = useState<string | null>(null);
 
+    // REMOVER ou simplificar este useEffect problemático
     useEffect(() => {
+        // Apenas log para debug, não forçar mudança de estado
         const modeParam = searchParams.get("mode");
-        const shouldBeSpectator = modeParam === "spectator";
-
-        if (shouldBeSpectator !== isSpectator) {
-            setIsSpectator(shouldBeSpectator);
-            console.log('🔄 Spectator mode updated:', shouldBeSpectator);
-        }
+        console.log('🔍 URL mode param:', modeParam, 'Current isSpectator:', isSpectator);
     }, [searchParams, isSpectator]);
-
 
 
     // Check if current user is host
@@ -142,27 +138,57 @@ export function RoomLobby() {
 
             console.log('✅ Room found:', existingRoom);
 
-            // NOVA LÓGICA: Permitir entrada em qualquer status da sala
+            // 🔧 NOVA LÓGICA CORRIGIDA: Determinar modo espectador baseado no STATUS DA SALA
+            let shouldBeSpectator = false;
             let shouldRedirectToGame = false;
             let redirectMessage = "";
 
-            if (existingRoom.status === 'in_progress' && existingRoom.game_session_id) {
-                shouldRedirectToGame = true;
-                redirectMessage = "Jogo em andamento! Entrando como espectador...";
-            } else if (existingRoom.status === 'round_lobby') {
-                redirectMessage = "Entrando no lobby da rodada...";
-            } else if (existingRoom.status === 'lobby' || existingRoom.status === 'waiting') {
+            // 1. Se sala está em lobby ou waiting → NUNCA é espectador
+            if (existingRoom.status === 'lobby' || existingRoom.status === 'waiting') {
+                shouldBeSpectator = false;
                 redirectMessage = "Entrando na sala...";
             }
+            // 2. Se sala está em round_lobby → NUNCA é espectador
+            else if (existingRoom.status === 'round_lobby') {
+                shouldBeSpectator = false;
+                redirectMessage = "Entrando no lobby da rodada...";
+            }
+            // 3. Se sala está em in_progress → VERIFICAR se deve ser espectador
+            else if (existingRoom.status === 'in_progress' && existingRoom.game_session_id) {
+                // Verificar se já é participante ou host
+                const { data: participant } = await supabase
+                    .from("room_participants")
+                    .select("id, client_id, is_host")
+                    .eq("room_id", existingRoom.id)
+                    .eq("client_id", clientId.current)
+                    .maybeSingle();
 
-            // Sempre tentar fazer join na sala, independente do status
-            // 🔧 CORREÇÃO: Usar o estado atual de isSpectator
+                const isHost = existingRoom.host_id === clientId.current;
+                const wasAlreadyInRoom = !!participant;
+
+                if (isHost || wasAlreadyInRoom) {
+                    // Host ou já estava na sala → NÃO é espectador
+                    shouldBeSpectator = false;
+                    redirectMessage = "Retornando ao jogo...";
+                } else {
+                    // Novo jogador em jogo em andamento → É espectador
+                    shouldBeSpectator = true;
+                    redirectMessage = "Jogo em andamento! Entrando como espectador...";
+                }
+
+                shouldRedirectToGame = true;
+            }
+
+            // 🔧 ATUALIZAR o estado local ANTES do join
+            setIsSpectator(shouldBeSpectator);
+
+            // Fazer join na sala com o valor correto
             const { error: joinError } = await supabase.rpc('join_room', {
                     p_room_code: roomCode.trim(),
                     p_display_name: userProfile.displayName || `Galinha ${Math.floor(Math.random() * 1000)}`,
                     p_avatar: user?.user_metadata?.avatar_url || userProfile.avatar || '🐔',
                 p_client_id: clientId.current,
-                p_is_spectator: isSpectator // ✅ Agora vai usar o valor correto
+                p_is_spectator: shouldBeSpectator // ✅ Usar valor calculado dinamicamente
         });
 
             if (joinError && joinError.message !== 'ALREADY_IN_ROOM') {
@@ -170,12 +196,13 @@ export function RoomLobby() {
 
                 // Se não conseguiu entrar, mas a sala existe, ainda assim redirecionar
                 if (shouldRedirectToGame) {
+                    const mode = shouldBeSpectator ? 'spectator' : 'multiplayer';
                     toast({
                         title: "Entrando como espectador",
                         description: "Redirecionando para o jogo em andamento...",
                         variant: "default",
                     });
-                    navigate(`/game/${roomCode}?sid=${existingRoom.game_session_id}&mode=spectator`);
+                    navigate(`/game/${roomCode}?sid=${existingRoom.game_session_id}&mode=${mode}`);
                     return;
                 }
 
@@ -192,19 +219,19 @@ export function RoomLobby() {
             }
 
             // Redirecionar conforme o status da sala
-            // Redirecionar conforme o status da sala
             if (existingRoom.status === 'in_progress' && existingRoom.game_session_id) {
                 console.log('🎮 Redirecionando para jogo em andamento:', existingRoom.game_session_id);
-                navigatedRef.current = true; // ADICIONAR ESTA LINHA
-                const mode = isSpectator ? 'spectator' : 'multiplayer';
+                navigatedRef.current = true;
+                const mode = shouldBeSpectator ? 'spectator' : 'multiplayer';
                 navigate(`/game/${roomCode}?sid=${existingRoom.game_session_id}&mode=${mode}`);
                 return;
             } else if (existingRoom.status === 'round_lobby') {
                 console.log('🏆 Redirecionando para round lobby:', existingRoom.game_session_id);
-                navigatedRef.current = true; // ADICIONAR ESTA LINHA
+                navigatedRef.current = true;
                 navigate(`/round-lobby/${roomCode}?sid=${existingRoom.game_session_id || 'current'}`);
                 return;
             }
+
             // Continuar com a lógica normal para lobby
             const { data: roomData, error: roomError } = await supabase
                 .from('game_rooms')
@@ -231,7 +258,7 @@ export function RoomLobby() {
                     table: 'room_participants',
                     filter: `room_id=eq.${roomData.id}`
                 }, (payload) => {
-                    console.log('🔄 Room participants changed:', payload);
+                    console.log('📄 Room participants changed:', payload);
                     setTimeout(() => loadRoomData(roomData.id), 100);
                 })
                 .on('postgres_changes', {
