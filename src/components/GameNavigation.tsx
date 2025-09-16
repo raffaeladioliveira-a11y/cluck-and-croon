@@ -27,35 +27,43 @@ export function GameNavigation({
     }
 
     if (roomCode) {
-      // Recupera o ID do jogador salvo no localStorage
-      const player = localStorage.getItem(`room_${roomCode}_player`);
-      if (player) {
-        const parsed = JSON.parse(player);
+      try {
+        // Importar a função que gera clientId
+        const { getOrCreateClientId } = await import('@/utils/clientId');
+        const clientId = getOrCreateClientId();
 
-        // Remove do banco de dados (ou marca como inativo)
-        const { error } = await supabase
-            .from("room_participants")
-            .delete()
-            .eq("room_code", roomCode)
-            .eq("id", parsed.id);
+        // Buscar room_id
+        const { data: room } = await supabase
+            .from('game_rooms')
+            .select('id')
+            .eq('room_code', roomCode)
+            .maybeSingle();
 
-        if (error) {
-          console.error("Erro ao remover jogador da sala:", error.message);
+        if (room?.id) {
+          // Deletar usando room_id
+          await supabase
+              .from("room_participants")
+              .delete()
+              .eq("room_id", room.id)
+              .eq("client_id", clientId);
         }
+
+        // Limpar localStorage
+        localStorage.removeItem(`room_${roomCode}_session`);
+        localStorage.removeItem(`room_${roomCode}_player`);
+
+        toast({
+          title: "🐔 Saiu da Sala",
+          description: "Você saiu do galinheiro com sucesso",
+        });
+
+      } catch (error) {
+        console.error("Erro ao sair:", error);
+        // Limpar mesmo com erro
+        localStorage.removeItem(`room_${roomCode}_session`);
+        localStorage.removeItem(`room_${roomCode}_player`);
       }
-
-      // Limpar dados locais
-      localStorage.removeItem(`room_${roomCode}_session`);
-      localStorage.removeItem(`room_${roomCode}_player`);
     }
-
-    // Aqui você também pode encerrar qualquer WebSocket/Realtime subscription
-    // Exemplo: supabase.removeChannel(roomChannel)
-
-    toast({
-      title: "🐔 Saiu da Sala",
-      description: "Você saiu do galinheiro com sucesso",
-    });
 
     navigate("/");
   };

@@ -1795,6 +1795,33 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
             console.log('[realtime] game channel status:', status);
           });
 
+          // Dentro do useEffect principal, onde você configura o canal, adicione:
+          ch.on('broadcast', { event: 'PLAYER_LEFT' }, (msg) => {
+            const { clientId: leftClientId, roomCode: msgRoomCode } = msg.payload;
+
+            console.log('👋 [real-time] Jogador saiu:', leftClientId);
+
+            if (msgRoomCode === roomCode) {
+              // Remover do estado local imediatamente
+              setPlayers(prevPlayers => {
+                const filtered = prevPlayers.filter(p => p.id !== leftClientId);
+                console.log('👋 Players após remoção:', filtered);
+                return filtered;
+              });
+
+              // Limpar das respostas também
+              setAnswersByOption(prev => {
+                const cleaned = { ...prev };
+                Object.keys(cleaned).forEach(optionIndex => {
+                  cleaned[Number(optionIndex)] = cleaned[Number(optionIndex)].filter(
+                      p => p.id !== leftClientId
+                  );
+                });
+                return cleaned;
+              });
+            }
+          });
+
           gameChannelRef.current = ch;
 
           // tenta descobrir se sou host
@@ -1990,6 +2017,86 @@ async function getRoomByCode(roomCode: string) {
 
     loadAlbumInfo();
   }, [roomCode]);
+
+
+// Sistema simples de cleanup automático - adicione este useEffect
+  // Sistema de cleanup automático usando sua função leave_room
+  useEffect(() => {
+    if (!isHost || !sessionId) return;
+
+    const autoCleanup = async () => {
+      try {
+        // Buscar participantes que não foram atualizados há mais de 30 segundos
+        const { data: staleParticipants, error } = await supabase
+            .from('room_participants')
+            .select('client_id, display_name, updated_at')
+            .eq('room_code', roomCode)
+            .lt('updated_at', new Date(Date.now() - 30000).toISOString());
+
+        if (!error && staleParticipants && staleParticipants.length > 0) {
+          console.log('Removendo jogadores inativos:', staleParticipants);
+
+          // Usar sua função leave_room para cada um
+          for (const participant of staleParticipants) {
+            const { error: leaveError } = await supabase.rpc('leave_room', {
+              p_room_code: roomCode,
+              p_client_id: participant.client_id
+            });
+
+            if (leaveError) {
+              console.error('Erro ao remover jogador:', participant.client_id, leaveError);
+            } else {
+              console.log('Jogador removido:', participant.client_id);
+            }
+          }
+
+          // Recarregar lista de jogadores
+          await loadPlayersFromRoom();
+
+          // Notificar outros jogadores
+          if (gameChannelRef.current) {
+            await gameChannelRef.current.send({
+              type: 'broadcast',
+              event: 'FORCE_PLAYERS_RELOAD',
+              payload: { reason: 'auto_cleanup', removedCount: staleParticipants.length }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Erro no auto-cleanup:', error);
+      }
+    };
+
+    // Executar a cada 15 segundos
+    const cleanupInterval = setInterval(autoCleanup, 15000);
+
+    return () => clearInterval(cleanupInterval);
+  }, [isHost, sessionId, roomCode, loadPlayersFromRoom]);
+
+  // Heartbeat simples - apenas UPDATE no timestamp
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const updatePresence = async () => {
+      try {
+        await supabase
+            .from('room_participants')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('room_code', roomCode)
+            .eq('client_id', clientId.current);
+      } catch (error) {
+        // Ignorar erros silenciosamente
+      }
+    };
+
+    // Atualizar presença a cada 10 segundos
+    const presenceInterval = setInterval(updatePresence, 10000);
+    updatePresence(); // Executar imediatamente
+
+    return () => clearInterval(presenceInterval);
+  }, [sessionId, roomCode]);
+
+
 
 const broadcastScoreUpdate = useCallback(async () => {
     if (!sessionId || !gameChannelRef.current) return;

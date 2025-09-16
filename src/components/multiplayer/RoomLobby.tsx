@@ -68,7 +68,7 @@ export function RoomLobby() {
 
 
 
-    const clientId = useMemo(getOrCreateClientId, []);
+    const clientId = useRef(getOrCreateClientId());
     const navigatedRef = useRef(false);
 
     // Load user profile
@@ -98,8 +98,8 @@ export function RoomLobby() {
 
     // Check if current user is host
     const isHost = useMemo(() => {
-        return players.some(p => p.client_id === clientId && p.isHost);
-    }, [players, clientId]);
+        return players.some(p => p.client_id === clientId.current && p.isHost); // ADICIONAR .current
+    }, [players]);
 
     useEffect(() => {
         if (loading) return;
@@ -161,7 +161,7 @@ export function RoomLobby() {
                     p_room_code: roomCode.trim(),
                     p_display_name: userProfile.displayName || `Galinha ${Math.floor(Math.random() * 1000)}`,
                     p_avatar: user?.user_metadata?.avatar_url || userProfile.avatar || '🐔',
-                p_client_id: clientId,
+                p_client_id: clientId.current,
                 p_is_spectator: isSpectator // ✅ Agora vai usar o valor correto
         });
 
@@ -301,6 +301,157 @@ export function RoomLobby() {
         gameModeRef.current = gameMode;
     }, [gameMode]);
 
+    // No componente do lobby, adicione os eventos de fechamento:
+    // Emergency cleanup
+    useEffect(() => {
+        if (!roomCode) return;
+
+        const emergencyCleanup = async () => {
+            try {
+                await supabase.rpc('leave_room', {
+                    p_room_code: roomCode,
+                    p_client_id: clientId.current
+                });
+            } catch (error) {
+                // Ignorar erros
+            }
+        };
+
+        const handleBeforeUnload = () => emergencyCleanup();
+        const handlePageHide = () => emergencyCleanup();
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        window.addEventListener('pagehide', handlePageHide);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            window.removeEventListener('pagehide', handlePageHide);
+        };
+    }, [roomCode]);
+
+
+// 1. Sistema de heartbeat para lobby
+    useEffect(() => {
+        if (!roomCode) return;
+        const updatePresence = async () => {
+            // ... DELETAR TODO ESTE BLOCO
+        };
+        // ...
+    }, [roomCode]);
+
+// 2. Sistema de auto-cleanup (apenas para host)
+    // 2. Sistema de auto-cleanup (apenas para host)
+    useEffect(() => {
+        if (!isHost || !roomCode) return;
+
+        const autoCleanup = async () => {
+            try {
+                console.log('🧹 Iniciando auto-cleanup para room:', roomCode);
+
+                // PRIMEIRO: Buscar o UUID da sala
+                const { data: roomData, error: roomError } = await supabase
+                    .from('game_rooms')
+                    .select('id')
+                    .eq('room_code', roomCode)
+                    .maybeSingle();
+
+                if (roomError) {
+                    console.error('Erro ao buscar room para cleanup:', roomError);
+                    return;
+                }
+
+                if (!roomData?.id) {
+                    console.error('Room não encontrada para cleanup:', roomCode);
+                    return;
+                }
+
+                console.log('Room UUID encontrado:', roomData.id);
+
+                // SEGUNDO: Buscar participantes inativos usando o UUID
+                const { data: staleParticipants, error } = await supabase
+                    .from('room_participants')
+                    .select('client_id, display_name, last_seen')
+                    .eq('room_id', roomData.id)
+                    .lt('last_seen', new Date(Date.now() - 30000).toISOString()); // 30 segundos
+
+                if (error) {
+                    console.error('Erro ao buscar participantes inativos:', error);
+                    return;
+                }
+
+                if (staleParticipants && staleParticipants.length > 0) {
+                    console.log('🧹 Participantes inativos encontrados:', staleParticipants.length);
+
+                    for (const participant of staleParticipants) {
+                        console.log('Removendo participante inativo:', participant.client_id);
+
+                        const { error: leaveError } = await supabase.rpc('leave_room', {
+                            p_room_code: roomCode,
+                            p_client_id: participant.client_id
+                        });
+
+                        if (leaveError) {
+                            console.error('Erro ao remover participante:', participant.client_id, leaveError);
+                        } else {
+                            console.log('✅ Participante removido:', participant.client_id);
+                        }
+                    }
+
+                    // Recarregar dados após cleanup
+                    console.log('🔄 Recarregando dados após cleanup...');
+                    await loadRoomData(roomData.id);
+
+                    // Broadcast para outros jogadores
+                    const lobbyChannel = supabase.channel(`lobby_${roomCode}_${Date.now()}`);
+                    await lobbyChannel.send({
+                        type: 'broadcast',
+                        event: 'PLAYERS_UPDATED',
+                        payload: { roomCode, removedCount: staleParticipants.length }
+                    });
+                    await supabase.removeChannel(lobbyChannel);
+                } else {
+                    console.log('🟢 Nenhum participante inativo encontrado');
+                }
+            } catch (error) {
+                console.error('Erro no auto-cleanup do lobby:', error);
+            }
+        };
+
+        // Executar limpeza a cada 15 segundos
+        const cleanupInterval = setInterval(autoCleanup, 15000);
+
+        // Executar uma vez imediatamente após 5 segundos
+        const initialTimeout = setTimeout(autoCleanup, 5000);
+
+        return () => {
+            clearInterval(cleanupInterval);
+            clearTimeout(initialTimeout);
+        };
+    }, [isHost, roomCode]); // Remover `room` da dependência
+
+
+
+// 3. Listener para real-time de jogadores que saíram
+    useEffect(() => {
+        if (!roomCode) return;
+
+        const channel = supabase.channel(`lobby_${roomCode}`)
+            .on('broadcast', { event: 'PLAYER_LEFT' }, (msg) => {
+                const { clientId: leftClientId } = msg.payload;
+                console.log('👋 Jogador saiu do lobby:', leftClientId);
+
+                // Remover do state local imediatamente
+                setPlayers(prevPlayers =>
+                    prevPlayers.filter(p => p.client_id !== leftClientId)
+                );
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [roomCode]);
+
     // Adicionar estas funções
     const loadSystemGameMode = async () => {
         try {
@@ -371,6 +522,8 @@ export function RoomLobby() {
     const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
     const loadRoomData = async (roomId: string) => {
         try {
+            console.log('🔄 [loadRoomData] Carregando dados para room ID:', roomId);
+
             // Carregar dados da sala incluindo álbuns selecionados
             const { data: roomData, error: roomError } = await supabase
                 .from('game_rooms')
@@ -533,7 +686,7 @@ export function RoomLobby() {
             // CORREÇÃO: Passar parâmetros adicionais para o RPC
             const { data: sessionId, error } = await supabase.rpc('start_game', {
                 p_room_code: roomCode.trim(),
-                p_client_id: clientId,
+                p_client_id: clientId.current,
                 // NOVOS PARÂMETROS:
                 p_game_mode: systemGameMode,
                 p_selected_spotify_album_id: systemGameMode === "spotify" ? selectedSpotifyAlbumId : null,
@@ -656,7 +809,7 @@ export function RoomLobby() {
                 {/* Players List com seleção de álbum habilitada para ambos os modos */}
                 <PlayerList
                     players={players}
-                    currentClientId={clientId}
+                    currentClientId={clientId.current}
                     onToggleReady={undefined} // Removido completamente - nenhum botão de ready
                     roomCode={roomCode}
                     gameMode={systemGameMode}
