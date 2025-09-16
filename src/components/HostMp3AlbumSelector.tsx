@@ -27,6 +27,7 @@ interface HostMp3AlbumSelectorProps {
 
 export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
     const [albums, setAlbums] = useState<Mp3Album[]>([]);
+    const [album, setAlbum] = useState(null); // Adicionar se não existir
     const [genres, setGenres] = useState<Genre[]>([]);
     const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
     const [selectedAlbum, setSelectedAlbum] = useState<Mp3Album | null>(null);
@@ -412,12 +413,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                                             {album.artist_name}
                                         </p>
                                         <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/60">
-                                            {album.release_year && (
-                                                <>
-                                                <span>Ano: {album.release_year}</span>
-                                                <span>•</span>
-                                                </>
-                                            )}
+
                                             {album.song_count !== undefined && (
                                                 <span>
                                                     {album.song_count} música{album.song_count !== 1 ? "s" : ""}
@@ -593,11 +589,11 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                                         <p className="text-xs sm:text-sm text-white/60">
                                             Gênero: {selectedGenre.emoji} {selectedGenre.name}
                                         </p>
-                                        {album.release_year && (
-                                            <p className="text-xs sm:text-sm text-white/60">
-                                                Ano: {selectedAlbum.release_year}
-                                            </p>
-                                        )}
+                                        {/*{album.release_year && (*/}
+                                            {/*<p className="text-xs sm:text-sm text-white/60">*/}
+                                                {/*Ano: {selectedAlbum.release_year}*/}
+                                            {/*</p>*/}
+                                        {/*)}*/}
                                         {selectedAlbum.song_count !== undefined && (
                                             <p className="text-xs sm:text-sm text-white/60">
                                                 {selectedAlbum.song_count} música{selectedAlbum.song_count !== 1 ? "s" : ""}

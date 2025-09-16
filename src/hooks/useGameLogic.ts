@@ -330,6 +330,7 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   const [isHost, setIsHost] = useState(false);
   const [usedSongIds, setUsedSongIds] = useState<string[]>([]);
   const [usedOptionTitles, setUsedOptionTitles] = useState<string[]>([]);
+  const [albums, setAlbums] = useState<Mp3Album[]>([]);
 
 
   // Adicione após os estados existentes
