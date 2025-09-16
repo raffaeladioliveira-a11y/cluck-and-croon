@@ -259,79 +259,104 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
 
     if (loading) {
         return (
-            <BarnCard variant="nest" className="text-center p-8">
-                <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-barn-brown" />
-                <p className="text-barn-brown">Carregando álbuns...</p>
+            <BarnCard variant="nest" className="text-center p-4 sm:p-8">
+                <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin mx-auto mb-4 text-barn-brown" />
+                <p className="text-barn-brown text-sm sm:text-base">Carregando álbuns...</p>
             </BarnCard>
         );
     }
 
     return (
-        <BarnCard variant="coop" className="p-6">
-            <div className="flex items-center gap-3 mb-6">
-                <Music className="w-6 h-6 text-white" />
-                <h3 className="text-xl font-bold text-white">
-                    {step === "genre" && "Escolha o Gênero Musical"}
-                    {step === "album" && `Álbuns de ${selectedGenre?.name}`}
-                    {step === "confirm" && (isRandomSelection ? "Confirmar Seleção Aleatória" : "Confirmar Seleção")}
+        <BarnCard variant="coop" className="p-3 sm:p-6">
+            <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                <Music className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                <h3 className="text-lg sm:text-xl font-bold text-white">
+                    {step === "genre" && (
+                        <>
+                        <span className="sm:hidden">Escolha o Gênero</span>
+                        <span className="hidden sm:inline">Escolha o Gênero Musical</span>
+                        </>
+                    )}
+                    {step === "album" && (
+                        <>
+                        <span className="sm:hidden">Álbuns de {selectedGenre?.name}</span>
+                        <span className="hidden sm:inline">Álbuns de {selectedGenre?.name}</span>
+                        </>
+                    )}
+                    {step === "confirm" && (
+                        <>
+                        <span className="sm:hidden">
+                                {isRandomSelection ? "Confirmar Aleatório" : "Confirmar Seleção"}
+                            </span>
+                        <span className="hidden sm:inline">
+                                {isRandomSelection ? "Confirmar Seleção Aleatória" : "Confirmar Seleção"}
+                            </span>
+                        </>
+                    )}
                 </h3>
             </div>
 
             {/* Passo 1: Seleção de Gênero OU Aleatório */}
             {step === "genre" && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                     {/* Card de Escolha Aleatória */}
                     <div className="relative">
                         <div
-                            className="p-6 border-2 border-dashed border-yellow-300 rounded-lg bg-gradient-to-r from-yellow-100/20 to-orange-100/20 hover:from-yellow-100/30 hover:to-orange-100/30 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
+                            className="p-3 sm:p-6 border-2 border-dashed border-yellow-300 rounded-lg bg-gradient-to-r from-yellow-100/20 to-orange-100/20 hover:from-yellow-100/30 hover:to-orange-100/30 cursor-pointer transition-all duration-300 hover:scale-[1.02]"
                             onClick={handleRandomSelection}
                         >
-                            <div className="flex items-center gap-4">
-                                <div className="p-3 bg-yellow-400/20 rounded-full">
-                                    <Shuffle className="w-8 h-8 text-yellow-300" />
+                            <div className="flex items-center gap-2 sm:gap-4">
+                                <div className="p-2 sm:p-3 bg-yellow-400/20 rounded-full">
+                                    <Shuffle className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-300" />
                                 </div>
-                                <div className="flex-1">
-                                    <h4 className="text-xl font-bold text-white flex items-center gap-2">
-                                        <Sparkles className="w-5 h-5 text-yellow-300" />
-                                        Escolha Aleatória
+                                <div className="flex-1 min-w-0">
+                                    <h4 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-300" />
+                                        <span className="sm:hidden">Aleatória</span>
+                                        <span className="hidden sm:inline">Escolha Aleatória</span>
                                     </h4>
-                                    <p className="text-white/80 text-sm mt-1">
-                                        Músicas sortidas de todos os gêneros e álbuns disponíveis
+                                    <p className="text-white/80 text-xs sm:text-sm mt-1">
+                                        <span className="sm:hidden">Músicas de todos os gêneros</span>
+                                        <span className="hidden sm:inline">Músicas sortidas de todos os gêneros e álbuns disponíveis</span>
                                     </p>
-                                    <div className="flex items-center gap-4 mt-3 text-xs text-white/60">
+                                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 sm:mt-3 text-xs text-white/60">
                                         <span>{albums.length} álbuns</span>
                                         <span>•</span>
                                         <span>{genres.length} gêneros</span>
-                                        <span>•</span>
-                                        <span>{albums.reduce((sum, album) => sum + (album.song_count || 0), 0)} músicas</span>
+                                        <span className="hidden sm:inline">•</span>
+                                        <span className="hidden sm:inline">{albums.reduce((sum, album) => sum + (album.song_count || 0), 0)} músicas</span>
                                     </div>
                                 </div>
-                                <div className="text-3xl">🎲</div>
+                                <div className="text-2xl sm:text-3xl">🎲</div>
                             </div>
                         </div>
                     </div>
 
                     {/* Divisor */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         <div className="flex-1 border-t border-white/20"></div>
-                        <span className="text-white/60 text-sm px-3">ou escolha um gênero específico</span>
+                        <span className="text-white/60 text-xs sm:text-sm px-2 sm:px-3 text-center">
+                            <span className="sm:hidden">ou escolha um gênero</span>
+                            <span className="hidden sm:inline">ou escolha um gênero específico</span>
+                        </span>
                         <div className="flex-1 border-t border-white/20"></div>
                     </div>
 
                     {/* Gêneros Específicos */}
                     <div>
-                        <p className="text-white mb-4">
-                            Selecione o gênero musical para o jogo:
+                        <p className="text-white mb-3 sm:mb-4 text-sm sm:text-base">
+                            <span className="sm:hidden">Selecione o gênero musical:</span>
+                            <span className="hidden sm:inline">Selecione o gênero musical para o jogo:</span>
                         </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                             {genres.map((genre) => (
                                 <ChickenButton
                                     key={genre.id}
                                     variant="corn"
                                     size="sm"
                                     onClick={() => handleGenreSelect(genre)}
-                                    className="justify-start text-left"
+                                    className="justify-start text-left text-sm"
                                 >
                                     {genre.emoji} {genre.name}
                                 </ChickenButton>
@@ -339,8 +364,9 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                         </div>
 
                         {genres.length === 0 && (
-                            <p className="text-center text-muted-foreground py-8">
-                                Nenhum gênero encontrado nos álbuns disponíveis.
+                            <p className="text-center text-muted-foreground py-6 sm:py-8 text-sm sm:text-base">
+                                <span className="sm:hidden">Nenhum gênero encontrado.</span>
+                                <span className="hidden sm:inline">Nenhum gênero encontrado nos álbuns disponíveis.</span>
                             </p>
                         )}
                     </div>
@@ -349,52 +375,55 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
 
             {/* Passo 2: Seleção de Álbum */}
             {step === "album" && selectedGenre && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <p className="text-white">
-                            Escolha um álbum de <strong>{selectedGenre.name}</strong>:
+                <div className="space-y-3 sm:space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <p className="text-white text-sm sm:text-base">
+                            <span className="sm:hidden">Álbuns de <strong>{selectedGenre.name}</strong>:</span>
+                            <span className="hidden sm:inline">Escolha um álbum de <strong>{selectedGenre.name}</strong>:</span>
                         </p>
                         <ChickenButton variant="feather" size="sm" onClick={handleBack}>
                             ← Voltar
                         </ChickenButton>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4">
                         {filteredAlbums.map((album) => (
                             <div
                                 key={album.id}
-                                className="p-4 border rounded-lg hover:bg-white/20 cursor-pointer transition-colors"
+                                className="p-3 sm:p-4 border rounded-lg hover:bg-white/20 cursor-pointer transition-colors"
                                 onClick={() => handleAlbumSelect(album)}
                             >
-                                <div className="flex items-start gap-3">
+                                <div className="flex items-start gap-2 sm:gap-3">
                                     {album.cover_image_url ? (
                                         <img
                                             src={album.cover_image_url}
                                             alt={album.name}
-                                            className="w-16 h-16 rounded object-cover"
+                                            className="w-12 h-12 sm:w-16 sm:h-16 rounded object-cover flex-shrink-0"
                                         />
                                     ) : (
-                                        <div className="w-16 h-16 rounded bg-barn-brown/20 flex items-center justify-center">
-                                            <Album className="w-8 h-8 text-barn-brown" />
+                                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded bg-barn-brown/20 flex items-center justify-center flex-shrink-0">
+                                            <Album className="w-6 h-6 sm:w-8 sm:h-8 text-barn-brown" />
                                         </div>
                                     )}
 
-                                    <div className="flex-1">
-                                        <h4 className="font-semibold text-white">{album.name}</h4>
-                                        <p className="text-sm text-white/80">
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-semibold text-white text-sm sm:text-base truncate">{album.name}</h4>
+                                        <p className="text-sm text-white/80 truncate">
                                             {album.artist_name}
                                         </p>
-                                        {album.release_year && (
-                                            <p className="text-xs text-white/60">
-                                                Ano: {album.release_year}
-                                            </p>
-                                        )}
-                                        {album.song_count !== undefined && (
-                                            <p className="text-xs text-white/60 mt-1">
-                                                {album.song_count} música
-                                                {album.song_count !== 1 ? "s" : ""}
-                                            </p>
-                                        )}
+                                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/60">
+                                            {album.release_year && (
+                                                <>
+                                                <span>Ano: {album.release_year}</span>
+                                                <span>•</span>
+                                                </>
+                                            )}
+                                            {album.song_count !== undefined && (
+                                                <span>
+                                                    {album.song_count} música{album.song_count !== 1 ? "s" : ""}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -402,10 +431,14 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                     </div>
 
                     {filteredAlbums.length === 0 && (
-                        <div className="text-center py-8">
-                            <p className="text-white/60 mb-4">
-                                Nenhum álbum encontrado para o gênero{" "}
-                                <strong>{selectedGenre.name}</strong>.
+                        <div className="text-center py-6 sm:py-8">
+                            <p className="text-white/60 mb-4 text-sm sm:text-base">
+                                <span className="sm:hidden">
+                                    Nenhum álbum de <strong>{selectedGenre.name}</strong>.
+                                </span>
+                                <span className="hidden sm:inline">
+                                    Nenhum álbum encontrado para o gênero <strong>{selectedGenre.name}</strong>.
+                                </span>
                             </p>
                             <ChickenButton variant="feather" onClick={handleBack}>
                                 ← Escolher Outro Gênero
@@ -417,10 +450,11 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
 
             {/* Passo 3: Confirmação */}
             {step === "confirm" && (
-                <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-lg font-semibold text-white">
-                            Confirmar Seleção:
+                <div className="space-y-4 sm:space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <h4 className="text-base sm:text-lg font-semibold text-white">
+                            <span className="sm:hidden">Confirmar:</span>
+                            <span className="hidden sm:inline">Confirmar Seleção:</span>
                         </h4>
                         <ChickenButton variant="feather" size="sm" onClick={handleBack}>
                             ← Voltar
@@ -428,42 +462,49 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                     </div>
 
                     {/* Confirmação de Seleção Aleatória */}
-                    {/* Confirmação de Seleção Aleatória */}
                     {isRandomSelection && randomSelectionInfo && (
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                             {/* Informações gerais da seleção aleatória */}
-                            <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 border border-yellow-300/30 rounded-lg p-6">
-                                <div className="flex items-center gap-4 mb-4">
-                                    <div className="p-3 bg-yellow-400/30 rounded-full">
-                                        <Shuffle className="w-10 h-10 text-yellow-300" />
+                            <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 border border-yellow-300/30 rounded-lg p-3 sm:p-6">
+                                <div className="flex items-center gap-2 sm:gap-4 mb-3 sm:mb-4">
+                                    <div className="p-2 sm:p-3 bg-yellow-400/30 rounded-full flex-shrink-0">
+                                        <Shuffle className="w-6 h-6 sm:w-10 sm:h-10 text-yellow-300" />
                                     </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                            <Sparkles className="w-5 h-5 text-yellow-300" />
-                                            Seleção Aleatória
+                                    <div className="min-w-0">
+                                        <h3 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-300" />
+                                            <span className="sm:hidden">Aleatória</span>
+                                            <span className="hidden sm:inline">Seleção Aleatória</span>
                                         </h3>
-                                        <p className="text-lg text-white/80">
-                                            Álbum Sorteado da Biblioteca
+                                        <p className="text-sm sm:text-lg text-white/80">
+                                            <span className="sm:hidden">Álbum Sorteado</span>
+                                            <span className="hidden sm:inline">Álbum Sorteado da Biblioteca</span>
                                         </p>
                                     </div>
-                                    <div className="text-4xl">🎲</div>
+                                    <div className="text-2xl sm:text-4xl">🎲</div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4 mb-4">
-                                    <div className="text-center p-3 bg-white/10 rounded">
-                                        <div className="text-2xl font-bold text-yellow-300">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4 mb-3 sm:mb-4">
+                                    <div className="text-center p-2 sm:p-3 bg-white/10 rounded">
+                                        <div className="text-lg sm:text-2xl font-bold text-yellow-300">
                                             {randomSelectionInfo.totalSongs}
                                         </div>
-                                        <div className="text-xs text-white/60">Músicas Disponíveis</div>
+                                        <div className="text-xs text-white/60">
+                                            <span className="sm:hidden">Músicas</span>
+                                            <span className="hidden sm:inline">Músicas Disponíveis</span>
+                                        </div>
                                     </div>
-                                    <div className="text-center p-3 bg-white/10 rounded">
-                                        <div className="text-2xl font-bold text-yellow-300">
+                                    <div className="text-center p-2 sm:p-3 bg-white/10 rounded">
+                                        <div className="text-lg sm:text-2xl font-bold text-yellow-300">
                                             {randomSelectionInfo.albumsCount}
                                         </div>
-                                        <div className="text-xs text-white/60">Álbuns na Biblioteca</div>
+                                        <div className="text-xs text-white/60">
+                                            <span className="sm:hidden">Álbuns</span>
+                                            <span className="hidden sm:inline">Álbuns na Biblioteca</span>
+                                        </div>
                                     </div>
-                                    <div className="text-center p-3 bg-white/10 rounded">
-                                        <div className="text-2xl font-bold text-yellow-300">
+                                    <div className="text-center p-2 sm:p-3 bg-white/10 rounded col-span-2 sm:col-span-1">
+                                        <div className="text-lg sm:text-2xl font-bold text-yellow-300">
                                             {randomSelectionInfo.genresCount}
                                         </div>
                                         <div className="text-xs text-white/60">Gêneros</div>
@@ -473,102 +514,108 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
 
                             {/* Álbum específico sorteado */}
                             {selectedAlbum && (
-                                <div className="bg-white/30 rounded-lg p-6 border-2 border-yellow-300/50">
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <Sparkles className="w-5 h-5 text-yellow-300" />
-                                        <h4 className="text-lg font-bold text-white">Álbum Sorteado:</h4>
+                                <div className="bg-white/30 rounded-lg p-3 sm:p-6 border-2 border-yellow-300/50">
+                                    <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                                        <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-300" />
+                                        <h4 className="text-base sm:text-lg font-bold text-white">
+                                            <span className="sm:hidden">Sorteado:</span>
+                                            <span className="hidden sm:inline">Álbum Sorteado:</span>
+                                        </h4>
                                     </div>
 
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-start gap-3 sm:gap-4">
                                         {selectedAlbum.cover_image_url ? (
                                             <img
                                                 src={selectedAlbum.cover_image_url}
                                                 alt={selectedAlbum.name}
-                                                className="w-20 h-20 rounded object-cover"
+                                                className="w-16 h-16 sm:w-20 sm:h-20 rounded object-cover flex-shrink-0"
                                             />
                                         ) : (
-                                            <div className="w-20 h-20 rounded bg-barn-brown/20 flex items-center justify-center">
-                                                <Album className="w-10 h-10 text-barn-brown" />
+                                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded bg-barn-brown/20 flex items-center justify-center flex-shrink-0">
+                                                <Album className="w-8 h-8 sm:w-10 sm:h-10 text-barn-brown" />
                                             </div>
                                         )}
 
-                                        <div>
-                                            <h3 className="text-xl font-bold text-white">
+                                        <div className="min-w-0">
+                                            <h3 className="text-lg sm:text-xl font-bold text-white truncate">
                                                 {selectedAlbum.name}
                                             </h3>
-                                            <p className="text-lg text-white/80">
+                                            <p className="text-base sm:text-lg text-white/80 truncate">
                                                 {selectedAlbum.artist_name}
                                             </p>
-                                            <p className="text-sm text-white/60">
+                                            <p className="text-xs sm:text-sm text-white/60">
                                                 Gênero: {selectedGenre?.emoji} {selectedGenre?.name}
                                             </p>
                                             {selectedAlbum.song_count !== undefined && (
-                                                <p className="text-sm text-white/60">
-                                                    {selectedAlbum.song_count} música
-                                                    {selectedAlbum.song_count !== 1 ? "s" : ""}
+                                                <p className="text-xs sm:text-sm text-white/60">
+                                                    {selectedAlbum.song_count} música{selectedAlbum.song_count !== 1 ? "s" : ""}
                                                 </p>
                                             )}
                                         </div>
                                     </div>
 
-                                    <div className="bg-yellow-400/10 border border-yellow-400/20 rounded p-3 mt-4">
-                                        <p className="text-sm text-yellow-200 flex items-center gap-2">
-                                            <Sparkles className="w-4 h-4" />
-                                            Este álbum foi escolhido aleatoriamente para o jogo!
+                                    <div className="bg-yellow-400/10 border border-yellow-400/20 rounded p-2 sm:p-3 mt-3 sm:mt-4">
+                                        <p className="text-xs sm:text-sm text-yellow-200 flex items-center gap-2">
+                                            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                                            <span className="sm:hidden">Álbum escolhido aleatoriamente!</span>
+                                            <span className="hidden sm:inline">Este álbum foi escolhido aleatoriamente para o jogo!</span>
                                         </p>
                                     </div>
                                 </div>
                             )}
                         </div>
                     )}
+
                     {/* Confirmação de Álbum Específico */}
                     {selectedAlbum && selectedGenre && !isRandomSelection && (
-                        <div className="bg-white/30 rounded-lg p-6">
-                            <div className="flex items-center gap-4 mb-4">
+                        <div className="bg-white/30 rounded-lg p-3 sm:p-6">
+                            <div className="flex items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
                                 {selectedAlbum.cover_image_url ? (
                                     <img
                                         src={selectedAlbum.cover_image_url}
                                         alt={selectedAlbum.name}
-                                        className="w-20 h-20 rounded object-cover"
+                                        className="w-16 h-16 sm:w-20 sm:h-20 rounded object-cover flex-shrink-0"
                                     />
                                 ) : (
-                                    <div className="w-20 h-20 rounded bg-barn-brown/20 flex items-center justify-center">
-                                        <Album className="w-10 h-10 text-barn-brown" />
+                                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded bg-barn-brown/20 flex items-center justify-center flex-shrink-0">
+                                        <Album className="w-8 h-8 sm:w-10 sm:h-10 text-barn-brown" />
                                     </div>
                                 )}
 
-                                <div>
-                                    <h3 className="text-xl font-bold text-white">
+                                <div className="min-w-0">
+                                    <h3 className="text-lg sm:text-xl font-bold text-white truncate">
                                         {selectedAlbum.name}
                                     </h3>
-                                    <p className="text-lg text-white/80">
+                                    <p className="text-base sm:text-lg text-white/80 truncate">
                                         {selectedAlbum.artist_name}
                                     </p>
-                                    <p className="text-sm text-white/60">
-                                        Gênero: {selectedGenre.emoji} {selectedGenre.name}
-                                    </p>
-                                    {selectedAlbum.release_year && (
-                                        <p className="text-sm text-white/60">
-                                            Ano: {selectedAlbum.release_year}
+                                    <div className="space-y-1 mt-1">
+                                        <p className="text-xs sm:text-sm text-white/60">
+                                            Gênero: {selectedGenre.emoji} {selectedGenre.name}
                                         </p>
-                                    )}
-                                    {selectedAlbum.song_count !== undefined && (
-                                        <p className="text-sm text-white/60">
-                                            {selectedAlbum.song_count} música
-                                            {selectedAlbum.song_count !== 1 ? "s" : ""}
-                                        </p>
-                                    )}
+                                        {album.release_year && (
+                                            <p className="text-xs sm:text-sm text-white/60">
+                                                Ano: {selectedAlbum.release_year}
+                                            </p>
+                                        )}
+                                        {selectedAlbum.song_count !== undefined && (
+                                            <p className="text-xs sm:text-sm text-white/60">
+                                                {selectedAlbum.song_count} música{selectedAlbum.song_count !== 1 ? "s" : ""}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
                             {selectedAlbum.description && (
-                                <p className="text-sm text-white/60 mb-4">
+                                <p className="text-xs sm:text-sm text-white/60 mb-3 sm:mb-4">
                                     {selectedAlbum.description}
                                 </p>
                             )}
 
-                            <p className="text-white/80 mb-4">
-                                As próximas 10 rodadas serão tocadas apenas com músicas deste álbum.
+                            <p className="text-white/80 text-sm sm:text-base">
+                                <span className="sm:hidden">As próximas 10 rodadas serão deste álbum.</span>
+                                <span className="hidden sm:inline">As próximas 10 rodadas serão tocadas apenas com músicas deste álbum.</span>
                             </p>
                         </div>
                     )}
@@ -579,15 +626,23 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                             size="lg"
                             onClick={handleConfirmSelection}
                             disabled={saving}
-                            className="min-w-[200px]"
+                            className="min-w-[200px] text-sm sm:text-base"
                         >
                             {saving ? (
                                 <>
                                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                Confirmando...
+                                <span className="sm:hidden">Confirmando...</span>
+                                <span className="hidden sm:inline">Confirmando...</span>
                                 </>
                             ) : (
-                                isRandomSelection ? "🎲 Confirmar Seleção Aleatória" : "✅ Confirmar Álbum"
+                                <>
+                                <span className="sm:hidden">
+                                        {isRandomSelection ? "🎲 Confirmar" : "✅ Confirmar"}
+                                    </span>
+                                <span className="hidden sm:inline">
+                                        {isRandomSelection ? "🎲 Confirmar Seleção Aleatória" : "✅ Confirmar Álbum"}
+                                    </span>
+                                </>
                             )}
                         </ChickenButton>
                     </div>

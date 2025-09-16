@@ -243,6 +243,13 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
 
             if (error) throw error;
 
+            // Adicionar mensagem localmente para feedback imediato
+            setMessages(prev => {
+                // Evitar duplicatas
+                if (prev.find(m => m.id === savedMessage.id)) return prev;
+                return [...prev, savedMessage];
+            });
+
             if (chatChannelRef.current) {
                 try {
                     await chatChannelRef.current.send({
@@ -256,7 +263,6 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
                 }
             }
 
-            // A mensagem será adicionada via PostgreSQL changes listener, não precisa adicionar aqui
             setNewMessage("");
             setReplyingTo(null);
             setTimeout(scrollToBottom, 100);
@@ -282,6 +288,31 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
         const hasReacted = currentReactions[emoji]?.includes(clientId.current);
         const action = hasReacted ? 'remove' : 'add';
 
+        // 🔧 CORREÇÃO: Atualizar estado local IMEDIATAMENTE
+        setMessages(prev => prev.map(msg => {
+            if (msg.id === messageId) {
+                const reactions = { ...(msg.reactions || {}) };
+
+                if (action === 'add') {
+                    if (!reactions[emoji]) reactions[emoji] = [];
+                    if (!reactions[emoji].includes(clientId.current)) {
+                        reactions[emoji].push(clientId.current);
+                    }
+                } else if (action === 'remove') {
+                    if (reactions[emoji]) {
+                        reactions[emoji] = reactions[emoji].filter(id => id !== clientId.current);
+                        if (reactions[emoji].length === 0) {
+                            delete reactions[emoji];
+                        }
+                    }
+                }
+
+                return { ...msg, reactions };
+            }
+            return msg;
+        }));
+
+        // Fazer broadcast para outros usuários
         await chatChannelRef.current.send({
             type: 'broadcast',
             event: 'MESSAGE_REACTION',
@@ -490,13 +521,14 @@ export function GameChat({ roomCode, sessionId, isVisible = false, onToggle, onU
 
                                                             {/* Picker de emojis */}
                                                             {showEmojiPicker === message.id && (
-                                                                <div className="absolute bottom-full right-0 mb-1 bg-black/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border border-white/20 z-10">
-                                                                    <div className="flex gap-1">
+                                                                <div className="absolute bottom-full right-0 mb-1 bg-black/90 backdrop-blur-sm rounded-lg p-2 shadow-lg border border-white/20 z-50 min-w-[180px] sm:min-w-auto">
+                                                                    <div className="flex flex-wrap gap-1 justify-center">
                                                                         {REACTION_EMOJIS.map(emoji => (
                                                                             <button
                                                                                 key={emoji}
                                                                                 onClick={() => toggleReaction(message.id, emoji)}
-                                                                                className="text-lg hover:scale-125 transition-transform p-1"
+                                                                                className="text-base sm:text-lg hover:scale-125 transition-transform p-1 sm:p-2 touch-manipulation"
+                                                                                style={{ minWidth: '28px', minHeight: '28px' }}
                                                                             >
                                                                                 {emoji}
                                                                             </button>
