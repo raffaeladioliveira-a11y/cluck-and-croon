@@ -12,6 +12,7 @@ import { Loader2, Crown, Trophy, Music } from "lucide-react";
 import { useAuthSession } from "@/hooks/useAuthSession";
 import { HostMp3AlbumSelector } from "@/components/HostMp3AlbumSelector";
 import { GameChat, ChatToggleButton } from "@/components/GameChat";
+import { ArrowLeft, LogOut } from "lucide-react";
 
 interface PlayerRanking {
   id: string;

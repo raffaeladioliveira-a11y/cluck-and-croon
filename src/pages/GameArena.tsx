@@ -324,6 +324,8 @@ function GameArenaContent() {
     };
     })();
 
+
+
     const playersOnOption = (optionIndex: number) => {
         const playersOnThisOption = answersByOption ?.[optionIndex] || [];
 
@@ -405,35 +407,35 @@ function GameArenaContent() {
         );
     }
 
-    const handleLeaveRoom = async () => {
-        try {
-            const { data: roomData } = await supabase
-                .from("game_rooms")
-                .select("id")
-                .or(`code.eq.${roomCode},room_code.eq.${roomCode}`)
-                .maybeSingle();
-
-            if (roomData) {
-                await supabase
-                    .from("room_participants")
-                    .delete()
-                    .eq("room_id", roomData.id)
-                    .eq("client_id", clientId.current);
-            }
-
-            localStorage.removeItem(`room_${roomCode}_session`);
-            localStorage.removeItem(`room_${roomCode}_player`);
-
-            toast({
-                title: "🐔 Saiu da Sala",
-                description: "Você saiu do galinheiro com sucesso",
-            });
-
-            navigate("/");
-        } catch (err) {
-            navigate("/");
-        }
-    };
+    // const handleLeaveRoom = async () => {
+    //     try {
+    //         const { data: roomData } = await supabase
+    //             .from("game_rooms")
+    //             .select("id")
+    //             .or(`code.eq.${roomCode},room_code.eq.${roomCode}`)
+    //             .maybeSingle();
+    //
+    //         if (roomData) {
+    //             await supabase
+    //                 .from("room_participants")
+    //                 .delete()
+    //                 .eq("room_id", roomData.id)
+    //                 .eq("client_id", clientId.current);
+    //         }
+    //
+    //         localStorage.removeItem(`room_${roomCode}_session`);
+    //         localStorage.removeItem(`room_${roomCode}_player`);
+    //
+    //         toast({
+    //             title: "🐔 Saiu da Sala",
+    //             description: "Você saiu do galinheiro com sucesso",
+    //         });
+    //
+    //         navigate("/");
+    //     } catch (err) {
+    //         navigate("/");
+    //     }
+    // };
 
     // ---------- COUNTDOWN SCREEN ----------
     if (showCountdown && countdown !== null) {
@@ -529,8 +531,7 @@ function GameArenaContent() {
 
                             {/* Botão sair sempre na direita */}
                             <div className="flex-shrink-0 ml-4">
-                                <GameNavigation showLeaveRoom={true}
-                                                customLeaveAction={handleLeaveRoom} />
+                                <GameNavigation showLeaveRoom={true} />
                             </div>
                         </div>
                     </div>

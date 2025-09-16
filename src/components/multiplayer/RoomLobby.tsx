@@ -11,6 +11,9 @@ import { useAuthSession } from "@/hooks/useAuthSession";
 // Adicionar esta importação no topo do arquivo RoomLobby
 import { SelectedAlbumDisplay } from "@/components/SelectedAlbumDisplay";
 import { GameChat, ChatToggleButton } from "@/components/GameChat";
+import {GameNavigation} from "@/components/GameNavigation";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
+
 
 interface Room {
     code: string;
@@ -34,6 +37,9 @@ export function RoomLobby() {
 
     // Always use uppercase room code
     const roomCode = (roomCodeParam || "").toUpperCase();
+
+    // ⬇️ nosso hook de presença
+    useHeartbeat(roomCode);
 
     // Redirect to home if no room code
     useEffect(() => {
@@ -88,13 +94,7 @@ export function RoomLobby() {
         }
     }, [searchParams, isSpectator]);
 
-    // DEBUG:
-    console.log('AUTH STATUS:', {
-        user: user,
-        loading: loading,
-        userProfile: userProfile,
-        user_avatar: user?.user_metadata?.avatar_url
-});
+
 
     // Check if current user is host
     const isHost = useMemo(() => {
@@ -569,47 +569,6 @@ export function RoomLobby() {
         }
     };
 
-    const handleLeaveRoom = async () => {
-        try {
-            // Buscar a sala atual
-            const { data: roomData, error: roomError } = await supabase
-                .from("game_rooms")
-                .select("id")
-                .or(`code.eq.${roomCode},room_code.eq.${roomCode}`)
-                .maybeSingle();
-
-            if (roomError) {
-                console.error("Erro ao buscar sala para sair:", roomError);
-            } else if (roomData) {
-                // Remover jogador da tabela room_participants
-                const { error: deleteError } = await supabase
-                    .from("room_participants")
-                    .delete()
-                    .eq("room_id", roomData.id)
-                    .eq("client_id", clientId);
-
-                if (deleteError) {
-                    console.error("Erro ao remover jogador da sala:", deleteError);
-                } else {
-                    console.log(`🐔 Jogador ${clientId} removido da sala ${roomCode}`);
-                }
-            }
-
-            // Limpar dados locais
-            localStorage.removeItem(`room_${roomCode}_session`);
-            localStorage.removeItem(`room_${roomCode}_player`);
-
-            toast({
-                title: "🐔 Saiu da Sala",
-                description: "Você saiu do galinheiro com sucesso",
-            });
-
-            navigate("/");
-        } catch (err) {
-            console.error("Erro no handleLeaveRoom:", err);
-            navigate("/");
-        }
-    };
 
     if (isLoading || loadingGameMode) {
         return (
@@ -628,14 +587,7 @@ export function RoomLobby() {
         <div className="min-h-screen bg-gradient-sky p-4 relative">
             {/* Botão Sair - Canto Superior Direito */}
             <div className="absolute top-4 right-4 z-10">
-                <ChickenButton
-                    variant="feather"
-                    size="sm"
-                    onClick={handleLeaveRoom}
-                    className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-                >
-                    🚪 Sair
-                </ChickenButton>
+                <GameNavigation showLeaveRoom={true} />
             </div>
 
             <div className="max-w-4xl mx-auto">
