@@ -110,7 +110,7 @@ function GameArenaContent() {
                         status: isSpectatorMode ? "spectator" : "active"
                     })
                     .eq("room_code", roomCode)
-                    .eq("session_id", sid);
+                    .eq("id", sid);
 
                 if (sessionError) {
                     console.error('❌ Erro ao atualizar game_sessions:', sessionError);

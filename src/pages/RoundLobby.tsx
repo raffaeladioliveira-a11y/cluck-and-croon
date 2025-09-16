@@ -70,6 +70,8 @@ export default function RoundLobby() {
     genre: string;
   } | null>(null);
 
+  const [isRandomSelecting, setIsRandomSelecting] = useState(false);
+
   const gameChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Calcular ranking baseado nos dados reais dos participantes
@@ -106,6 +108,74 @@ export default function RoundLobby() {
     }));
   }, []);
 
+// Função para escolha aleatória de álbum
+  const handleRandomAlbumSelection = async () => {
+    setIsRandomSelecting(true);
+
+    try {
+      // Buscar álbuns disponíveis
+      const { data: albums, error } = await supabase
+          .from('albums')
+          .select(`
+        id,
+        name,
+        artist_name,
+        genres (id, name)
+      `)
+          .limit(100);
+
+      if (error) throw error;
+
+      if (!albums || albums.length === 0) {
+        toast({
+          title: 'Erro',
+          description: 'Nenhum álbum disponível para seleção aleatória.',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      // Escolher um álbum aleatório
+      const randomIndex = Math.floor(Math.random() * albums.length);
+      const selectedAlbum = albums[randomIndex];
+
+      const albumInfo = {
+            name: selectedAlbum.name,
+            artist: selectedAlbum.artist_name,
+            genre: selectedAlbum.genres?.name || 'Gênero Desconhecido'
+    };
+
+      setSelectedAlbumInfo(albumInfo);
+      setAlbumSelected(true);
+
+      // Broadcast para outros jogadores
+      if (gameChannelRef.current) {
+        await gameChannelRef.current.send({
+          type: 'broadcast',
+          event: 'ALBUM_SELECTED',
+          payload: { albumInfo }
+        });
+      }
+
+      toast({
+        title: 'Álbum Selecionado Aleatoriamente',
+        description: `${albumInfo.name} - ${albumInfo.artist}`,
+        variant: 'default'
+      });
+
+    } catch (error) {
+      console.error('Erro ao selecionar álbum aleatório:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível selecionar um álbum aleatório.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsRandomSelecting(false);
+    }
+  };
+
+
   // Carregar dados iniciais
   useEffect(() => {
     const loadInitialData = async () => {
@@ -138,7 +208,16 @@ export default function RoundLobby() {
         if (participants) {
           const rankingData = calculateRanking(participants);
           setRanking(rankingData);
-          setTopPlayer(rankingData[0] || null);
+
+          // Se há participantes, o primeiro é o topPlayer
+          // Se o jogador atual está na lista, ele pode ser o topPlayer (modo solo)
+          const currentPlayerInRanking = rankingData.find(p => p.id === clientId.current);
+          if (rankingData.length === 1 && currentPlayerInRanking) {
+            // Modo solo - jogador atual é automaticamente o top
+            setTopPlayer(currentPlayerInRanking);
+          } else {
+            setTopPlayer(rankingData[0] || null);
+          }
         }
 
         // Carregar gêneros disponíveis
@@ -165,30 +244,20 @@ export default function RoundLobby() {
   }, [roomCode, calculateRanking, toast]);
 
   // Listener para evento de álbum selecionado
+  // Listener para evento de álbum selecionado
   useEffect(() => {
     const handleAlbumSelected = async (event: any) => {
-      const { albumId, genreId } = event.detail;
+      const { albumId, genreId, albumInfo } = event.detail;
 
       try {
-        // Buscar informações do álbum selecionado
-        const { data: album } = await supabase
-            .from('albums')
-            .select(`
-          name,
-          artist_name,
-          genres (name)
-        `)
-            .eq('id', albumId)
-            .single();
-
-        if (album) {
-          const albumInfo = {
-                name: album.name,
-                artist: album.artist_name,
-                genre: album.genres?.name || ''
-        };
-
-          setSelectedAlbumInfo(albumInfo);
+        // Verificar se é seleção aleatória (albumInfo já vem pronto)
+        if (albumInfo && albumInfo.isRandom) {
+          // Seleção aleatória - usar as informações que já vêm do evento
+          setSelectedAlbumInfo({
+            name: albumInfo.name,
+            artist: albumInfo.artist,
+            genre: albumInfo.genre
+          });
           setAlbumSelected(true);
 
           // Broadcast para outros jogadores
@@ -196,8 +265,43 @@ export default function RoundLobby() {
             await gameChannelRef.current.send({
               type: 'broadcast',
               event: 'ALBUM_SELECTED',
-              payload: { albumInfo }
+              payload: { albumInfo: {
+                name: albumInfo.name,
+                artist: albumInfo.artist,
+                genre: albumInfo.genre
+              }}
             });
+          }
+        } else if (albumId) {
+          // Seleção normal de álbum específico
+          const { data: album } = await supabase
+              .from('albums')
+              .select(`
+          name,
+          artist_name,
+          genres (name)
+        `)
+              .eq('id', albumId)
+              .single();
+
+          if (album) {
+            const albumInfo = {
+                  name: album.name,
+                  artist: album.artist_name,
+                  genre: album.genres?.name || ''
+          };
+
+            setSelectedAlbumInfo(albumInfo);
+            setAlbumSelected(true);
+
+            // Broadcast para outros jogadores
+            if (gameChannelRef.current) {
+              await gameChannelRef.current.send({
+                type: 'broadcast',
+                event: 'ALBUM_SELECTED',
+                payload: { albumInfo }
+              });
+            }
           }
         }
       } catch (error) {
@@ -534,6 +638,22 @@ export default function RoundLobby() {
           <p className="text-white/80 text-sm sm:text-base">{selectedAlbumInfo.artist}</p>
           <p className="text-white/70 text-xs sm:text-sm">{selectedAlbumInfo.genre}</p>
         </div>
+        {/* ADICIONAR ESTA SEÇÃO - Botão para trocar álbum */}
+        {topPlayer?.id === clientId.current && (
+        <div className="mt-4">
+          <ChickenButton
+              variant="feather"
+              size="sm"
+              onClick={() => {
+        setAlbumSelected(false);
+        setSelectedAlbumInfo(null);
+      }}
+              className="bg-white/20 hover:bg-white/30"
+          >
+            🔄 Trocar Álbum
+          </ChickenButton>
+        </div>
+        )}
       </BarnCard>
       </div>
   )}

@@ -58,6 +58,7 @@ export function RoomLobby() {
         const modeParam = searchParams.get("mode");
         return modeParam === "spectator";
     });
+    const [isRandomSelectionMode, setIsRandomSelectionMode] = useState(false);
 
 
 
@@ -191,14 +192,19 @@ export function RoomLobby() {
             }
 
             // Redirecionar conforme o status da sala
+            // Redirecionar conforme o status da sala
             if (existingRoom.status === 'in_progress' && existingRoom.game_session_id) {
-                navigate(`/game/${roomCode}?sid=${existingRoom.game_session_id}&mode=spectator`);
+                console.log('🎮 Redirecionando para jogo em andamento:', existingRoom.game_session_id);
+                navigatedRef.current = true; // ADICIONAR ESTA LINHA
+                const mode = isSpectator ? 'spectator' : 'multiplayer';
+                navigate(`/game/${roomCode}?sid=${existingRoom.game_session_id}&mode=${mode}`);
                 return;
             } else if (existingRoom.status === 'round_lobby') {
+                console.log('🏆 Redirecionando para round lobby:', existingRoom.game_session_id);
+                navigatedRef.current = true; // ADICIONAR ESTA LINHA
                 navigate(`/round-lobby/${roomCode}?sid=${existingRoom.game_session_id || 'current'}`);
                 return;
             }
-
             // Continuar com a lógica normal para lobby
             const { data: roomData, error: roomError } = await supabase
                 .from('game_rooms')
@@ -245,9 +251,12 @@ export function RoomLobby() {
 
                     setSelectedMp3AlbumId(updatedRoom.selected_mp3_album_id);
                     setSelectedSpotifyAlbumId(updatedRoom.selected_spotify_album_id);
+                    setIsRandomSelectionMode(updatedRoom.is_random_selection || false);
 
-                    // Navegação inteligente baseada no status
-                    if (!navigatedRef.current) {
+                    // CORRIGIR: Navegação apenas uma vez e só para mudanças de status relevantes
+                    if (!navigatedRef.current && updatedRoom.status !== 'lobby' && updatedRoom.status !== 'waiting') {
+                        console.log('🚀 Navegando para:', updatedRoom.status, 'com session:', updatedRoom.game_session_id);
+
                         if (updatedRoom.status === 'in_progress' && updatedRoom.game_session_id) {
                             navigatedRef.current = true;
                             const mode = gameModeRef.current === 'solo' ? 'solo' : 'multiplayer';
@@ -304,16 +313,39 @@ export function RoomLobby() {
             if (error && error.code !== 'PGRST116') throw error;
 
             if (data?.value) {
-                const mode = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+                let mode;
+                if (typeof data.value === 'string') {
+                    try {
+                        mode = JSON.parse(data.value);
+                    } catch (error) {
+                        console.warn('Invalid JSON in game_mode setting, using default:', data.value);
+                        // Se for "NaN" ou inválido, usar mp3 como padrão
+                        mode = (data.value === 'spotify') ? 'spotify' : 'mp3';
+                    }
+                } else {
+                    mode = data.value;
+                }
+
+                // ADICIONAR VALIDAÇÃO EXTRA:
+                if (mode !== 'mp3' && mode !== 'spotify') {
+                    console.warn('Invalid game mode detected, defaulting to mp3:', mode);
+                    mode = 'mp3';
+                }
+
                 setSystemGameMode(mode);
 
                 // Se for modo Spotify, carregar os álbuns
                 if (mode === "spotify") {
                     await loadSpotifyAlbums();
                 }
+            } else {
+                // Se não há configuração, usar mp3 como padrão
+                setSystemGameMode('mp3');
             }
         } catch (error) {
             console.error("Error loading game mode:", error);
+            // Em caso de erro, usar mp3 como padrão
+            setSystemGameMode('mp3');
         } finally {
             setLoadingGameMode(false);
         }
@@ -342,7 +374,7 @@ export function RoomLobby() {
             // Carregar dados da sala incluindo álbuns selecionados
             const { data: roomData, error: roomError } = await supabase
                 .from('game_rooms')
-                .select('selected_mp3_album_id, selected_spotify_album_id')
+                .select('selected_mp3_album_id, selected_spotify_album_id, is_random_selection')
                 .eq('id', roomId)
                 .single();
 
@@ -351,6 +383,7 @@ export function RoomLobby() {
             } else {
                 setSelectedMp3AlbumId(roomData.selected_mp3_album_id);
                 setSelectedSpotifyAlbumId(roomData.selected_spotify_album_id);
+                setIsRandomSelectionMode(roomData.is_random_selection || false);
             }
 
             // Carregar participantes (código existente)
@@ -481,6 +514,16 @@ export function RoomLobby() {
             toast({
                 title: "Selecione um álbum",
                 description: "Escolha um álbum do Spotify para jogar.",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        // VERIFICAÇÃO: Se for modo MP3 e nem álbum nem seleção aleatória
+        if (systemGameMode === "mp3" && !selectedMp3AlbumId && !isRandomSelectionMode) {
+            toast({
+                title: "Selecione um álbum",
+                description: "Escolha um álbum MP3 ou use seleção aleatória para jogar.",
                 variant: "destructive",
             });
             return;
@@ -675,13 +718,23 @@ export function RoomLobby() {
                             variant="corn"
                             size="lg"
                             onClick={handleStartGame}
-                            disabled={gameMode === 'multiplayer' && players.length < 2}
+                            disabled={
+    (gameMode === 'multiplayer' && players.length < 2) ||
+    (systemGameMode === "spotify" && !selectedSpotifyAlbumId) ||
+    (systemGameMode === "mp3" && !selectedMp3AlbumId && !isRandomSelectionMode)
+}
                             className="min-w-[250px]"
                         >
                             {gameMode === 'solo'
-                                ? '🎵 Iniciar Jogo Solo'
+                                ? (systemGameMode === "spotify" && !selectedSpotifyAlbumId) ||
+                            (systemGameMode === "mp3" && !selectedMp3AlbumId && !isRandomSelectionMode)
+                                ? '🎵 Escolha um Álbum'
+                                : '🎵 Iniciar Jogo Solo'
                                 : players.length < 2
                                 ? '🔄 Aguardando Jogadores...'
+                                : (systemGameMode === "spotify" && !selectedSpotifyAlbumId) ||
+                            (systemGameMode === "mp3" && !selectedMp3AlbumId && !isRandomSelectionMode)
+                                ? '🎵 Escolha um Álbum'
                                 : `🎵 Iniciar Multiplayer (${players.length}/10)`
                             }
                         </ChickenButton>
