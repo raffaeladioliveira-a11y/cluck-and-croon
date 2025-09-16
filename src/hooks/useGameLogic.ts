@@ -329,6 +329,8 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   const [audioUnlocked, setAudioUnlocked] = useState(true);
   const [isHost, setIsHost] = useState(false);
   const [usedSongIds, setUsedSongIds] = useState<string[]>([]);
+  const [usedOptionTitles, setUsedOptionTitles] = useState<string[]>([]);
+
 
   // Adicione após os estados existentes
   const [battleMode, setBattleMode] = useState<'classic' | 'battle'>('classic');
@@ -539,55 +541,63 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   // 1. ADICIONAR novas funções para buscar opções especificamente do álbum
 
   /** Busca outras músicas do mesmo ÁLBUM para usar como opções incorretas (MP3) */
-  async function getOtherMP3TracksFromAlbum(albumId: string, excludeSongId: string, limit: number = 10): Promise<string[]> {
+  async function getOtherMP3TracksFromAlbum(
+      albumId: string,
+      excludeSongId: string,
+      excludeTitles: string[] = [], // NOVO: títulos já usados
+      limit: number = 50 // AUMENTAR limite
+  ): Promise<string[]> {
     try {
-      console.log('🐛 [getOtherMP3TracksFromAlbum] INÍCIO:', { albumId, excludeSongId, limit });
+      console.log('🛠 [getOtherMP3TracksFromAlbum] INÍCIO:', {
+        albumId,
+        excludeSongId,
+        excludeTitles: excludeTitles.length,
+        limit
+      });
 
       const { data: albumSongs, error } = await supabase
           .from('album_songs')
           .select(`
-          songs (
-            id,
-            title
-          )
-        `)
+        songs (
+          id,
+          title
+        )
+      `)
           .eq('album_id', albumId)
           .neq('song_id', excludeSongId)
           .limit(limit);
 
-      console.log('🐛 [getOtherMP3TracksFromAlbum] RESULTADO QUERY:', { albumSongs, error, count: albumSongs?.length });
-
-      if (error) {
-        console.error('🐛 [getOtherMP3TracksFromAlbum] ERRO:', error);
+      if (error || !albumSongs) {
+        console.error('🛠 [getOtherMP3TracksFromAlbum] ERRO:', error);
         return [];
       }
 
-      if (!albumSongs) {
-        console.log('🐛 [getOtherMP3TracksFromAlbum] Nenhum resultado');
-        return [];
-      }
+      const availableTitles = albumSongs
+          .map(item => item.songs?.title)
+    .filter(title => title && !excludeTitles.includes(title)) // FILTRAR títulos já usados
+          .filter((title, index, self) => self.indexOf(title) === index); // Remove duplicatas
 
-      const titles = albumSongs
-          .map(item => {
-            console.log('🐛 [getOtherMP3TracksFromAlbum] Item:', item);
-            return item.songs?.title;
-          })
-          .filter(title => {
-            console.log('🐛 [getOtherMP3TracksFromAlbum] Title filtrado:', title);
-            return title;
-          })
-          .slice(0, limit);
+      console.log('🛠 [getOtherMP3TracksFromAlbum] TÍTULOS DISPONÍVEIS:', {
+        total: albumSongs.length,
+        afterFilter: availableTitles.length,
+        excluded: excludeTitles.length
+      });
 
-      console.log('🐛 [getOtherMP3TracksFromAlbum] TÍTULOS FINAIS:', titles);
-      return titles;
+      // EMBARALHAR para garantir variedade
+      return availableTitles.sort(() => Math.random() - 0.5);
+
     } catch (error) {
-      console.error('🐛 [getOtherMP3TracksFromAlbum] CATCH ERROR:', error);
+      console.error('🛠 [getOtherMP3TracksFromAlbum] CATCH ERROR:', error);
       return [];
     }
   }
-
   /** Busca outras músicas do mesmo ÁLBUM para usar como opções incorretas (Spotify) */
-  async function getOtherSpotifyTracksFromAlbum(spotifyAlbumId: string, excludeTrackId: string, limit: number = 10): Promise<string[]> {
+  async function getOtherSpotifyTracksFromAlbum(
+      spotifyAlbumId: string,
+      excludeTrackId: string,
+      excludeTitles: string[] = [], // NOVO: títulos já usados
+      limit: number = 50 // AUMENTAR limite
+  ): Promise<string[]> {
     try {
       const { data: tracks, error } = await supabase
           .from('spotify_tracks')
@@ -597,7 +607,14 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
           .limit(limit);
 
       if (error || !tracks) return [];
-      return tracks.map(t => t.track_name);
+
+      const availableTitles = tracks
+          .map(t => t.track_name)
+          .filter(title => title && !excludeTitles.includes(title)) // FILTRAR títulos já usados
+          .filter((title, index, self) => self.indexOf(title) === index);
+
+      return availableTitles.sort(() => Math.random() - 0.5);
+
     } catch (error) {
       console.error('[getOtherSpotifyTracksFromAlbum] Erro:', error);
       return [];
@@ -1070,80 +1087,181 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       excludeId: string,
       mode: 'mp3' | 'spotify'
   ): Promise<string[]> {
-    console.log('🎵 [buildOptionsFromAlbum] INÍCIO:', { correctTitle, albumId, excludeId, mode });
+    console.log('🎵 [buildOptionsFromAlbum] INÍCIO:', {
+      correctTitle,
+      albumId,
+      excludeId,
+      mode,
+      usedOptions: usedOptionTitles.length // MOSTRAR quantas opções já foram usadas
+    });
 
     try {
       let otherTracks: string[] = [];
 
       if (mode === 'mp3') {
-        console.log('🎵 [buildOptionsFromAlbum] Buscando no modo MP3...');
+        // PASSAR títulos já usados para evitar repetição
+        otherTracks = await getOtherMP3TracksFromAlbum(
+            albumId,
+            excludeId,
+            usedOptionTitles, // NOVO: excluir títulos já usados
+            100 // AUMENTAR limite drasticamente
+        );
+      } else if (mode === 'spotify') {
+        otherTracks = await getOtherSpotifyTracksFromAlbum(
+            albumId,
+            excludeId,
+            usedOptionTitles, // NOVO: excluir títulos já usados
+            100
+        );
+      }
 
-        // Query mais robusta
-        const { data: albumSongs, error } = await supabase
-            .from('album_songs')
-            .select(`
-            song_id,
-            songs!inner (
-              id,
-              title
-            )
-          `)
-            .eq('album_id', albumId)
-            .neq('song_id', excludeId);
+      console.log('🎵 [buildOptionsFromAlbum] Tracks encontradas:', otherTracks.length);
 
-        console.log('🎵 [buildOptionsFromAlbum] Query result:', {
-              count: albumSongs?.length || 0,
-            error: error?.message,
-            sample: albumSongs?.slice(0, 3)
-      });
+      // Se temos músicas suficientes do álbum
+      if (otherTracks.length >= 3) {
+        // EMBARALHAR e pegar 3 opções diferentes
+        const shuffled = otherTracks.sort(() => Math.random() - 0.5);
+        const selectedOptions = shuffled.slice(0, 3);
 
-        if (!error && albumSongs && albumSongs.length > 0) {
-          otherTracks = albumSongs
-              .map(item => item.songs?.title)
-        .filter(title => title && title !== correctTitle)
-              .filter((title, index, self) => self.indexOf(title) === index) // Remove duplicatas
-              .slice(0, 3);
+        // REGISTRAR as opções usadas para evitar repetição futura
+        setUsedOptionTitles(prev => [...prev, ...selectedOptions]);
 
-          console.log('🎵 [buildOptionsFromAlbum] Títulos únicos encontrados:', otherTracks);
-        } else {
-          console.warn('🎵 [buildOptionsFromAlbum] Query falhou ou vazia:', error);
+        const finalOptions = [correctTitle, ...selectedOptions].sort(() => Math.random() - 0.5);
+
+        console.log('🎵 [buildOptionsFromAlbum] ✅ SUCESSO - Opções únicas:', {
+          options: finalOptions,
+          totalUsedOptions: usedOptionTitles.length + selectedOptions.length
+        });
+
+        return finalOptions;
+      }
+
+      // Fallback se não temos músicas suficientes
+      console.warn('🎵 [buildOptionsFromAlbum] Poucas músicas disponíveis, usando fallback');
+
+      // BUSCAR de outros álbuns do mesmo gênero se necessário
+      if (otherTracks.length < 3) {
+        try {
+          const { data: albumInfo } = await supabase
+              .from('albums')
+              .select('genre_id')
+              .eq('id', albumId)
+              .single();
+
+          if (albumInfo?.genre_id) {
+            const { data: sameGenreAlbums } = await supabase
+                .from('albums')
+                .select('id')
+                .eq('genre_id', albumInfo.genre_id)
+                .neq('id', albumId)
+                .limit(10);
+
+            if (sameGenreAlbums && sameGenreAlbums.length > 0) {
+              const albumIds = sameGenreAlbums.map(a => a.id);
+
+              const { data: moreTracks } = await supabase
+                  .from('album_songs')
+                  .select(`
+                songs (
+                  title
+                )
+              `)
+                  .in('album_id', albumIds)
+                  .not('songs.title', 'eq', correctTitle)
+                  .order('random()')
+                  .limit(50);
+
+              if (moreTracks) {
+                const additionalTracks = moreTracks
+                    .map(item => item.songs?.title)
+              .filter(title =>
+                    title &&
+                    !usedOptionTitles.includes(title) && // NOVO: excluir já usadas
+                    !otherTracks.includes(title)
+                )
+                    .slice(0, 10);
+
+                otherTracks.push(...additionalTracks);
+              }
+            }
+          }
+        } catch (genreError) {
+          console.error('🎵 [buildOptionsFromAlbum] Erro ao buscar por gênero:', genreError);
         }
       }
 
-      // Verificar se conseguimos opções suficientes
-      if (otherTracks.length < 3) {
-        console.warn(`🎵 [buildOptionsFromAlbum] Apenas ${otherTracks.length} músicas encontradas no álbum`);
+      // Garantir que temos pelo menos 3 opções
+      const needed = Math.max(0, 3 - otherTracks.length);
+      if (needed > 0) {
+        // Buscar músicas aleatórias como último recurso
+        const { data: randomTracks } = await supabase
+            .from('songs')
+            .select('title')
+            .not('title', 'eq', correctTitle)
+            .not('title', 'in', `(${[...usedOptionTitles, ...otherTracks].map(t => `"${t}"`).join(',')})`)
+            .order('random()')
+            .limit(needed * 3); // Buscar mais para ter opções
 
-        // IMPORTANTE: Não buscar de outros álbuns, usar variações da música atual
-        const needed = 3 - otherTracks.length;
-        const variations = [
-          `${correctTitle} (Versão Deluxe)`,
-          `${correctTitle} (Versão Estendida)`,
-          `${correctTitle} (Versão do Álbum)`,
-          `${correctTitle} (Faixa Bônus)`,
-          `${correctTitle} (Remaster)`
-        ];
+        if (randomTracks && randomTracks.length > 0) {
+          const randomTitles = randomTracks
+              .map(s => s.title)
+              .slice(0, needed);
 
-        otherTracks.push(...variations.slice(0, needed));
-        console.log('🎵 [buildOptionsFromAlbum] Completado com variações:', otherTracks);
+          otherTracks.push(...randomTitles);
+        }
       }
 
-      const options = [correctTitle, ...otherTracks];
-      const finalOptions = options.sort(() => Math.random() - 0.5);
+      // Garantir que temos exatamente 3 opções incorretas
+      const finalIncorrectOptions = otherTracks.slice(0, 3);
 
-      console.log('🎵 [buildOptionsFromAlbum] ✅ SUCESSO - Opções finais:', finalOptions);
+      // REGISTRAR as opções usadas
+      setUsedOptionTitles(prev => [...prev, ...finalIncorrectOptions]);
+
+      const finalOptions = [correctTitle, ...finalIncorrectOptions].sort(() => Math.random() - 0.5);
+
+      console.log('🎵 [buildOptionsFromAlbum] ✅ Opções finais com fallback:', finalOptions);
       return finalOptions;
 
     } catch (error) {
       console.error('🎵 [buildOptionsFromAlbum] ❌ ERRO:', error);
-      return [
-        correctTitle,
-        `${correctTitle} (Remix)`,
-        `${correctTitle} (Live)`,
-        `${correctTitle} (Acoustic)`
-      ].sort(() => Math.random() - 0.5);
+      return [correctTitle, 'Opção A', 'Opção B', 'Opção C'].sort(() => Math.random() - 0.5);
     }
   }
+
+  // 5. ADICIONAR função para resetar opções usadas quando necessário
+  const resetUsedOptions = useCallback(() => {
+    setUsedOptionTitles([]);
+    console.log('🔄 Histórico de opções resetado');
+  }, []);
+
+// 6. ADICIONAR lógica para resetar opções a cada novo jogo
+  useEffect(() => {
+    if (gameState === 'idle') {
+      resetUsedOptions();
+    }
+  }, [gameState, resetUsedOptions]);
+
+// 7. ADICIONAR função para limpar opções quando ficam poucas disponíveis
+  const checkAndResetOptions = useCallback(async (albumId: string) => {
+    try {
+      // Verificar quantas músicas ainda estão disponíveis
+      const { data: albumSongs } = await supabase
+          .from('album_songs')
+          .select('songs(title)')
+          .eq('album_id', albumId);
+
+      const totalTracks = albumSongs?.length || 0;
+      const usedTracks = usedOptionTitles.length;
+
+      // Se usamos mais de 80% das músicas disponíveis, resetar
+      if (totalTracks > 0 && usedTracks > (totalTracks * 0.8)) {
+        console.log('🔄 Resetando opções - muitas músicas já utilizadas');
+        setUsedOptionTitles([]);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar opções disponíveis:', error);
+    }
+  }, [usedOptionTitles]);
 
   // Função para obter modo de batalha
   const getBattleMode = async (): Promise<'classic' | 'battle'> => {
@@ -2265,6 +2383,9 @@ const broadcastScoreUpdate = useCallback(async () => {
     activeGenre,
     players,
     selectedAlbumInfo,
+    resetUsedOptions,
+    usedOptionsCount: usedOptionTitles.length,
+    checkAndResetOptions,
     // ADICIONE estas novas propriedades:
     battleMode,
     battleSettings,
