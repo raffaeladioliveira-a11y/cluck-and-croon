@@ -26,6 +26,8 @@ import { ArrowRight, Link } from 'lucide-react';
 // Adicione estas linhas nos imports
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal } from 'lucide-react';
+import { Eye, EyeOff } from "lucide-react";
+
 
 interface Song {
     id: string;
@@ -78,6 +80,7 @@ interface Album {
     cover_image_url: string;
     genre_id: string;
     created_at?: string;
+    is_hidden?: boolean;
     genres?: {  // Note que é 'genres' (plural) vindo do Supabase
         id: string;
         name: string;
@@ -113,6 +116,8 @@ export default function AdminDashboard() {
     const [isMoveSongDialogOpen, setIsMoveSongDialogOpen] = useState(false);
     const [selectedSongForManager, setSelectedSongForManager] = useState<Song | null>(null);
     const [currentAlbumIdForMove, setCurrentAlbumIdForMove] = useState<string>('');
+    const [showHiddenAlbums, setShowHiddenAlbums] = useState(false);
+
 
     // Função para abrir o gerenciador de álbuns de uma música
     const openSongAlbumManager = (song: Song) => {
@@ -277,6 +282,33 @@ export default function AdminDashboard() {
         }
     }, [filters]);
 
+    // 3. Adicione esta função para alternar visibilidade
+    const toggleAlbumVisibility = async (albumId: string, currentIsHidden: boolean) => {
+        try {
+            const { error } = await supabase
+                .from('albums')
+                .update({ is_hidden: !currentIsHidden })
+                .eq('id', albumId);
+
+            if (error) throw error;
+
+            toast({
+                title: currentIsHidden ? "Álbum exibido" : "Álbum oculto",
+                description: currentIsHidden
+                    ? "O álbum agora aparecerá na seleção de jogos"
+                    : "O álbum não aparecerá mais na seleção de jogos",
+            });
+
+            await loadAlbums();
+        } catch (error) {
+            toast({
+                title: "Erro",
+                description: "Não foi possível alterar a visibilidade do álbum",
+                variant: "destructive",
+            });
+        }
+    };
+
     // const searchSongs = useCallback(async() => {
     //     // Se não há filtros, limpa os resultados
     //     if (!filters.artist && !filters.song && !filters.year) {
@@ -431,6 +463,11 @@ export default function AdminDashboard() {
     const filterAlbums = useCallback(async() => {
         let filtered = [...albums];
 
+        // Filtrar álbuns ocultos se a opção não estiver ativada
+        if (!showHiddenAlbums) {
+            filtered = filtered.filter(album => !album.is_hidden);
+        }
+
         // Filtro por artista (com proteção contra null)
         if (filters.artist) {
             filtered = filtered.filter(album =>
@@ -468,7 +505,7 @@ export default function AdminDashboard() {
     // useEffect para aplicar filtros (versão assíncrona)
     useEffect(() => {
         filterAlbums();
-    }, [albums, filters]);
+    }, [albums, filters, showHiddenAlbums]);
 
     useEffect(() => {
         const timeoutId = setTimeout(() => {
@@ -752,6 +789,7 @@ export default function AdminDashboard() {
             const albumsWithCount = (albumsData || []).map(album => ({
                 ...album,
                 songs_count: album.album_songs ? album.album_songs.length : 0,
+                is_hidden: album.is_hidden || false,
                 // Remove album_songs do objeto final para não poluir o estado
                 album_songs: undefined
             }));
@@ -1719,6 +1757,7 @@ export default function AdminDashboard() {
 
                                 {/* Formulário de Novo Álbum */}
                                 <BarnCard variant="nest" className="p-4">
+
                                     <h4 className="text-lg font-semibold text-primary mb-4">Filtrar Músicas</h4>
                                     <div className="grid md:grid-cols-3 gap-4">
                                         <div>
@@ -1736,6 +1775,16 @@ export default function AdminDashboard() {
                                                 value={filters.song}
                                                 onChange={(e) => setFilters(prev => ({...prev, song: e.target.value}))}
                                             />
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <Switch
+                                                id="show-hidden"
+                                                checked={showHiddenAlbums}
+                                                onCheckedChange={setShowHiddenAlbums}
+                                            />
+                                            <Label htmlFor="show-hidden" className="text-sm">
+                                                Mostrar álbuns ocultos
+                                            </Label>
                                         </div>
                                         {/*<div>*/}
                                         {/*<Label>Buscar por Ano</Label>*/}
@@ -2079,10 +2128,22 @@ export default function AdminDashboard() {
                                         {albums.map(album => (
                                             <Card
                                                 key={album.id}
-                                                className="cursor-pointer hover:shadow-lg transition-all duration-300 hover:scale-105"
+                                                className={`cursor-pointer hover:shadow-lg transition-all duration-300 hover:scale-105 ${
+        album.is_hidden ? 'opacity-60 border-red-200 bg-red-50/30' : ''
+    }`}
                                                 onClick={() => openAlbum(album)}
                                             >
                                                 <CardHeader className="p-4">
+                                                    {/* Indicador de álbum oculto */}
+                                                    {album.is_hidden && (
+                                                        <div className="absolute top-2 right-2 z-10">
+                                                            <Badge variant="destructive" className="text-xs">
+                                                                <EyeOff className="w-3 h-3 mr-1" />
+                                                                Oculto
+                                                            </Badge>
+                                                        </div>
+                                                    )}
+
                                                     {album.cover_image_url ? (
                                                         <img
                                                             src={album.cover_image_url}
@@ -2118,6 +2179,20 @@ export default function AdminDashboard() {
 
                                                         </div>
                                                         <div className="flex gap-1">
+                                                            {/* Botão de visibilidade */}
+                                                            <Button
+                                                                variant={album.is_hidden ? "destructive" : "outline"}
+                                                                size="icon"
+                                                                className="h-8 w-8"
+                                                                onClick={(e) => {
+            e.stopPropagation();
+            toggleAlbumVisibility(album.id, album.is_hidden || false);
+        }}
+                                                                title={album.is_hidden ? "Álbum oculto - clique para exibir" : "Álbum visível - clique para ocultar"}
+                                                            >
+                                                                {album.is_hidden ? <EyeOff className="w-3 h-3"/> : <Eye className="w-3 h-3"/>}
+                                                            </Button>
+
                                                             <Button
                                                                 variant="outline"
                                                                 size="icon"

@@ -19,6 +19,7 @@ interface Mp3Album {
     cover_image_url?: string;
     song_count?: number;
     album_songs?: { song_id: string }[];
+    is_hidden?: boolean;
 }
 
 interface HostMp3AlbumSelectorProps {
@@ -53,6 +54,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                     *,
                     genres (id, name, emoji)
                 `)
+                    .eq('is_hidden', false)
                     .order("artist_name", { ascending: true })
                     .order("name", { ascending: true });
 
@@ -72,6 +74,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                         return {
                             ...album,
                             song_count: count || 0,
+                            is_hidden: album.is_hidden || false,
                         };
                     })
                 );
@@ -101,7 +104,7 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
     useEffect(() => {
         if (selectedGenre) {
             const filtered = albums.filter(
-                (album) => album.genre_id === selectedGenre.id
+                (album) => album.genre_id === selectedGenre.id && !album.is_hidden
             );
             setFilteredAlbums(filtered);
         } else {
@@ -112,6 +115,18 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
     const handleRandomSelection = async () => {
         try {
             setSaving(true);
+
+            // Filtrar álbuns visíveis para seleção aleatória
+            const visibleAlbums = albums.filter(album => !album.is_hidden && (album.song_count || 0) > 0);
+
+            if (visibleAlbums.length === 0) {
+                toast({
+                    title: "Erro",
+                    description: "Nenhum álbum disponível para seleção aleatória",
+                    variant: "destructive",
+                });
+                return;
+            }
 
             // Calcular estatísticas da seleção aleatória
             const totalSongs = albums.reduce((sum, album) => sum + (album.song_count || 0), 0);
@@ -136,6 +151,19 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
     };
 
     const handleGenreSelect = async (genre: Genre) => {
+        // Verificar se há álbuns visíveis neste gênero
+        const visibleAlbumsInGenre = albums.filter(
+            album => album.genre_id === genre.id && !album.is_hidden && (album.song_count || 0) > 0
+        );
+
+        if (visibleAlbumsInGenre.length === 0) {
+            toast({
+                title: "Aviso",
+                description: `Nenhum álbum disponível para o gênero ${genre.name}`,
+                variant: "destructive",
+            });
+            return;
+        }
         setSelectedGenre(genre);
         setSelectedAlbum(null);
         setIsRandomSelection(false);
@@ -153,6 +181,24 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
     };
 
     const handleAlbumSelect = (album: Mp3Album) => {
+        // Verificação de segurança adicional
+        if (album.is_hidden) {
+            toast({
+                title: "Erro",
+                description: "Este álbum não está mais disponível",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if ((album.song_count || 0) === 0) {
+            toast({
+                title: "Erro",
+                description: "Este álbum não possui músicas disponíveis",
+                variant: "destructive",
+            });
+            return;
+        }
         setSelectedAlbum(album);
         setIsRandomSelection(false);
         setStep("confirm");
@@ -162,6 +208,18 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
         setSaving(true);
         try {
             if (isRandomSelection) {
+                // Filtrar álbuns visíveis para sorteio
+                const visibleAlbums = albums.filter(album => !album.is_hidden && (album.song_count || 0) > 0);
+
+                if (visibleAlbums.length === 0) {
+                    toast({
+                        title: "Erro",
+                        description: "Nenhum álbum disponível para sorteio",
+                        variant: "destructive",
+                    });
+                    return;
+                }
+
                 // Sortear um álbum específico da biblioteca
                 const randomIndex = Math.floor(Math.random() * albums.length);
                 const randomlySelectedAlbum = albums[randomIndex];
@@ -204,6 +262,15 @@ export function HostMp3AlbumSelector({ roomCode }: HostMp3AlbumSelectorProps) {
                     setSelectedGenre(randomlySelectedAlbum.genre || null);
                 }
             } else if (selectedAlbum) {
+                // Verificação adicional: garantir que o álbum selecionado não está oculto
+                if (selectedAlbum.is_hidden) {
+                    toast({
+                        title: "Erro",
+                        description: "Este álbum não está mais disponível",
+                        variant: "destructive",
+                    });
+                    return;
+                }
                 // Seleção normal de álbum
                 const { error } = await supabase
                     .from("game_rooms")
