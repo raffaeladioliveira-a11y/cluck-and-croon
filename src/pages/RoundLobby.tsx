@@ -177,119 +177,119 @@ export default function RoundLobby() {
   };
 
   // No componente RoundLobby, adicione este useEffect:
-  useEffect(() => {
-    if (!roomCode) return;
+  // useEffect(() => {
+  //   if (!roomCode) return;
+  //
+  //   const updatePresence = async () => {
+  //     try {
+  //       // Buscar room_id primeiro
+  //       const { data: room } = await supabase
+  //           .from('game_rooms')
+  //           .select('id')
+  //           .eq('room_code', roomCode)
+  //           .maybeSingle();
+  //
+  //       if (room?.id) {
+  //         await supabase
+  //             .from('room_participants')
+  //             .update({ last_seen: new Date().toISOString() })
+  //             .eq('room_id', room.id)
+  //             .eq('client_id', clientId.current); // ou clientId dependendo de como você definiu
+  //       }
+  //     } catch (error) {
+  //       // Ignorar erros silenciosamente
+  //     }
+  //   };
+  //
+  //   const presenceInterval = setInterval(updatePresence, 10000);
+  //   updatePresence();
+  //
+  //   return () => clearInterval(presenceInterval);
+  // }, [roomCode]);
 
-    const updatePresence = async () => {
-      try {
-        // Buscar room_id primeiro
-        const { data: room } = await supabase
-            .from('game_rooms')
-            .select('id')
-            .eq('room_code', roomCode)
-            .maybeSingle();
-
-        if (room?.id) {
-          await supabase
-              .from('room_participants')
-              .update({ last_seen: new Date().toISOString() })
-              .eq('room_id', room.id)
-              .eq('client_id', clientId.current); // ou clientId dependendo de como você definiu
-        }
-      } catch (error) {
-        // Ignorar erros silenciosamente
-      }
-    };
-
-    const presenceInterval = setInterval(updatePresence, 10000);
-    updatePresence();
-
-    return () => clearInterval(presenceInterval);
-  }, [roomCode]);
-
-  // Sistema de auto-cleanup no round-lobby
-  useEffect(() => {
-    if (!isHost || !roomCode) return; // Substitua por sua variável de host
-
-    const autoCleanup = async () => {
-      try {
-        // Buscar room_id
-        const { data: roomData } = await supabase
-            .from('game_rooms')
-            .select('id')
-            .eq('room_code', roomCode)
-            .maybeSingle();
-
-        if (!roomData?.id) return;
-
-        // Buscar participantes inativos
-        const { data: staleParticipants, error } = await supabase
-            .from('room_participants')
-            .select('client_id, display_name, last_seen')
-            .eq('room_id', roomData.id)
-            .lt('last_seen', new Date(Date.now() - 30000).toISOString());
-
-        if (!error && staleParticipants && staleParticipants.length > 0) {
-          console.log('🧹 [RoundLobby] Removendo jogadores inativos:', staleParticipants.length);
-
-          for (const participant of staleParticipants) {
-            await supabase
-                .from('room_participants')
-                .delete()
-                .eq('room_id', roomData.id)
-                .eq('client_id', participant.client_id);
-          }
-
-          // Recarregar sua lista de jogadores
-          // loadPlayers(); // Substitua pela sua função de carregar jogadores
-
-          console.log('✅ [RoundLobby] Cleanup concluído');
-        }
-      } catch (error) {
-        console.error('❌ [RoundLobby] Erro no auto-cleanup:', error);
-      }
-    };
-
-    const cleanupInterval = setInterval(autoCleanup, 15000);
-    return () => clearInterval(cleanupInterval);
-  }, [isHost, roomCode]);
+  // // Sistema de auto-cleanup no round-lobby
+  // useEffect(() => {
+  //   if (!isHost || !roomCode) return; // Substitua por sua variável de host
+  //
+  //   const autoCleanup = async () => {
+  //     try {
+  //       // Buscar room_id
+  //       const { data: roomData } = await supabase
+  //           .from('game_rooms')
+  //           .select('id')
+  //           .eq('room_code', roomCode)
+  //           .maybeSingle();
+  //
+  //       if (!roomData?.id) return;
+  //
+  //       // Buscar participantes inativos
+  //       const { data: staleParticipants, error } = await supabase
+  //           .from('room_participants')
+  //           .select('client_id, display_name, last_seen')
+  //           .eq('room_id', roomData.id)
+  //           .lt('last_seen', new Date(Date.now() - 30000).toISOString());
+  //
+  //       if (!error && staleParticipants && staleParticipants.length > 0) {
+  //         console.log('🧹 [RoundLobby] Removendo jogadores inativos:', staleParticipants.length);
+  //
+  //         for (const participant of staleParticipants) {
+  //           await supabase
+  //               .from('room_participants')
+  //               .delete()
+  //               .eq('room_id', roomData.id)
+  //               .eq('client_id', participant.client_id);
+  //         }
+  //
+  //         // Recarregar sua lista de jogadores
+  //         // loadPlayers(); // Substitua pela sua função de carregar jogadores
+  //
+  //         console.log('✅ [RoundLobby] Cleanup concluído');
+  //       }
+  //     } catch (error) {
+  //       console.error('❌ [RoundLobby] Erro no auto-cleanup:', error);
+  //     }
+  //   };
+  //
+  //   const cleanupInterval = setInterval(autoCleanup, 15000);
+  //   return () => clearInterval(cleanupInterval);
+  // }, [isHost, roomCode]);
 
 
   // Emergency cleanup no round-lobby
-  useEffect(() => {
-    if (!roomCode) return;
-
-    const emergencyCleanup = async () => {
-      try {
-        const { data: room } = await supabase
-            .from('game_rooms')
-            .select('id')
-            .eq('room_code', roomCode)
-            .maybeSingle();
-
-        if (room?.id) {
-          await supabase
-              .from('room_participants')
-              .delete()
-              .eq('room_id', room.id)
-              .eq('client_id', clientId.current); // ou clientId
-        }
-      } catch (error) {
-        // Ignorar erros
-      }
-    };
-
-    const handleBeforeUnload = () => emergencyCleanup();
-    const handlePageHide = () => emergencyCleanup();
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    window.addEventListener('pagehide', handlePageHide);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      window.removeEventListener('pagehide', handlePageHide);
-    };
-  }, [roomCode]);
+  // useEffect(() => {
+  //   if (!roomCode) return;
+  //
+  //   const emergencyCleanup = async () => {
+  //     try {
+  //       const { data: room } = await supabase
+  //           .from('game_rooms')
+  //           .select('id')
+  //           .eq('room_code', roomCode)
+  //           .maybeSingle();
+  //
+  //       if (room?.id) {
+  //         await supabase
+  //             .from('room_participants')
+  //             .delete()
+  //             .eq('room_id', room.id)
+  //             .eq('client_id', clientId.current); // ou clientId
+  //       }
+  //     } catch (error) {
+  //       // Ignorar erros
+  //     }
+  //   };
+  //
+  //   const handleBeforeUnload = () => emergencyCleanup();
+  //   const handlePageHide = () => emergencyCleanup();
+  //
+  //   window.addEventListener('beforeunload', handleBeforeUnload);
+  //   window.addEventListener('pagehide', handlePageHide);
+  //
+  //   return () => {
+  //     window.removeEventListener('beforeunload', handleBeforeUnload);
+  //     window.removeEventListener('pagehide', handlePageHide);
+  //   };
+  // }, [roomCode]);
 
   // Carregar dados iniciais
   useEffect(() => {
