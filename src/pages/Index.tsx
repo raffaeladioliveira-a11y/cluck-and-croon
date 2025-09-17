@@ -24,37 +24,100 @@ interface BattleSettings {
 }
 
 // Adicione este componente na sua tela de entrada
-const BattleModeInfo = ({battleSettings}: { battleSettings: BattleSettings }) => (
-    <div className="bg-gradient-to-r from-glass-500/10 to-orange-500/10 border-0 rounded-lg p-4 mb-4">
-        <div className="flex items-center justify-center gap-2 mb-4">
-            <span className="text-4xl">⚔️</span>
-            <h3 className="font-bold text-700 text-xl md:text-3xl">Modo Batalha Ativado!</h3>
+const BattleModeInfo = ({battleSettings}: { battleSettings: BattleSettings }) => {
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const openModal = () => setIsModalOpen(true);
+    const closeModal = () => setIsModalOpen(false);
+
+    return (
+        <>
+        {/* Componente principal - apenas título e botão */}
+        <div className="bg-gradient-to-r from-glass-500/10 to-orange-500/10 border-0 rounded-lg p-4 mb-4">
+            <div className="flex items-center justify-center gap-2 mb-4">
+                <span className="text-4xl">⚔️</span>
+                <h3 className="font-bold text-700 text-xl md:text-3xl">Modo Batalha Ativado!</h3>
+            </div>
+            <div className="flex items-center justify-center gap-2 mb-4">
+                <h5 className="font-bold text-700 text-xl md:text-3xl">Como funciona?</h5>
+            </div>
+            <div className="text-center">
+                <button
+                    onClick={openModal}
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-2 px-6 rounded-full transition-all duration-200 transform hover:scale-105 shadow-lg"
+                >
+                    📖 Ver Regras Completas
+                </button>
+            </div>
         </div>
-        <div className="flex items-center justify-center gap-2 mb-4">
-            <h5 className="font-bold text-700 text-xl md:text-3xl">Como funciona?</h5>
-        </div>
-        <div className="text-sm md:text-base space-y-2 leading-relaxed">
-            <p>🐔 <strong>Crie sua galinha:</strong> escolha um nome e um avatar, depois clique em <em>“Entrar na sala”</em>.</p>
-            <p>🎶 <strong>Aguarde o Host:</strong> ele selecionará o gênero musical e o álbum da partida.</p>
-            <p>⏱️ <strong>Início da rodada:</strong> após a contagem regressiva, uma música tocará por alguns segundos.</p>
-            <p>👉 <strong>Sua missão:</strong> antes que o tempo acabe, clique na opção que você acredita ser o nome correto da música.</p>
 
-            <hr className="border-white/10 my-2" />
+        {/* Modal */}
+        {isModalOpen && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-gradient-to-br from-purple-900/95 via-black/90 to-purple-800/95 backdrop-blur-md rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-purple-500/30">
+                    {/* Header do Modal */}
+                    <div className="sticky top-0 bg-gradient-to-r from-purple-800/90 to-black/90 backdrop-blur-md p-6 rounded-t-2xl border-b border-purple-400/30">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="text-4xl">⚔️</span>
+                                <h2 className="text-2xl md:text-3xl font-bold text-white">Como funciona o Modo Batalha?</h2>
+                            </div>
+                            <button
+                                onClick={closeModal}
+                                className="bg-purple-600/30 hover:bg-purple-500/40 border border-purple-400/50 text-white font-semibold py-3 px-8 rounded-full transition-all duration-200 transform hover:scale-105"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    </div>
 
-            <p>🥚 <strong>Regras dos ovos:</strong></p>
-            <ul className="list-disc list-inside space-y-1 pl-2">
-                <li>Você começa com <strong>{battleSettings.initialEggs} ovos</strong>.</li>
-                <li>Cada rodada vale <strong>{battleSettings.eggsPerRound} ovos</strong>.</li>
-                <li>A partida tem <strong>10 rodadas</strong>.</li>
-                <li>Se <span className="text-red-400 font-semibold">errar</span>: seus ovos vão para quem acertou.</li>
-                <li>Se <span className="text-green-400 font-semibold">acertar</span>: você ganha ovos de quem errou.</li>
-                <li>Se <span className="text-yellow-400 font-semibold">não responder</span>: mantém seus ovos.</li>
-            </ul>
-        </div>
+                    {/* Conteúdo do Modal */}
+                    <div className="p-6 text-white">
+                        <div className="text-base md:text-lg space-y-4 leading-relaxed">
+                            <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                                <p className="mb-3">🐔 <strong>Crie sua galinha:</strong> escolha um nome e um avatar, depois clique em <em>"Entrar na sala"</em>.</p>
+                                <p className="mb-3">🎶 <strong>Aguarde o Host:</strong> ele selecionará o gênero musical e o álbum da partida.</p>
+                                <p className="mb-3">⏱️ <strong>Início da rodada:</strong> após a contagem regressiva, uma música tocará por alguns segundos.</p>
+                                <p>👉 <strong>Sua missão:</strong> antes que o tempo acabe, clique na opção que você acredita ser o nome correto da música.</p>
+                            </div>
 
-    </div>
-);
+                            <hr className="border-white/20 my-4" />
 
+                            <div className="bg-white/10 rounded-lg p-4 border border-white/20">
+                                <p className="text-lg font-semibold mb-3 text-yellow-200">🥚 <strong>Regras dos ovos:</strong></p>
+                                <ul className="list-disc list-inside space-y-2 pl-2">
+                                    <li>Você começa com <strong className="text-yellow-200">{battleSettings.initialEggs} ovos</strong>.</li>
+                                    <li>Cada rodada vale <strong className="text-yellow-200">{battleSettings.eggsPerRound} ovos</strong>.</li>
+                                    <li>A partida tem <strong className="text-yellow-200">10 rodadas</strong>.</li>
+                                    <li>Se <span className="text-red-300 font-semibold">errar</span>: seus ovos vão para quem acertou.</li>
+                                    <li>Se <span className="text-green-300 font-semibold">acertar</span>: você ganha ovos de quem errou.</li>
+                                    <li>Se <span className="text-yellow-300 font-semibold">não responder</span>: mantém seus ovos.</li>
+                                </ul>
+                            </div>
+
+                            <div className="bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-lg p-4 border border-yellow-400/30 mt-4">
+                                <p className="text-center text-lg font-semibold text-yellow-200">
+                                    🏆 Quem tiver mais ovos ao final é o grande campeão! 🏆
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Botão de fechar no final */}
+                        <div className="text-center mt-6">
+                            <button
+                                onClick={closeModal}
+                                className="bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-8 rounded-full transition-all duration-200 transform hover:scale-105"
+                            >
+                                ✅ Entendi, vamos jogar!
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
+    );
+};
 const Index = () => {
     const navigate = useNavigate();
     const {roomCode} = useParams<{ roomCode: string }>();
