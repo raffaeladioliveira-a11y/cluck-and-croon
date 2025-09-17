@@ -14,6 +14,8 @@ import {getOrCreateClientId} from "@/utils/clientId";
 import {GameChat, ChatToggleButton} from "@/components/GameChat";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+// Adicione estas importações no topo, após as existentes
+import { BattleEggEffects } from '@/components/BattleEggEffects'; // Ajuste o caminho conforme sua estrutura
 
 /** Util: extrai o trackId a partir de uma URL de embed do Spotify */
 function extractSpotifyTrackIdFromUrl(url?: string | null): string | undefined {
@@ -271,6 +273,12 @@ function GameArenaContent() {
         selectedAlbumInfo,
         battleMode,
         battleSettings,
+        // MODIFIQUE/ADICIONE ESTAS LINHAS COM VALORES PADRÃO:
+        eggTransferEvents = [],
+        playerEggChanges = [],
+        showEggEffects = true,
+        toggleEggEffects = () => console.log('toggleEggEffects not implemented'),
+        forceEffectsUpdate = () => console.log('forceEffectsUpdate not implemented'),
     } = useGameLogic(roomCode || "", sid, isSpectator);
 
     const startCountdown = () => {
@@ -632,6 +640,7 @@ function GameArenaContent() {
                         {/* Linha principal */}
                         <div className="flex items-center justify-between">
 
+
                             {/* Itens (esquerda no mobile, centralizados + espaçados no desktop) */}
                             <div className="flex flex-1 justify-start sm:justify-center gap-4 sm:gap-12">
                                 {/* Rodada */}
@@ -741,6 +750,7 @@ function GameArenaContent() {
                                         return (
                                             <div
                                                 key={player.id}
+                                                data-player-id={player.id}
                                                 className="relative flex flex-col items-center p-3 rounded-lg min-w-[90px] sm:min-w-[110px]"
 
                                             >
@@ -1040,6 +1050,20 @@ function GameArenaContent() {
                                 </div>
                             </BarnCard>
 
+                            {/* Desliga efeitos visuais */}
+                            <div className="flex flex-col items-center">
+                                <span className="text-sm mb-1">✨</span>
+                                <p className="text-xs text-white/80">Efeitos</p>
+                                <button
+                                    onClick={toggleEggEffects}
+                                    className={`text-xs font-bold px-2 py-1 rounded ${
+            showEggEffects ? 'bg-yellow-500 text-white' : 'bg-gray-500 text-gray-300'
+        }`}
+                                >
+                                    {showEggEffects ? 'ON' : 'OFF'}
+                                </button>
+                            </div>
+
                             {/* Resultados */}
                             {showResults && (
                                 <BarnCard variant="golden" className="text-center p-4 sm:p-6">
@@ -1092,6 +1116,7 @@ function GameArenaContent() {
                 </div>
             </div>
 
+
             {/* Chat */}
             <GameChat
                 roomCode={roomCode || ""}
@@ -1115,11 +1140,24 @@ function GameArenaContent() {
                 />
             )}
 
+
+
             {/* Enfeites decorativos - apenas desktop */}
             <div className="fixed inset-0 pointer-events-none z-0 hidden lg:block">
                 <div className="absolute top-20 right-10 animate-feather-float text-xl opacity-20">🪶</div>
                 <div className="absolute bottom-40 left-10 animate-egg-bounce text-2xl opacity-10">🌽</div>
             </div>
+
+            {/* POR ESTA: */}
+            {battleMode === 'battle' && (
+                <BattleEggEffects
+                    eggTransferEvents={eggTransferEvents || []}
+                    playerEggChanges={playerEggChanges || []}
+                    showEggEffects={showEggEffects}
+                    players={players}
+                    className="fixed inset-0 pointer-events-none z-[9999]" // ✅ z-index muito alto
+                />
+            )}
         </div>
     );
 }

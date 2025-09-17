@@ -28,6 +28,23 @@ export interface PlayerFace {
   avatar: string;
 }
 
+// Adicione estas interfaces após as existentes
+export interface EggTransferEvent {
+  id: string;
+  losers: PlayerFace[];
+  winners: PlayerFace[];
+  eggsPerTransfer: number;
+  timestamp: number;
+}
+
+export interface PlayerEggChange {
+  playerId: string;
+  previousEggs: number;
+  newEggs: number;
+  change: number;
+  timestamp: number;
+}
+
 export type GameState = 'idle' | 'playing' | 'reveal' | 'transition' | 'finished';
 type AnswersByOption = Record<number, PlayerFace[]>;
 
@@ -332,6 +349,12 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   const [usedOptionTitles, setUsedOptionTitles] = useState<string[]>([]);
   const [albums, setAlbums] = useState<Mp3Album[]>([]);
 
+  // NOVOS ESTADOS PARA EFEITOS VISUAIS
+  const [eggTransferEvents, setEggTransferEvents] = useState<EggTransferEvent[]>([]);
+  const [playerEggChanges, setPlayerEggChanges] = useState<PlayerEggChange[]>([]);
+  const [previousPlayerEggs, setPreviousPlayerEggs] = useState<Record<string, number>>({});
+  const [showEggEffects, setShowEggEffects] = useState(true);
+
 
   // Adicione após os estados existentes
   const [battleMode, setBattleMode] = useState<'classic' | 'battle'>('classic');
@@ -538,6 +561,64 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
       throw error;
     }
   };
+
+  // Função para detectar mudanças nos ovos dos jogadores
+  const detectEggChanges = useCallback((currentPlayers: PlayerFace[]) => {
+    const changes: PlayerEggChange[] = [];
+    const newEggState: Record<string, number> = {};
+
+    currentPlayers.forEach(player => {
+      const currentEggs = player.eggs || 0;
+      const previousEggs = previousPlayerEggs[player.id] ?? currentEggs;
+      const change = currentEggs - previousEggs;
+
+      newEggState[player.id] = currentEggs;
+
+      if (change !== 0) {
+        changes.push({
+          playerId: player.id,
+          previousEggs,
+          newEggs: currentEggs,
+          change,
+          timestamp: Date.now()
+        });
+      }
+    });
+
+    if (changes.length > 0) {
+      setPlayerEggChanges(prev => [...prev, ...changes]);
+      console.log('🥚 [detectEggChanges] Mudanças detectadas:', changes);
+    }
+
+    setPreviousPlayerEggs(newEggState);
+  }, [previousPlayerEggs]);
+
+  // Função para criar evento de transferência de ovos
+  const createEggTransferEvent = useCallback((
+      losers: PlayerFace[],
+      winners: PlayerFace[],
+      eggsPerTransfer: number
+  ) => {
+    if (!showEggEffects || losers.length === 0 || winners.length === 0) return;
+
+    const transferEvent: EggTransferEvent = {
+      id: `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      losers: losers.map(p => ({ ...p })), // Clone para evitar referência
+      winners: winners.map(p => ({ ...p })), // Clone para evitar referência
+      eggsPerTransfer,
+      timestamp: Date.now()
+    };
+
+    setEggTransferEvents(prev => [...prev, transferEvent]);
+    console.log('🎯 [createEggTransferEvent] Evento de transferência criado:', transferEvent);
+
+    // Remover evento após 5 segundos
+    setTimeout(() => {
+      setEggTransferEvents(prev => prev.filter(event => event.id !== transferEvent.id));
+    }, 5000);
+  }, [showEggEffects]);
+
+
 
   // 1. ADICIONAR novas funções para buscar opções especificamente do álbum
 
@@ -1374,8 +1455,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   };
 
 // Função para redistribuir ovos
+  // MODIFIQUE a função redistributeEggs existente para disparar efeitos visuais
   const redistributeEggs = async (roomCode: string, correctAnswerIndex: number, answersData: any, battleSettings: any) => {
-    const playersWhoAnswered = Object.keys(answersData); // USAR answersData diretamente
+    const playersWhoAnswered = Object.keys(answersData);
 
     if (playersWhoAnswered.length === 0) {
       return;
@@ -1388,25 +1470,14 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
           .eq('room_code', roomCode)
           .single();
 
-      if (roomError) {
-        return;
-      }
+      if (roomError || !room) return;
 
-      if (!room) {
-        return;
-      }
       const { data: participants, error: participantsError } = await supabase
           .from('room_participants')
           .select('client_id, current_eggs, display_name')
           .eq('room_id', room.id);
 
-      if (participantsError) {
-        return;
-      }
-
-      if (!participants) {
-        return;
-      }
+      if (participantsError || !participants) return;
 
       const correctPlayers = playersWhoAnswered.filter(
           playerId => answersData[playerId].answer === correctAnswerIndex
@@ -1415,110 +1486,72 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
           playerId => answersData[playerId].answer !== correctAnswerIndex
       );
 
-
-      if (incorrectPlayers.length === 0) {
-        console.log('🎯 [redistributeEggs] Nenhum jogador errou, sem redistribuição');
+      if (incorrectPlayers.length === 0 || correctPlayers.length === 0) {
+        console.log('🎯 [redistributeEggs] Sem redistribuição necessária');
         return;
       }
 
-      if (correctPlayers.length === 0) {
-        console.log('🎯 [redistributeEggs] Nenhum jogador acertou, sem redistribuição');
-        return;
-      }
+      // NOVO: Preparar dados para efeitos visuais ANTES da redistribuição
+      const losersForEffect = incorrectPlayers
+          .map(playerId => players?.find(p => p.id === playerId))
+    .filter(Boolean) as PlayerFace[];
 
+      const winnersForEffect = correctPlayers
+          .map(playerId => players?.find(p => p.id === playerId))
+    .filter(Boolean) as PlayerFace[];
+
+      // Executar redistribuição no banco (código existente)
       const eggsToRedistribute = incorrectPlayers.length * battleSettings.eggsPerRound;
       const eggsPerWinner = Math.floor(eggsToRedistribute / correctPlayers.length);
 
-      console.log('🎯 [redistributeEggs] Cálculos:', {
-        eggsToRedistribute,
-        eggsPerWinner,
-        incorrectCount: incorrectPlayers.length,
-        correctCount: correctPlayers.length,
-        eggsPerRound: battleSettings.eggsPerRound
-      });
+      if (eggsPerWinner > 0) {
+        const updates = [];
 
-      if (eggsPerWinner === 0) {
-        console.log('🎯 [redistributeEggs] Nenhum ovo para redistribuir');
-        return;
-      }
-
-      const updates = [];
-
-      // Processar jogadores que erraram
-      for (const playerId of incorrectPlayers) {
-        const participant = participants.find(p => p.client_id === playerId);
-        if (participant) {
-          const newEggs = Math.max(0, participant.current_eggs - battleSettings.eggsPerRound);
-          console.log(`🎯 [redistributeEggs] ${participant.display_name} (${playerId}) perde ovos: ${participant.current_eggs} -> ${newEggs}`);
-
-          const updatePromise = supabase
-              .from('room_participants')
-              .update({ current_eggs: newEggs })
-              .eq('room_id', room.id)
-              .eq('client_id', playerId);
-
-          updates.push({ type: 'loss', playerId, newEggs, promise: updatePromise });
-        } else {
-          console.warn(`🎯 [redistributeEggs] Participante não encontrado para ${playerId}`);
+        // Processar perdas
+        for (const playerId of incorrectPlayers) {
+          const participant = participants.find(p => p.client_id === playerId);
+          if (participant) {
+            const newEggs = Math.max(0, participant.current_eggs - battleSettings.eggsPerRound);
+            updates.push(
+                supabase
+                    .from('room_participants')
+                    .update({ current_eggs: newEggs })
+                    .eq('room_id', room.id)
+                    .eq('client_id', playerId)
+            );
+          }
         }
-      }
 
-      // Processar jogadores que acertaram
-      for (const playerId of correctPlayers) {
-        const participant = participants.find(p => p.client_id === playerId);
-        if (participant) {
-          const newEggs = participant.current_eggs + eggsPerWinner;
-          console.log(`🎯 [redistributeEggs] ${participant.display_name} (${playerId}) ganha ovos: ${participant.current_eggs} -> ${newEggs}`);
-
-          const updatePromise = supabase
-              .from('room_participants')
-              .update({ current_eggs: newEggs })
-              .eq('room_id', room.id)
-              .eq('client_id', playerId);
-
-          updates.push({ type: 'gain', playerId, newEggs, promise: updatePromise });
-        } else {
-          console.warn(`🎯 [redistributeEggs] Participante não encontrado para ${playerId}`);
+        // Processar ganhos
+        for (const playerId of correctPlayers) {
+          const participant = participants.find(p => p.client_id === playerId);
+          if (participant) {
+            const newEggs = participant.current_eggs + eggsPerWinner;
+            updates.push(
+                supabase
+                    .from('room_participants')
+                    .update({ current_eggs: newEggs })
+                    .eq('room_id', room.id)
+                    .eq('client_id', playerId)
+            );
+          }
         }
+
+        // Executar todas as atualizações
+        await Promise.all(updates);
+
+        // NOVO: Disparar efeitos visuais APÓS a redistribuição
+        createEggTransferEvent(losersForEffect, winnersForEffect, battleSettings.eggsPerRound);
+
+        console.log('🎯 [redistributeEggs] Redistribuição completa com efeitos visuais');
       }
-
-      console.log(`🎯 [redistributeEggs] Executando ${updates.length} atualizações...`);
-
-      // Executar todas as atualizações
-      const results = await Promise.all(updates.map(update => update.promise));
-
-      console.log('🎯 [redistributeEggs] Resultados das atualizações:');
-      results.forEach((result, index) => {
-        const update = updates[index];
-        if (result.error) {
-          console.error(`🎯 [redistributeEggs] ERRO ${update.type} para ${update.playerId}:`, result.error);
-        } else {
-          console.log(`🎯 [redistributeEggs] ✅ ${update.type} para ${update.playerId}: ${update.newEggs} ovos`);
-        }
-      });
-
-      // Verificar se todas as atualizações foram bem-sucedidas
-      const errors = results.filter(result => result.error);
-      if (errors.length > 0) {
-        console.error('🎯 [redistributeEggs] ❌ Erros encontrados:', errors);
-      } else {
-        console.log('🎯 [redistributeEggs] ✅ Redistribuição concluída com sucesso!');
-      }
-
-      // Verificar estado final
-      const { data: finalParticipants } = await supabase
-          .from('room_participants')
-          .select('client_id, current_eggs, display_name')
-          .eq('room_id', room.id);
-
-      console.log('🎯 [redistributeEggs] Participantes DEPOIS da redistribuição:', finalParticipants);
 
     } catch (error) {
-      console.error('🎯 [redistributeEggs] ❌ Erro geral na redistribuição:', error);
+      console.error('🎯 [redistributeEggs] Erro na redistribuição:', error);
     }
-
-    console.log('🎯 [redistributeEggs] ===================');
   };
+
+
 
 // 5. ADICIONAR reset do histórico quando o jogo reinicia
   const resetUsedSongs = useCallback(() => {
@@ -1866,6 +1899,9 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
             is_spectator: p.is_spectator || false // ← Preservar valor do banco
           }));
 
+          // NOVO: Detectar mudanças nos ovos antes de atualizar o estado
+          detectEggChanges(playerList);
+
           setPlayers(playerList);
 
           // 🔥 ATUALIZAR playerEggs local se for o jogador atual e NÃO for espectador
@@ -1885,8 +1921,40 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
     } catch (e) {
       console.error('[loadPlayersFromRoom] erro ao carregar jogadores:', e);
     }
-  }, [roomCode, clientId, isSpectator]); // ← Adicionar isSpectator
+  }, [roomCode, clientId, isSpectator, detectEggChanges]); // ← Adicionar isSpectator
 
+
+  // Função para limpar efeitos antigos
+  const cleanupOldEffects = useCallback(() => {
+    const now = Date.now();
+    const maxAge = 10000; // 10 segundos
+
+    setPlayerEggChanges(prev =>
+        prev.filter(change => now - change.timestamp < maxAge)
+    );
+
+    setEggTransferEvents(prev =>
+        prev.filter(event => now - event.timestamp < maxAge)
+    );
+  }, []);
+
+  // Cleanup automático dos efeitos antigos
+  useEffect(() => {
+    const cleanupInterval = setInterval(cleanupOldEffects, 5000);
+    return () => clearInterval(cleanupInterval);
+  }, [cleanupOldEffects]);
+
+  // Função para alternar visibilidade dos efeitos
+  const toggleEggEffects = useCallback(() => {
+    setShowEggEffects(prev => !prev);
+  }, []);
+
+  // Função para forçar atualização dos efeitos (útil para debug)
+  const forceEffectsUpdate = useCallback(() => {
+    if (players && players.length > 0) {
+      detectEggChanges(players);
+    }
+  }, [players, detectEggChanges]);
 
 // Certifique-se de que esta função existe no useGameLogic.ts
   const getBattleMode = async (): Promise<'classic' | 'battle'> => {
@@ -2558,6 +2626,12 @@ const broadcastScoreUpdate = useCallback(async () => {
   : playerEggs,
     answerTime,
     currentSettings,
+      // NOVOS RETORNOS:
+      eggTransferEvents,
+      playerEggChanges,
+      showEggEffects,
+      toggleEggEffects,
+      forceEffectsUpdate,
 
     //Não utilizar músicas repetidas na rodada
     resetUsedSongs, // NOVA FUNÇÃO PARA RESETAR
