@@ -267,6 +267,7 @@ function GameArenaContent() {
         answersByOption,
         isHost,
         activeGenre,
+        totalRounds,    // <- Esta já é calculada corretamente no hook
         selectedAlbumInfo,
         battleMode,
         battleSettings,
@@ -637,7 +638,7 @@ function GameArenaContent() {
                                 <div className="flex flex-col items-center">
                                     <span className="text-sm mb-1">🔢</span>
                                     <p className="text-xs text-white/80">Rodada</p>
-                                    <p className="text-sm font-bold text-white">{currentRound}/10</p>
+                                    <p className="text-sm font-bold text-white">{currentRound}/{totalRounds}</p>
                                 </div>
 
                                 {/* Tempo */}
@@ -647,26 +648,45 @@ function GameArenaContent() {
                                     <p className="text-sm font-bold text-white">{timeLeft}s</p>
                                 </div>
 
+                                <div className="flex flex-col items-center">
+                                    <span className="text-sm mb-1">🎮</span>
+                                    <p className="text-xs text-white/80">Modo</p>
+                                    {battleMode === 'battle' ? <p className="text-sm font-bold text-white">Batalha</p> :  <p className="text-sm font-bold text-white">Clássico</p>}
+                                </div>
+
                                 {/* Valendo */}
                                 <div className="flex flex-col items-center">
                                     <span className="text-sm mb-1 animate-egg-bounce">🥚</span>
-                                    <p className="text-xs text-white/80">Valendo</p>
-                                    <p className="text-sm font-bold text-white">
-                                        {currentSettings?.eggs_per_correct || 10}
-                                    </p>
+                                    {battleMode === 'battle' ? (
+                                        <>
+                                        <p className="text-xs text-white/80">Em Risco</p>
+                                        <p className="text-sm font-bold text-white">
+                                            {battleSettings?.eggsPerRound || 10}
+                                        </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                        <p className="text-xs text-white/80">Valendo</p>
+                                        <p className="text-sm font-bold text-white">
+                                            {currentSettings?.eggs_per_correct || 10}
+                                        </p>
+                                        </>
+                                    )}
                                 </div>
+
+
 
                                 {/* Estilo */}
                                 {activeGenre ? (
                                     <div className="flex flex-col items-center">
                                         <span className="text-sm mb-1">{activeGenre.emoji}</span>
-                                        <p className="text-xs text-white/80">Estilo</p>
+                                        <p className="text-xs text-white/80">Gênero</p>
                                         <p className="text-xs font-bold text-white">{activeGenre.name}</p>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center">
                                         <span className="text-sm mb-1">🎵</span>
-                                        <p className="text-xs text-white/80">Estilo</p>
+                                        <p className="text-xs text-white/80">Gênero</p>
                                         <p className="text-xs font-bold text-white">-</p>
                                     </div>
                                 )}

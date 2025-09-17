@@ -1264,19 +1264,90 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
     }
   }, [usedOptionTitles]);
 
-  // Função para obter modo de batalha
-  const getBattleMode = async (): Promise<'classic' | 'battle'> => {
-    const { data, error } = await supabase
-        .from('game_settings')
-        .select('value')
-        .eq('key', 'battle_mode')
-        .maybeSingle();
+  // Substituir a lógica existente de carregamento de configurações por esta:
+// Substitua a função loadModeSpecificSettings existente por esta versão corrigida:
 
-    if (error) return 'classic';
+  const loadModeSpecificSettings = async (mode: 'classic' | 'battle') => {
+    try {
+      console.log('🔧 [loadModeSpecificSettings] Carregando configurações para modo:', mode);
 
-    const raw = data?.value;
-    const normalized = typeof raw === 'string' ? raw.replace(/"/g, '') : 'classic';
-    return normalized === 'battle' ? 'battle' : 'classic';
+      // Definir as chaves baseadas no modo
+      const prefix = mode === 'battle' ? 'battle_' : 'classic_';
+      const keys = [
+        `${prefix}eggs_per_correct`,
+        `${prefix}speed_bonus`,
+        `${prefix}time_per_question`,
+        `${prefix}song_duration`
+      ];
+
+      console.log('🔧 [loadModeSpecificSettings] Buscando chaves:', keys);
+
+      const { data, error } = await supabase
+          .from('game_settings')
+          .select('key, value')
+          .in('key', keys);
+
+      if (error) {
+        console.error('🔧 [loadModeSpecificSettings] Erro ao buscar:', error);
+        throw error;
+      }
+
+      console.log('🔧 [loadModeSpecificSettings] Dados do banco:', data);
+
+      const settings: any = {};
+      data?.forEach(setting => {
+        // Remove o prefixo para ter as chaves padrão
+        const key = setting.key.replace(prefix, '');
+        const value = parseInt(setting.value as string) || 0;
+        settings[key] = value;
+        console.log(`🔧 [loadModeSpecificSettings] ${setting.key} -> ${key}: ${value}`);
+      });
+
+      // Valores padrão específicos por modo
+      const defaultSettings = mode === 'battle' ? {
+        eggs_per_correct: 0, // Battle mode não usa eggs_per_correct
+        speed_bonus: 0,      // Battle mode não usa speed bonus
+        time_per_question: 15,
+        song_duration: 10,
+        max_players: 10
+      } : {
+        eggs_per_correct: 10,
+        speed_bonus: 5,
+        time_per_question: 15,
+        song_duration: 15, // Classic mode: música mais longa
+        max_players: 10
+      };
+
+      const finalSettings = {
+        ...defaultSettings,
+        ...settings // Sobrescrever com dados do banco se existirem
+      };
+
+      console.log(`🔧 [loadModeSpecificSettings] Configurações finais do modo ${mode}:`, finalSettings);
+
+      setCurrentSettings(prev => ({
+        ...prev,
+        ...finalSettings
+      }));
+
+    } catch (error) {
+      console.error(`🔧 [loadModeSpecificSettings] Erro ao carregar configurações do modo ${mode}:`, error);
+
+      // Fallback com valores padrão
+      const fallbackSettings = mode === 'battle' ? {
+        eggs_per_correct: 0,
+        speed_bonus: 0,
+        time_per_question: 15,
+        song_duration: 10
+      } : {
+        eggs_per_correct: 10,
+        speed_bonus: 5,
+        time_per_question: 15,
+        song_duration: 15
+      };
+
+      setCurrentSettings(prev => ({ ...prev, ...fallbackSettings }));
+    }
   };
 
 // Função para inicializar ovos
@@ -1534,6 +1605,57 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   });
   }, [sessionId, players, currentSettings, timeLeft, battleMode, isSpectator]); // ← Adicionar isSpectator
 
+  useEffect(() => {
+    const loadBattleConfig = async () => {
+      try {
+        const [mode, settings] = await Promise.all([
+          getBattleMode(),
+          getBattleSettings() // você precisa desta função
+        ]);
+
+        setBattleMode(mode);
+        setBattleSettings(settings);
+
+        console.log('🎯 Battle config loaded:', { mode, settings });
+      } catch (error) {
+        console.error('Erro ao carregar config de batalha:', error);
+      }
+    };
+
+    loadBattleConfig();
+  }, []);
+
+  const getBattleSettings = async () => {
+    const { data, error } = await supabase
+        .from('game_settings')
+        .select('key, value')
+        .in('key', ['battle_eggs_per_round', 'battle_total_rounds']);
+
+    const defaults = {
+      eggsPerRound: 10,
+      totalRounds: 10,
+      initialEggs: 100,
+      time_per_question: 15,
+      song_duration: 10
+    };
+
+    if (error || !data) return defaults;
+
+    const settings = { ...defaults };
+    data.forEach(row => {
+      if (row.key === 'battle_eggs_per_round') {
+        settings.eggsPerRound = parseInt(String(row.value), 10) || defaults.eggsPerRound;
+      }
+      if (row.key === 'battle_total_rounds') {
+        settings.totalRounds = parseInt(String(row.value), 10) || defaults.totalRounds;
+      }
+    });
+
+    settings.initialEggs = settings.eggsPerRound * settings.totalRounds;
+    return settings;
+  };
+
+
   /* --------------------------------- AÇÕES -------------------------------- */
 
   const startFirstRound = useCallback(async () => {
@@ -1766,7 +1888,33 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
   }, [roomCode, clientId, isSpectator]); // ← Adicionar isSpectator
 
 
+// Certifique-se de que esta função existe no useGameLogic.ts
+  const getBattleMode = async (): Promise<'classic' | 'battle'> => {
+    try {
+      const { data, error } = await supabase
+          .from('game_settings')
+          .select('value')
+          .eq('key', 'battle_mode')
+          .maybeSingle();
 
+      if (error) {
+        console.warn('⚠️ Erro ao buscar battle_mode:', error);
+        return 'classic';
+      }
+
+      const raw = data?.value;
+      console.log('🔍 [getBattleMode] Valor bruto do banco:', raw);
+
+      const normalized = typeof raw === 'string' ? raw.replace(/"/g, '') : 'classic';
+      const result = normalized === 'battle' ? 'battle' : 'classic';
+
+      console.log('🔍 [getBattleMode] Modo detectado:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Erro em getBattleMode:', error);
+      return 'classic';
+    }
+  };
 
   /* -------------------------- INICIALIZAÇÃO/REALTIME ------------------------- */
 
@@ -1784,7 +1932,10 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
         if (!cancelled) {
           setBattleMode(battleModeResult);
 
-          // Configurar battleSettings baseado nas configurações
+          // Carregar configurações específicas do modo ativo
+          await loadModeSpecificSettings(battleModeResult);
+
+          // Configurar battleSettings se necessário
           if (gameSettings.data) {
             const eggsPerRound = gameSettings.data.find(s => s.key === 'battle_eggs_per_round')?.value || 10;
             const totalRounds = gameSettings.data.find(s => s.key === 'battle_total_rounds')?.value || 10;
@@ -1795,15 +1946,16 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
             });
           }
         }
+
         // carrega configurações (opcional)
-        const { data, error } = await supabase.from('game_settings').select('key,value');
-        if (!error && data) {
-          const s: any = {};
-          data.forEach(row => { s[row.key] = parseInt(String(row.value), 10); });
-          if (!cancelled) {
-            setCurrentSettings(prev => ({ ...prev, ...s }));
-          }
-        }
+        // const { data, error } = await supabase.from('game_settings').select('key,value');
+        // if (!error && data) {
+        //   const s: any = {};
+        //   data.forEach(row => { s[row.key] = parseInt(String(row.value), 10); });
+        //   if (!cancelled) {
+        //     setCurrentSettings(prev => ({ ...prev, ...s }));
+        //   }
+        // }
       } catch {
       }
 
@@ -1984,8 +2136,38 @@ export const useGameLogic = (roomCode: string, sessionId?: string, isSpectator: 
     };
   }, [sessionId, roomCode, clearTimers, startRoundTimer]);
 
+// Adicione este useEffect separado para reagir a mudanças de modo
+  useEffect(() => {
+    if (!isLoading) {
+      loadModeSpecificSettings(battleMode);
+    }
+  }, [battleMode, isLoading]);
 
+  const loadGeneralSettings = async () => {
+    try {
+      const { data, error } = await supabase
+          .from('game_settings')
+          .select('key, value')
+          .in('key', ['max_players', 'room_timeout', 'auto_next_round']);
 
+      if (error) throw error;
+
+      const generalSettings: any = {};
+      data?.forEach(setting => {
+        if (setting.key === 'auto_next_round') {
+          generalSettings[setting.key] = setting.value === 'true';
+        } else {
+          generalSettings[setting.key] = parseInt(setting.value as string) || 0;
+        }
+      });
+
+      // Aplicar configurações gerais ao currentSettings
+      setCurrentSettings(prev => ({ ...prev, ...generalSettings }));
+
+    } catch (error) {
+      console.error('Erro ao carregar configurações gerais:', error);
+    }
+  };
 
 // Substitua o useEffect atual por este:
   useEffect(() => {
@@ -2293,7 +2475,8 @@ const broadcastScoreUpdate = useCallback(async () => {
     (async () => {
       try {
         const nextRound = currentRound + 1;
-        if (nextRound > 10) {
+        const maxRounds = battleMode === 'battle' ? battleSettings.totalRounds : 10;
+        if (nextRound > maxRounds) {
 
           try {
             // 🔥 Atualiza status da sala via função do banco
@@ -2370,7 +2553,9 @@ const broadcastScoreUpdate = useCallback(async () => {
     startFirstRound,
 
     // placar próprio
-    playerEggs,
+        playerEggs: battleMode === 'battle'
+            ? (players?.find(p => p.id === clientId.current)?.eggs || battleSettings.initialEggs)
+  : playerEggs,
     answerTime,
     currentSettings,
 
@@ -2390,6 +2575,7 @@ const broadcastScoreUpdate = useCallback(async () => {
     // ADICIONE estas novas propriedades:
     battleMode,
     battleSettings,
+      totalRounds: battleMode === 'battle' ? battleSettings.totalRounds : 10,
     roundAnswers: Object.keys(roundAnswers).length,
     redistributionProcessed, // ADICIONE esta linha
   };

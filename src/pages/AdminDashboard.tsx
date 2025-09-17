@@ -117,6 +117,10 @@ export default function AdminDashboard() {
     const [selectedSongForManager, setSelectedSongForManager] = useState<Song | null>(null);
     const [currentAlbumIdForMove, setCurrentAlbumIdForMove] = useState<string>('');
     const [showHiddenAlbums, setShowHiddenAlbums] = useState(false);
+    const [battleMode, setBattleMode] = useState<'classic' | 'battle'>('classic');
+    const [isLoadingBattleMode, setIsLoadingBattleMode] = useState(true);
+    const [isLoadingBattleSettings, setIsLoadingBattleSettings] = useState(false);
+
 
 
     // Função para abrir o gerenciador de álbuns de uma música
@@ -175,24 +179,30 @@ export default function AdminDashboard() {
 
 
 
+    // CONFIGURAÇÕES PARA O MODO CLÁSSICO
+    const [classicSettings, setClassicSettings] = useState({
+        eggs_per_correct: 10,
+        speed_bonus: 5,
+        time_per_question: 15,
+        song_duration: 10
+    });
 
-    const [battleMode, setBattleMode] = useState<'classic' | 'battle'>('classic');
+    // CONFIGURAÇÕES PARA O MODO BATALHA
     const [battleSettings, setBattleSettings] = useState({
         eggsPerRound: 10,
         totalRounds: 10,
-        initialEggs: 100
-    });
-    const [isLoadingBattleSettings, setIsLoadingBattleSettings] = useState(false);
-
-
-    // Estados para configurações
-    const [gameSettings, setGameSettings] = useState({
-        eggs_per_correct: 10,
-        speed_bonus: 5,
-        time_per_question: 10,
-        max_players: 10,
+        initialEggs: 100,
+        time_per_question: 15,
         song_duration: 10
     });
+
+    // CONFIGURAÇÕES GERAIS (aplicam-se a ambos os modos)
+    const [generalSettings, setGeneralSettings] = useState({
+        max_players: 10,
+        room_timeout: 300, // tempo limite da sala em segundos
+        auto_next_round: true // avançar rodada automaticamente
+    });
+
 
     // Estados para filtros
     const [filters, setFilters] = useState({
@@ -580,17 +590,40 @@ export default function AdminDashboard() {
             if (error && error.code !== 'PGRST116') throw error;
 
             if (data?.value) {
-                try {
-                    const mode = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
-                    setGameMode(mode);
-                } catch (parseError) {
-                    console.warn("Erro ao fazer parse do game_mode, usando valor padrão");
-                    setGameMode("mp3");
+                let mode: "mp3" | "spotify" = "mp3"; // valor padrão
+
+                // Tentar diferentes formatos de dados
+                if (typeof data.value === 'string') {
+                    // Se for string, verificar se é JSON ou valor direto
+                    const cleanValue = data.value.replace(/['"]/g, '').toLowerCase().trim();
+
+                    if (cleanValue === 'spotify' || cleanValue === 'mp3') {
+                        mode = cleanValue as "mp3" | "spotify";
+                    } else {
+                        // Tentar como JSON se não for valor direto
+                        try {
+                            const parsed = JSON.parse(data.value);
+                            mode = (parsed === 'spotify') ? 'spotify' : 'mp3';
+                        } catch {
+                            // Se falhou JSON parse, usar valor padrão
+                            console.warn(`Valor game_mode inválido: "${data.value}", usando padrão "mp3"`);
+                        mode = "mp3";
+                    }
+                    }
+                } else if (data.value === 'spotify' || data.value === 'mp3') {
+                    // Se já for o valor direto (não string)
+                    mode = data.value;
                 }
+
+                setGameMode(mode);
+                console.log(`Game mode carregado: ${mode}`);
+            } else {
+                // Se não há valor, usar padrão
+                setGameMode("mp3");
+                console.log("Nenhum game_mode encontrado, usando padrão: mp3");
             }
         } catch (error) {
             console.error("Error loading game mode:", error);
-            // Use valor padrão em caso de erro
             setGameMode("mp3");
         }
     };
@@ -601,37 +634,99 @@ export default function AdminDashboard() {
             const { data, error } = await supabase
                 .from('game_settings')
                 .select('key, value')
-                .in('key', ['battle_mode', 'battle_eggs_per_round', 'battle_total_rounds']);
+                .in('key', [
+                    'battle_mode',
+                    'battle_eggs_per_round',
+                    'battle_total_rounds',
+                    'battle_time_per_question',
+                    'battle_song_duration'
+                ]);
 
             if (!error && data) {
+                const newSettings = { ...battleSettings };
+
                 data.forEach((setting: any) => {
                     switch (setting.key) {
                         case 'battle_mode':
                             setBattleMode(setting.value?.replace(/"/g, '') === 'battle' ? 'battle' : 'classic');
                             break;
                         case 'battle_eggs_per_round':
-                            setBattleSettings(prev => ({
-                                ...prev,
-                                eggsPerRound: parseInt(setting.value) || 10
-                            }));
+                            newSettings.eggsPerRound = parseInt(setting.value) || 10;
                             break;
                         case 'battle_total_rounds':
-                            setBattleSettings(prev => ({
-                                ...prev,
-                                totalRounds: parseInt(setting.value) || 10
-                            }));
+                            newSettings.totalRounds = parseInt(setting.value) || 10;
+                            break;
+                        case 'battle_time_per_question':
+                            newSettings.time_per_question = parseInt(setting.value) || 15;
+                            break;
+                        case 'battle_song_duration':
+                            newSettings.song_duration = parseInt(setting.value) || 10;
                             break;
                     }
                 });
 
-                // Calcular ovos iniciais
-                setBattleSettings(prev => ({
-                    ...prev,
-                    initialEggs: prev.eggsPerRound * prev.totalRounds
-                }));
+                newSettings.initialEggs = newSettings.eggsPerRound * newSettings.totalRounds;
+                setBattleSettings(newSettings);
             }
         } catch (error) {
             console.error('Erro ao carregar configurações de batalha:', error);
+        }
+    };
+
+    // Carregar configurações gerais
+    const loadGeneralSettings = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('game_settings')
+                .select('key, value')
+                .in('key', ['max_players', 'room_timeout', 'auto_next_round']);
+
+            if (error) throw error;
+
+            const settings: any = {};
+            data?.forEach(setting => {
+                if (setting.key === 'auto_next_round') {
+                    settings[setting.key] = setting.value === 'true';
+                } else {
+                    settings[setting.key] = parseInt(setting.value as string) || 0;
+                }
+            });
+
+            setGeneralSettings(prev => ({ ...prev, ...settings }));
+        } catch (error) {
+            console.error('Erro ao carregar configurações gerais:', error);
+        }
+    };
+
+
+    // Salvar configurações clássicas
+    const saveClassicSettings = async () => {
+        try {
+            const updates = [
+                { key: 'classic_eggs_per_correct', value: classicSettings.eggs_per_correct.toString() },
+                { key: 'classic_speed_bonus', value: classicSettings.speed_bonus.toString() },
+                { key: 'classic_time_per_question', value: classicSettings.time_per_question.toString() },
+                { key: 'classic_song_duration', value: classicSettings.song_duration.toString() }
+            ];
+
+            for (const update of updates) {
+                const { error } = await supabase
+                    .from('game_settings')
+                    .upsert(update);
+
+                if (error) throw error;
+            }
+
+            toast({
+                title: "Configurações Clássicas Salvas!",
+                description: "As configurações do modo clássico foram atualizadas",
+            });
+        } catch (error) {
+            toast({
+                title: "Erro",
+                description: "Não foi possível salvar as configurações clássicas",
+                variant: "destructive"
+            });
         }
     };
 
@@ -667,18 +762,14 @@ export default function AdminDashboard() {
     };
 
 // Salvar configurações de batalha
+    // Salvar configurações de batalha (atualizar a existente)
     const saveBattleSettings = async () => {
-        setIsLoadingBattleSettings(true);
         try {
             const updates = [
-                {
-                    key: 'battle_eggs_per_round',
-                    value: battleSettings.eggsPerRound.toString()
-                },
-                {
-                    key: 'battle_total_rounds',
-                    value: battleSettings.totalRounds.toString()
-                }
+                { key: 'battle_eggs_per_round', value: battleSettings.eggsPerRound.toString() },
+                { key: 'battle_total_rounds', value: battleSettings.totalRounds.toString() },
+                { key: 'battle_time_per_question', value: battleSettings.time_per_question.toString() },
+                { key: 'battle_song_duration', value: battleSettings.song_duration.toString() }
             ];
 
             for (const update of updates) {
@@ -690,18 +781,45 @@ export default function AdminDashboard() {
             }
 
             toast({
-                title: "✅ Configurações de Batalha Salvas!",
+                title: "Configurações de Batalha Salvas!",
                 description: `${battleSettings.eggsPerRound} ovos por rodada, ${battleSettings.totalRounds} rodadas totais`,
             });
-
         } catch (error) {
             toast({
                 title: "Erro",
                 description: "Não foi possível salvar as configurações de batalha",
                 variant: "destructive"
             });
-        } finally {
-            setIsLoadingBattleSettings(false);
+        }
+    };
+
+    // Salvar configurações gerais
+    const saveGeneralSettings = async () => {
+        try {
+            const updates = [
+                { key: 'max_players', value: generalSettings.max_players.toString() },
+                { key: 'room_timeout', value: generalSettings.room_timeout.toString() },
+                { key: 'auto_next_round', value: generalSettings.auto_next_round.toString() }
+            ];
+
+            for (const update of updates) {
+                const { error } = await supabase
+                    .from('game_settings')
+                    .upsert(update);
+
+                if (error) throw error;
+            }
+
+            toast({
+                title: "Configurações Gerais Salvas!",
+                description: "As configurações gerais foram atualizadas",
+            });
+        } catch (error) {
+            toast({
+                title: "Erro",
+                description: "Não foi possível salvar as configurações gerais",
+                variant: "destructive"
+            });
         }
     };
 
@@ -754,14 +872,24 @@ export default function AdminDashboard() {
     };
     // Load data from Supabase
     useEffect(() => {
-        loadGenres();
-        loadSongs();
-        loadGameSettings();
-        loadGameMode();
-        loadBattleSettings();
-        loadAlbums();
-        loadTotalSongsCount();
-        loadAllUsers();
+        const loadInitialData = async () => {
+            await loadGenres();
+            await loadSongs();
+            await loadGameMode();
+
+            // ADICIONAR: Carregar o battleMode atual
+            const currentBattleMode = await getBattleMode();
+            setBattleMode(currentBattleMode);
+
+            await loadClassicSettings();
+            await loadBattleSettings();
+            await loadGeneralSettings();
+            await loadAlbums();
+            await loadTotalSongsCount();
+            await loadAllUsers();
+        };
+
+        loadInitialData();
     }, []);
 
 
@@ -1183,58 +1311,48 @@ export default function AdminDashboard() {
         checkAdminAccess();
     }, [navigate]);
 
-    // Carregar configurações do banco
-    const loadGameSettings = async() => {
+    // Carregar modo de batalha atual
+    const getBattleMode = async (): Promise<'classic' | 'battle'> => {
+        const { data, error } = await supabase
+            .from('game_settings')
+            .select('value')
+            .eq('key', 'battle_mode')
+            .maybeSingle();
+
+        if (error) return 'classic';
+
+        const raw = data?.value;
+        const normalized = typeof raw === 'string' ? raw.replace(/"/g, '') : 'classic';
+        return normalized === 'battle' ? 'battle' : 'classic';
+    };
+
+    // Carregar configurações do modo clássico
+    const loadClassicSettings = async () => {
         try {
-            const {data, error} = await supabase
+            const { data, error } = await supabase
                 .from('game_settings')
-                .select('key, value');
+                .select('key, value')
+                .in('key', [
+                    'classic_eggs_per_correct',
+                    'classic_speed_bonus',
+                    'classic_time_per_question',
+                    'classic_song_duration'
+                ]);
 
             if (error) throw error;
 
             const settings: any = {};
-            data ?.forEach(setting => {
-                settings[setting.key] = parseInt(setting.value as string);
+            data?.forEach(setting => {
+                const key = setting.key.replace('classic_', '');
+                settings[key] = parseInt(setting.value as string) || 0;
             });
 
-            setGameSettings(prev => ({...prev, ...settings}));
+            setClassicSettings(prev => ({ ...prev, ...settings }));
         } catch (error) {
-
+            console.error('Erro ao carregar configurações clássicas:', error);
         }
     };
 
-    // Função para salvar configurações
-    const saveGameSettings = async() => {
-        try {
-            // Salvar cada configuração no banco
-            const promises = Object.entries(gameSettings).map(([key, value]) =>
-                supabase
-                    .from('game_settings')
-                    .upsert({key, value: value.toString()})
-            );
-
-            await Promise.all(promises);
-
-            toast({
-                title: "✅ Configurações salvas!",
-                description: "As configurações do galinheiro foram atualizadas com sucesso.",
-            });
-
-        } catch (error) {
-            toast({
-                title: "❌ Erro",
-                description: "Erro ao salvar configurações",
-                variant: "destructive"
-            });
-        }
-    };
-
-    const handleSettingChange = (field: string, value: string) => {
-        setGameSettings(prev => ({
-            ...prev,
-            [field]: parseInt(value) || 0
-        }));
-    };
 
     const handleLogout = async() => {
         await supabase.auth.signOut();
@@ -2683,7 +2801,7 @@ export default function AdminDashboard() {
                     {/* Settings */}
                     <TabsContent value="settings">
                         <div className="space-y-6">
-                            {/* Modo de Jogo - Clássico vs Batalha */}
+                            {/* Modo de Jogo - mantém igual */}
                             <BarnCard variant="default" className={`transition-all ${battleMode === 'battle' ? 'border-red-200 bg-red-50/30' : 'border-blue-200 bg-blue-50/30'}`}>
                                 <div className="p-6">
                                     <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
@@ -2742,175 +2860,252 @@ export default function AdminDashboard() {
                                 </div>
                             </BarnCard>
 
-                            {/* Configurações de Batalha - só aparece se modo batalha estiver ativo */}
-                            {battleMode === 'battle' && (
-                                <BarnCard variant="default" className="border-red-200">
-                                    <div className="p-6">
-                                        <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-700">
-                                            🏆 Configurações do Modo Batalha
-                                        </h3>
+                            {/* NOVO: Configurações do Modo Clássico */}
+                            <BarnCard variant="coop" className="border-blue-200">
+                                <div className="p-6">
+                                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-blue-700">
+                                        🎵 Configurações do Modo Clássico
+                                    </h3>
 
-                                        <div className="grid md:grid-cols-2 gap-6">
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <Label htmlFor="eggsPerRound" className="text-sm font-medium">
-                                                        Ovos por Rodada
-                                                    </Label>
-                                                    <Input
-                                                        id="eggsPerRound"
-                                                        type="number"
-                                                        min="1"
-                                                        max="50"
-                                                        value={battleSettings.eggsPerRound}
-                                                        onChange={(e) => {
-                    const value = parseInt(e.target.value) || 1;
-                    setBattleSettings(prev => ({
-                      ...prev,
-                      eggsPerRound: value,
-                      initialEggs: value * prev.totalRounds
-                    }));
-                  }}
-                                                        className="text-center font-mono"
-                                                    />
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        Quantidade de ovos que cada jogador arrisca por rodada
-                                                    </p>
-                                                </div>
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        <div className="space-y-4">
+                                            <h4 className="font-semibold text-lg">Sistema de Pontuação</h4>
 
-                                                <div>
-                                                    <Label htmlFor="totalRounds" className="text-sm font-medium">
-                                                        Total de Rodadas
-                                                    </Label>
-                                                    <Input
-                                                        id="totalRounds"
-                                                        type="number"
-                                                        min="1"
-                                                        max="20"
-                                                        value={battleSettings.totalRounds}
-                                                        onChange={(e) => {
-                    const value = parseInt(e.target.value) || 1;
-                    setBattleSettings(prev => ({
-                      ...prev,
-                      totalRounds: value,
-                      initialEggs: prev.eggsPerRound * value
-                    }));
-                  }}
-                                                        className="text-center font-mono"
-                                                    />
-                                                    <p className="text-xs text-gray-500 mt-1">
-                                                        Número de perguntas na partida
-                                                    </p>
-                                                </div>
+                                            <div>
+                                                <Label>Ovos por Acerto</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={classicSettings.eggs_per_correct}
+                                                    onChange={(e) => setClassicSettings(prev => ({
+                  ...prev,
+                  eggs_per_correct: parseInt(e.target.value) || 0
+                }))}
+                                                    className="text-center font-mono"
+                                                />
                                             </div>
 
-                                            <div className="space-y-4">
-                                                {/* Resumo */}
-                                                <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4">
-                                                    <h4 className="font-medium text-red-800 mb-3">📊 Resumo da Configuração</h4>
-                                                    <div className="space-y-3 text-sm">
-                                                        <div className="flex justify-between items-center p-2 bg-white rounded border">
-                                                            <span className="text-gray-600">Ovos Iniciais:</span>
-                                                            <span className="font-bold text-red-600">{battleSettings.initialEggs}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center p-2 bg-white rounded border">
-                                                            <span className="text-gray-600">Ovos por Rodada:</span>
-                                                            <span className="font-bold text-orange-600">{battleSettings.eggsPerRound}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center p-2 bg-white rounded border">
-                                                            <span className="text-gray-600">Total de Rodadas:</span>
-                                                            <span className="font-bold text-blue-600">{battleSettings.totalRounds}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <ChickenButton
-                                                    variant="barn"
-                                                    onClick={saveBattleSettings}
-                                                    disabled={isLoadingBattleSettings}
-                                                    className="w-full"
-                                                >
-                                                    {isLoadingBattleSettings ? "Salvando..." : "💾 Salvar Configurações de Batalha"}
-                                                </ChickenButton>
+                                            <div>
+                                                <Label>Bônus de Velocidade</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={classicSettings.speed_bonus}
+                                                    onChange={(e) => setClassicSettings(prev => ({
+                  ...prev,
+                  speed_bonus: parseInt(e.target.value) || 0
+                }))}
+                                                    className="text-center font-mono"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Ovos extras para respostas rápidas
+                                                </p>
                                             </div>
                                         </div>
-                                    </div>
-                                </BarnCard>
-                            )}
 
-                            {/* Configurações Clássicas do Jogo */}
-                            <BarnCard variant="golden">
-                                <h3 className="text-xl font-bold text-white mb-4">
-                                    ⚙️ Configurações {battleMode === 'classic' ? 'do Jogo' : 'Gerais'}
-                                </h3>
+                                        <div className="space-y-4">
+                                            <h4 className="font-semibold text-lg">Configurações de Tempo</h4>
 
-                                <div className="grid md:grid-cols-2 gap-6 text-white">
-                                    <div className="space-y-4">
-                                        <h4 className="font-semibold text-lg">Configurações de Pontuação</h4>
+                                            <div>
+                                                <Label>Tempo por Pergunta (segundos)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={classicSettings.time_per_question}
+                                                    onChange={(e) => setClassicSettings(prev => ({
+                  ...prev,
+                  time_per_question: parseInt(e.target.value) || 0
+                }))}
+                                                    className="text-center font-mono"
+                                                />
+                                            </div>
 
-                                        <div>
-                                            <Label className="text-white/90">
-                                                {battleMode === 'classic' ? 'Ovos por acerto' : 'Ovos por acerto (modo clássico apenas)'}
-                                            </Label>
-                                            <Input
-                                                value={gameSettings.eggs_per_correct}
-                                                onChange={(e) => handleSettingChange('eggs_per_correct', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white"
-                                                disabled={battleMode === 'battle'}
-                                            />
+                                            <div>
+                                                <Label>Duração da Música (segundos)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={classicSettings.song_duration}
+                                                    onChange={(e) => setClassicSettings(prev => ({
+                  ...prev,
+                  song_duration: parseInt(e.target.value) || 0
+                }))}
+                                                    className="text-center font-mono"
+                                                />
+                                            </div>
+
+                                            <ChickenButton
+                                                variant="corn"
+                                                onClick={saveClassicSettings}
+                                                className="w-full mt-4"
+                                            >
+                                                💾 Salvar Configurações Clássicas
+                                            </ChickenButton>
                                         </div>
-
-                                        <div>
-                                            <Label className="text-white/90">
-                                                {battleMode === 'classic' ? 'Bônus velocidade' : 'Bônus velocidade (modo clássico apenas)'}
-                                            </Label>
-                                            <Input
-                                                value={gameSettings.speed_bonus}
-                                                onChange={(e) => handleSettingChange('speed_bonus', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white"
-                                                disabled={battleMode === 'battle'}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <Label className="text-white/90">Tempo por pergunta (segundos)</Label>
-                                            <Input
-                                                value={gameSettings.time_per_question}
-                                                onChange={(e) => handleSettingChange('time_per_question', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <h4 className="font-semibold text-lg">Configurações Avançadas</h4>
-
-                                        <div>
-                                            <Label className="text-white/90">Máximo de jogadores por sala</Label>
-                                            <Input
-                                                value={gameSettings.max_players}
-                                                onChange={(e) => handleSettingChange('max_players', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white"
-                                            />
-                                        </div>
-
-                                        <div>
-                                            <Label className="text-white/90">Duração da música (segundos)</Label>
-                                            <Input
-                                                value={gameSettings.song_duration}
-                                                onChange={(e) => handleSettingChange('song_duration', e.target.value)}
-                                                className="bg-white/20 border-white/30 text-white"
-                                            />
-                                        </div>
-
-                                        <ChickenButton
-                                            variant="feather"
-                                            className="w-full"
-                                            onClick={saveGameSettings}
-                                        >
-                                            💾 Salvar Configurações Gerais
-                                        </ChickenButton>
                                     </div>
                                 </div>
+                            </BarnCard>
+
+                            {/* NOVO: Configurações do Modo Batalha */}
+                            <BarnCard variant="default" className="border-red-200">
+                                <div className="p-6">
+                                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-700">
+                                        ⚔️ Configurações do Modo Batalha
+                                    </h3>
+
+                                    <div className="grid md:grid-cols-2 gap-6">
+                                        <div className="space-y-4">
+                                            <h4 className="font-semibold text-lg">Sistema de Ovos</h4>
+
+                                            <div>
+                                                <Label>Ovos por Rodada</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    max="50"
+                                                    value={battleSettings.eggsPerRound}
+                                                    onChange={(e) => {
+                  const value = parseInt(e.target.value) || 1;
+                  setBattleSettings(prev => ({
+                    ...prev,
+                    eggsPerRound: value,
+                    initialEggs: value * prev.totalRounds
+                  }));
+                }}
+                                                    className="text-center font-mono"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <Label>Total de Rodadas</Label>
+                                                <Input
+                                                    type="number"
+                                                    min="1"
+                                                    max="20"
+                                                    value={battleSettings.totalRounds}
+                                                    onChange={(e) => {
+                  const value = parseInt(e.target.value) || 1;
+                  setBattleSettings(prev => ({
+                    ...prev,
+                    totalRounds: value,
+                    initialEggs: prev.eggsPerRound * value
+                  }));
+                }}
+                                                    className="text-center font-mono"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <Label>Tempo por Pergunta (segundos)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={battleSettings.time_per_question}
+                                                    onChange={(e) => setBattleSettings(prev => ({
+                  ...prev,
+                  time_per_question: parseInt(e.target.value) || 0
+                }))}
+                                                    className="text-center font-mono"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <Label>Duração da Música (segundos)</Label>
+                                                <Input
+                                                    type="number"
+                                                    value={battleSettings.song_duration}
+                                                    onChange={(e) => setBattleSettings(prev => ({
+                  ...prev,
+                  song_duration: parseInt(e.target.value) || 0
+                }))}
+                                                    className="text-center font-mono"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            {/* Resumo - código existente */}
+                                            <div className="bg-gradient-to-r from-red-50 to-orange-50 border border-red-200 rounded-lg p-4">
+                                                <h4 className="font-medium text-red-800 mb-3">📊 Resumo da Configuração</h4>
+                                                <div className="space-y-3 text-sm">
+                                                    <div className="flex justify-between items-center p-2 bg-white rounded border">
+                                                        <span className="text-gray-600">Ovos Iniciais:</span>
+                                                        <span className="font-bold text-red-600">{battleSettings.initialEggs}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center p-2 bg-white rounded border">
+                                                        <span className="text-gray-600">Ovos por Rodada:</span>
+                                                        <span className="font-bold text-orange-600">{battleSettings.eggsPerRound}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center p-2 bg-white rounded border">
+                                                        <span className="text-gray-600">Total de Rodadas:</span>
+                                                        <span className="font-bold text-blue-600">{battleSettings.totalRounds}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <ChickenButton
+                                                variant="barn"
+                                                onClick={saveBattleSettings}
+                                                disabled={isLoadingBattleSettings}
+                                                className="w-full"
+                                            >
+                                                {isLoadingBattleSettings ? "Salvando..." : "💾 Salvar Configurações de Batalha"}
+                                            </ChickenButton>
+                                        </div>
+                                    </div>
+                                </div>
+                            </BarnCard>
+
+                            {/* NOVO: Configurações Gerais */}
+                            <BarnCard variant="golden">
+                                <h3 className="text-xl font-bold text-white mb-4">
+                                    ⚙️ Configurações Gerais
+                                </h3>
+
+                                <div className="grid md:grid-cols-3 gap-6 text-white">
+                                    <div>
+                                        <Label className="text-white/90">Máximo de Jogadores por Sala</Label>
+                                        <Input
+                                            type="number"
+                                            value={generalSettings.max_players}
+                                            onChange={(e) => setGeneralSettings(prev => ({
+              ...prev,
+              max_players: parseInt(e.target.value) || 0
+            }))}
+                                            className="bg-white/20 border-white/30 text-white text-center font-mono"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label className="text-white/90">Timeout da Sala (segundos)</Label>
+                                        <Input
+                                            type="number"
+                                            value={generalSettings.room_timeout}
+                                            onChange={(e) => setGeneralSettings(prev => ({
+              ...prev,
+              room_timeout: parseInt(e.target.value) || 0
+            }))}
+                                            className="bg-white/20 border-white/30 text-white text-center font-mono"
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center space-x-2">
+                                        <Switch
+                                            id="auto-next"
+                                            checked={generalSettings.auto_next_round}
+                                            onCheckedChange={(checked) => setGeneralSettings(prev => ({
+              ...prev,
+              auto_next_round: checked
+            }))}
+                                        />
+                                        <Label htmlFor="auto-next" className="text-white/90">
+                                            Avançar Rodada Automaticamente
+                                        </Label>
+                                    </div>
+                                </div>
+
+                                <ChickenButton
+                                    variant="feather"
+                                    className="w-full mt-6"
+                                    onClick={saveGeneralSettings}
+                                >
+                                    💾 Salvar Configurações Gerais
+                                </ChickenButton>
                             </BarnCard>
                         </div>
                     </TabsContent>
