@@ -129,7 +129,7 @@ const EggChangeIndicator: React.FC<EggChangeIndicatorProps> = ({ change, playerI
 
     return (
         <div className={`
-     absolute -top-9 left-1/2 transform -translate-x-1/2 z-[9999]
+     absolute -top-6 left-1/2 transform -translate-x-1/2 z-[9999]
   transition-all duration-500 ease-out pointer-events-none
   px-2 py-1 rounded-full border text-sm font-bold shadow-lg backdrop-blur-sm
       ${getPositionClasses()} ${getColorClasses()}

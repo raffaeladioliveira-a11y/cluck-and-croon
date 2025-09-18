@@ -683,8 +683,6 @@ function GameArenaContent() {
                                     )}
                                 </div>
 
-
-
                                 {/* Estilo */}
                                 {activeGenre ? (
                                     <div className="flex flex-col items-center">
@@ -795,6 +793,7 @@ function GameArenaContent() {
                                                         <span>🥚</span>
                                                     </div>
                                                 )}
+
                                             </div>
                                         );
                                     })
@@ -873,64 +872,6 @@ function GameArenaContent() {
                     {gameState !== "idle" && currentQuestion && (
                         <div className="space-y-4">
 
-
-                            {/*<BarnCard variant="coop" className="p-3 sm:p-4">*/}
-                            {/*<h3 className="text-sm sm:text-xl font-bold text-barn-brown mb-3 sm:mb-4 text-center">*/}
-                            {/*🏆 Ranking da Partida*/}
-                            {/*</h3>*/}
-
-                            {/*/!* Layout vertical para TODAS as resoluções *!/*/}
-                            {/*<div className="space-y-2 sm:space-y-3">*/}
-                            {/*{Array.isArray(players) && players.length > 0 ? (*/}
-                            {/*players*/}
-                            {/*.sort((a, b) => ((b as any).eggs || 0) - ((a as any).eggs || 0))*/}
-                            {/*.slice(0, 6)*/}
-                            {/*.map((player, index) => {*/}
-                            {/*const isCurrentPlayer = player.id === clientId.current;*/}
-                            {/*return (*/}
-                            {/*<div*/}
-                            {/*key={player.id}*/}
-                            {/*className={`flex items-center gap-2 sm:gap-3 p-2 rounded-lg ${isCurrentPlayer ? 'bg-primary/10 border-2 border-primary' : 'bg-muted/10'}`}*/}
-                            {/*>*/}
-                            {/*<span className="text-sm font-bold w-6 text-center">*/}
-                            {/*{index + 1}º*/}
-                            {/*</span>*/}
-
-                            {/*{player.avatar?.startsWith("/") ? (*/}
-                            {/*<img*/}
-                            {/*src={player.avatar}*/}
-                            {/*alt={player.name}*/}
-                            {/*className="w-8 h-8 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-white flex-shrink-0"*/}
-                            {/*/>*/}
-                            {/*) : (*/}
-                            {/*<div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 text-sm">*/}
-                            {/*{player.avatar || "🐔"}*/}
-                            {/*</div>*/}
-                            {/*)}*/}
-
-                            {/*<div className="flex-1 min-w-0">*/}
-                            {/*<span className={`text-sm font-semibold truncate block ${isCurrentPlayer ? 'text-primary' : ''}`}>*/}
-                            {/*{player.name || "Jogador"}*/}
-                            {/*{isCurrentPlayer && <span className="ml-1">(Você)</span>}*/}
-                            {/*</span>*/}
-                            {/*</div>*/}
-
-                            {/*<EggCounter*/}
-                            {/*count={(player as any).eggs || 0}*/}
-                            {/*size="sm"*/}
-                            {/*variant={index === 0 ? "golden" : "default"}*/}
-                            {/*className="flex-shrink-0"*/}
-                            {/*/>*/}
-                            {/*</div>*/}
-                            {/*);*/}
-                            {/*})*/}
-                            {/*) : (*/}
-                            {/*<p className="text-sm text-muted-foreground text-center">*/}
-                            {/*Ranking ainda não disponível...*/}
-                            {/*</p>*/}
-                            {/*)}*/}
-                            {/*</div>*/}
-                            {/*</BarnCard>*/}
 
                             {/* Opções de resposta */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
@@ -1113,8 +1054,21 @@ function GameArenaContent() {
                             )}
                         </div>
                     )}
+
+                    {battleMode === 'battle' && (
+                        <BattleEggEffects
+                            eggTransferEvents={eggTransferEvents || []}
+                            playerEggChanges={playerEggChanges || []}
+                            showEggEffects={showEggEffects}
+                            players={players}
+                            className="fixed inset-0 pointer-events-none z-[99999]"
+                        />
+                    )}
+
                 </div>
             </div>
+
+
 
 
             {/* Chat */}
@@ -1148,16 +1102,6 @@ function GameArenaContent() {
                 <div className="absolute bottom-40 left-10 animate-egg-bounce text-2xl opacity-10">🌽</div>
             </div>
 
-            {/* POR ESTA: */}
-            {battleMode === 'battle' && (
-                <BattleEggEffects
-                    eggTransferEvents={eggTransferEvents || []}
-                    playerEggChanges={playerEggChanges || []}
-                    showEggEffects={showEggEffects}
-                    players={players}
-                    className="fixed inset-0 pointer-events-none z-[9999]" // ✅ z-index muito alto
-                />
-            )}
         </div>
     );
 }
